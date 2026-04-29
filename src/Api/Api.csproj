@@ -6,6 +6,7 @@
     <ProjectReference Include="..\Memory\Memory.csproj" />
     <ProjectReference Include="..\Tools\Tools.csproj" />
     <ProjectReference Include="..\Voice\Voice.csproj" />
+    <ProjectReference Include="..\Extensions\Extensions.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
