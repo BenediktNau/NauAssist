@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="AICore/AICore.csproj" />
+  <Project Path="Api/Api.csproj" />
+  <Project Path="Common/Common.csproj" />
+  <Project Path="Extensions/Extensions.csproj" />
+  <Project Path="Memory/Memory.csproj" />
+  <Project Path="Tests/Tests.csproj" />
+  <Project Path="Tools/Tools.csproj" />
+  <Project Path="Voice/Voice.csproj" />
+</Solution>

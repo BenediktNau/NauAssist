@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Konzept-Handout · Persönlicher AI-Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --ink:#1a1814;
+  --paper:#f5f1e8;
+  --paper-deep:#ebe5d4;
+  --line:#cbc3ad;
+  --line-soft:#dcd4be;
+  --accent:#7a4a1f;
+  --accent-soft:#a06a3c;
+  --muted:#6b6354;
+  --code-bg:#1a1814;
+  --code-ink:#d8d0bc;
+}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.7;
+  padding:0;
+}
+.sheet{
+  max-width:780px;
+  margin:0 auto;
+  padding:60px 56px 80px;
+  background:var(--paper);
+  position:relative;
+}
+
+/* Hero / Cover */
+.cover{
+  border-bottom:1px solid var(--line);
+  padding-bottom:44px;
+  margin-bottom:48px;
+  position:relative;
+}
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  color:var(--accent);
+  margin-bottom:24px;
+}
+.title{
+  font-family:'Fraunces',serif;
+  font-size:54px;
+  line-height:1.05;
+  font-weight:500;
+  letter-spacing:-1.5px;
+  margin-bottom:18px;
+}
+.title em{
+  font-style:italic;
+  color:var(--accent);
+}
+.subtitle{
+  font-family:'Fraunces',serif;
+  font-size:19px;
+  line-height:1.5;
+  color:var(--muted);
+  font-style:italic;
+  max-width:560px;
+}
+.meta{
+  display:flex;
+  gap:28px;
+  margin-top:36px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.meta span b{font-weight:500;color:var(--ink)}
+
+/* Section */
+.section{
+  margin:64px 0 48px;
+  scroll-margin-top:24px;
+}
+.section-num{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--accent);
+  margin-bottom:8px;
+}
+.section-title{
+  font-family:'Fraunces',serif;
+  font-size:34px;
+  font-weight:500;
+  line-height:1.1;
+  letter-spacing:-0.5px;
+  margin-bottom:20px;
+}
+.lede{
+  font-family:'Fraunces',serif;
+  font-size:18px;
+  font-style:italic;
+  color:var(--muted);
+  margin-bottom:32px;
+  line-height:1.5;
+  border-left:2px solid var(--accent);
+  padding-left:18px;
+}
+
+/* Body text */
+p{margin-bottom:16px;font-size:15px}
+h3{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:22px;
+  margin:32px 0 12px;
+  letter-spacing:-0.3px;
+}
+h4{
+  font-family:'Inter',sans-serif;
+  font-weight:500;
+  font-size:14px;
+  margin:24px 0 8px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--accent);
+}
+strong{font-weight:500;color:var(--ink)}
+em{font-style:italic}
+
+/* Principle cards */
+.principles{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:0;
+  margin:24px 0;
+  border-top:1px solid var(--line);
+}
+.principle{
+  display:grid;
+  grid-template-columns:60px 1fr;
+  gap:20px;
+  padding:20px 0;
+  border-bottom:1px solid var(--line);
+  align-items:start;
+}
+.p-num{
+  font-family:'Fraunces',serif;
+  font-style:italic;
+  font-size:36px;
+  color:var(--accent);
+  line-height:1;
+  text-align:right;
+  padding-top:4px;
+}
+.p-content h5{
+  font-family:'Inter',sans-serif;
+  font-size:15px;
+  font-weight:500;
+  margin-bottom:6px;
+}
+.p-content p{
+  font-size:14px;
+  color:var(--muted);
+  margin:0;
+  line-height:1.6;
+}
+
+/* Pipeline (numbered horizontal) */
+.pipeline{
+  margin:28px 0;
+  border:1px solid var(--line);
+  background:var(--paper-deep);
+  border-radius:2px;
+}
+.pipeline-step{
+  display:grid;
+  grid-template-columns:50px 1fr;
+  gap:20px;
+  padding:18px 22px;
+  border-bottom:1px solid var(--line-soft);
+  align-items:start;
+}
+.pipeline-step:last-child{border-bottom:none}
+.ps-num{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:1.5px;
+  color:var(--accent);
+  padding-top:2px;
+}
+.ps-content h5{
+  font-family:'Inter',sans-serif;
+  font-size:14px;
+  font-weight:500;
+  margin-bottom:4px;
+}
+.ps-content p{font-size:13px;color:var(--muted);margin:0;line-height:1.6}
+
+/* Layer cards */
+.layers{margin:24px 0}
+.layer-card{
+  margin-bottom:16px;
+  padding:20px 22px;
+  border:1px solid var(--line);
+  background:var(--paper-deep);
+  border-radius:2px;
+  position:relative;
+}
+.layer-card::before{
+  content:attr(data-tag);
+  position:absolute;
+  top:-9px;
+  left:18px;
+  background:var(--paper);
+  padding:0 10px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.5px;
+  color:var(--accent);
+  text-transform:uppercase;
+}
+.layer-card h5{
+  font-family:'Fraunces',serif;
+  font-size:18px;
+  font-weight:500;
+  margin-bottom:6px;
+  font-style:italic;
+}
+.layer-card p{font-size:14px;color:var(--muted);margin:0;line-height:1.6}
+
+/* Pull quote */
+.pull{
+  font-family:'Fraunces',serif;
+  font-size:24px;
+  font-style:italic;
+  line-height:1.4;
+  text-align:center;
+  margin:40px 0;
+  padding:24px 32px;
+  color:var(--ink);
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
+.pull::before{content:"„";color:var(--accent);font-size:36px}
+.pull::after{content:""}
+
+/* Code-ish blocks for examples */
+.example{
+  background:var(--code-bg);
+  color:var(--code-ink);
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  line-height:1.7;
+  padding:18px 22px;
+  border-radius:2px;
+  margin:16px 0;
+  position:relative;
+}
+.example::before{
+  content:"BEISPIEL";
+  position:absolute;
+  top:-8px;
+  left:14px;
+  background:var(--paper);
+  color:var(--accent);
+  padding:0 8px;
+  font-size:9px;
+  letter-spacing:2px;
+}
+.example b{color:#e8b878;font-weight:400}
+
+/* Two column comparison */
+.split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  margin:20px 0;
+  border:1px solid var(--line);
+}
+.split > div{
+  padding:18px 20px;
+}
+.split > div:first-child{
+  border-right:1px solid var(--line);
+}
+.split h6{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--accent);
+  margin-bottom:10px;
+  text-transform:uppercase;
+}
+.split p{font-size:13px;margin:0;line-height:1.6;color:var(--muted)}
+
+/* Lifecycle states */
+.lifecycle{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:16px 0;
+  padding:0;
+}
+.state{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  padding:6px 12px;
+  border:1px solid var(--line);
+  border-radius:2px;
+  background:var(--paper-deep);
+  color:var(--muted);
+  letter-spacing:0.5px;
+}
+.state b{color:var(--ink);font-weight:500}
+
+/* TOC */
+.toc{
+  border:1px solid var(--line);
+  padding:24px 28px;
+  margin:32px 0 56px;
+  background:var(--paper-deep);
+}
+.toc-label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--accent);
+  margin-bottom:16px;
+  text-transform:uppercase;
+}
+.toc ol{
+  list-style:none;
+  counter-reset:toc;
+  padding:0;
+}
+.toc li{
+  counter-increment:toc;
+  padding:6px 0;
+  font-size:14px;
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+}
+.toc li::before{
+  content:counter(toc,decimal-leading-zero);
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--accent);
+}
+.toc li::after{
+  content:"";
+  flex:1;
+  border-bottom:1px dotted var(--line);
+  margin:0 4px;
+  position:relative;
+  top:-3px;
+}
+.toc li a{
+  color:var(--ink);
+  text-decoration:none;
+}
+.toc-page{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--muted);
+}
+
+/* Open questions box */
+.open{
+  border:1px dashed var(--accent);
+  padding:24px 28px;
+  margin:32px 0;
+  background:rgba(122,74,31,0.04);
+}
+.open h4{margin-top:0}
+.open p{font-size:14px;margin-bottom:8px}
+.open ul{
+  list-style:none;
+  padding:0;
+  margin-top:12px;
+}
+.open li{
+  padding:6px 0 6px 20px;
+  position:relative;
+  font-size:14px;
+  color:var(--muted);
+}
+.open li::before{
+  content:"→";
+  position:absolute;
+  left:0;
+  color:var(--accent);
+}
+
+/* Hand-drawn divider */
+.divider{
+  text-align:center;
+  margin:48px 0;
+  font-family:'Fraunces',serif;
+  font-size:20px;
+  color:var(--line);
+  letter-spacing:8px;
+}
+
+/* Footer */
+.footer{
+  margin-top:80px;
+  padding-top:28px;
+  border-top:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:1px;
+  display:flex;
+  justify-content:space-between;
+}
+
+/* Etappe / Stage cards */
+.etappe{
+  margin:28px 0;
+  padding:0;
+  border-left:2px solid var(--accent);
+  padding-left:28px;
+  position:relative;
+}
+.etappe-head{
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+  margin-bottom:6px;
+}
+.etappe-num{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--accent);
+}
+.etappe-title{
+  font-family:'Fraunces',serif;
+  font-size:24px;
+  font-weight:500;
+  font-style:italic;
+  letter-spacing:-0.3px;
+  line-height:1.2;
+}
+.etappe-claim{
+  font-family:'Fraunces',serif;
+  font-size:16px;
+  color:var(--muted);
+  margin-bottom:14px;
+  font-style:italic;
+}
+.etappe-body p{font-size:14px;margin-bottom:10px;line-height:1.65}
+.etappe-body p:last-child{margin-bottom:0}
+.etappe-aside{
+  margin-top:14px;
+  padding:12px 16px;
+  background:rgba(122,74,31,0.05);
+  border-radius:2px;
+  font-size:13px;
+  color:var(--muted);
+  line-height:1.6;
+}
+.etappe-aside strong{color:var(--accent);font-weight:500}
+
+.spaeter{
+  margin-top:32px;
+  padding:20px 24px;
+  background:var(--paper-deep);
+  border-radius:2px;
+  border:1px solid var(--line-soft);
+}
+.spaeter h4{margin-top:0;margin-bottom:12px}
+.spaeter p{font-size:14px;margin-bottom:8px;color:var(--muted)}
+
+/* Print friendliness */
+@media print{
+  body{background:white}
+  .sheet{padding:30px}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<div class="cover">
+  <div class="eyebrow">Konzept-Handout · Stand 29.04.2026</div>
+  <h1 class="title">Ein <em>persönlicher</em><br/>AI-Agent</h1>
+  <p class="subtitle">Lokal lebend, proaktiv denkend, selbst-erweiternd. Ein Mitbewohner aus Code – nicht ein Chatbot. Übersicht für die Implementierung.</p>
+  <div class="meta">
+    <span>Stack: <b>.NET 9 + Semantic Kernel</b></span>
+    <span>Modell: <b>Gemma 4 E4B</b></span>
+    <span>Frontend: <b>React</b></span>
+  </div>
+</div>
+
+<div class="toc">
+  <div class="toc-label">Inhalt</div>
+  <ol>
+    <li><a href="#vision">Vision &amp; Selbstverständnis</a></li>
+    <li><a href="#prinzipien">Die 7 Grundprinzipien</a></li>
+    <li><a href="#bewertung">Bewertungs-Pipeline (wann der Agent sich meldet)</a></li>
+    <li><a href="#gedaechtnis">Gedächtnis-Architektur (4 Schichten)</a></li>
+    <li><a href="#extension">Self-Extension (zwei Phasen)</a></li>
+    <li><a href="#trennung">Architektonische Trennung Kern / Erweiterung</a></li>
+    <li><a href="#implementierung">Implementierungsplan (sechs Etappen)</a></li>
+    <li><a href="#offen">Was noch konzeptionell offen ist</a></li>
+  </ol>
+</div>
+
+<section class="section" id="vision">
+  <div class="section-num">— 01</div>
+  <h2 class="section-title">Vision &amp; Selbstverständnis</h2>
+  <p class="lede">Der Agent ist kein Chatbot, kein Skript-Sammler, keine Workflow-Engine. Er ist ein <em>autonomer digitaler Mitbewohner</em>, der eigenständig nachdenkt, sich erinnert, sich erweitert – aber niemals ohne Wissen des Nutzers nach außen handelt.</p>
+
+  <p>Er lebt auf einem dedizierten Linux-System als alleiniger Bewohner. Er hat dort vollen Bewegungsraum. Seine Wahrnehmung der Außenwelt wird vom Nutzer explizit konfiguriert: bestimmte Postfächer, bestimmte Messenger, bestimmte Kalender. Er reagiert nicht nur, er denkt periodisch von sich aus nach. Er meldet sich – aber nur wenn es den Wert der Stille übersteigt.</p>
+
+  <p>Das Frontend (React-App) ist eine austauschbare Linse auf einen ständig laufenden Backend-Dienst. Die Kommunikation zwischen Mensch und Agent kann per Text, per Sprache oder über proaktive Benachrichtigungen erfolgen.</p>
+</section>
+
+<section class="section" id="prinzipien">
+  <div class="section-num">— 02</div>
+  <h2 class="section-title">Die 7 Grundprinzipien</h2>
+  <p class="lede">Diese Prinzipien sind keine Empfehlungen, sondern Architektur-Constraints. Jede technische Entscheidung muss mit ihnen vereinbar sein.</p>
+
+  <div class="principles">
+    <div class="principle">
+      <div class="p-num">i.</div>
+      <div class="p-content">
+        <h5>System-Souveränität</h5>
+        <p>Der Agent operiert auf einem dedizierten Linux-System als alleiniger Bewohner. Er darf dort frei agieren – das System ist sein Habitat, nicht fremdes Territorium.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">ii.</div>
+      <div class="p-content">
+        <h5>Keine ungenehmigten Außenwirkungen</h5>
+        <p>Lesen darf er alles wozu er Zugriff hat. Schreiben nach außen (Mail, Termin, Slack, Datei an Dritte) <em>immer nur mit expliziter Zustimmung</em>. Vorbereiten ohne Senden ist erlaubt und erwünscht.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">iii.</div>
+      <div class="p-content">
+        <h5>Proaktivität bis zur Vorlage</h5>
+        <p>Er handelt selbstständig bis zu dem Punkt, wo etwas nach außen geht. Mails entwerfen, Vorschläge formulieren, planen – ja. Auf "Senden" drücken – nein.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">iv.</div>
+      <div class="p-content">
+        <h5>Stille als Standardzustand</h5>
+        <p>Er stört nicht, außer es ist wert gestört zu werden. Harte Sperrzonen (z.B. 22–7 Uhr) plus weiche Wert-vs-Kosten-Bewertung pro Ereignis.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">v.</div>
+      <div class="p-content">
+        <h5>Selektive Wahrnehmung</h5>
+        <p>Nur explizit konfigurierte Quellen. Was nicht freigegeben ist, existiert für ihn nicht. Der Nutzer behält Kontrolle darüber, was der Agent sehen darf.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">vi.</div>
+      <div class="p-content">
+        <h5>Lernfähigkeit durch Gedächtnis</h5>
+        <p>Anpassung an den Nutzer geschieht nicht durch Re-Training, sondern durch sich anreicherndes strukturiertes Gedächtnis. Das Modell bleibt gleich, der Kontext lernt.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <div class="p-num">vii.</div>
+      <div class="p-content">
+        <h5>Portabilität als Architekturprinzip</h5>
+        <p>Das gesamte Setup ist von Anfang an als Paket gedacht. Kein hardcodierter Pfad, keine maschinenspezifische Config. Container-basiert, deklarativ, in 5 Minuten auf neuer Hardware lauffähig.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="bewertung">
+  <div class="section-num">— 03</div>
+  <h2 class="section-title">Bewertungs-Pipeline</h2>
+  <p class="lede">Wann meldet sich der Agent? Eine vierstufige Pipeline filtert Ereignisse nach <em>Wert</em> und <em>Kosten</em>. Hybrid: deterministische Vorfilter, semantische Feinbewertung.</p>
+
+  <h3>Die Grundgleichung</h3>
+  <p>Der Agent meldet sich nur wenn <strong>Wert &gt; Kosten + Schwellenwert</strong>. Der Schwellenwert ist die "Stille-Steuer" – verhindert dass marginale Ereignisse durchkommen.</p>
+
+  <div class="split">
+    <div>
+      <h6>Wert-Faktoren</h6>
+      <p><strong>Zeitkritikalität</strong> – Verfällt die Information bei Verzögerung?<br/>
+      <strong>Handlungsbedarf</strong> – Erwartet jemand etwas vom Nutzer?<br/>
+      <strong>Personen-Relevanz</strong> – Wer hat das geschickt? Aus Gedächtnis.<br/>
+      <strong>Themen-Anschluss</strong> – Knüpft es an aktive Themen an?</p>
+    </div>
+    <div>
+      <h6>Kosten-Faktoren</h6>
+      <p><strong>Tageszeit</strong> – Sperrzonen sind quasi unendlich.<br/>
+      <strong>Aktivität</strong> – Im Meeting, im Fokusblock = teurer.<br/>
+      <strong>Frequenz</strong> – Wieviele Unterbrechungen heute schon?<br/>
+      <strong>Abrufbarkeit</strong> – Kann es der Nutzer leicht selbst sehen?</p>
+    </div>
+  </div>
+
+  <h3>Die vier Stufen</h3>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="ps-num">01</div>
+      <div class="ps-content">
+        <h5>Harte Filter (deterministisch, sofort)</h5>
+        <p>Sperrzonen-Check, Spam-Erkennung, Whitelist-Validierung. Was hier scheitert, wird leise geloggt. Kostet keine LLM-Tokens.</p>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="ps-num">02</div>
+      <div class="ps-content">
+        <h5>Strukturierte Faktor-Extraktion (deterministisch)</h5>
+        <p>Aus dem Ereignis werden harte Werte gezogen: Absender bekannt? Frequenz im Gedächtnis? Zeitangaben enthalten? Frage oder Information? Letzte Unterbrechung wann? Daraus entsteht ein Vorab-Score.</p>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="ps-num">03</div>
+      <div class="ps-content">
+        <h5>Schwellenwert-Entscheidung</h5>
+        <p>Vorab-Score unter Mindestwert → verworfen oder geparkt. Drüber → weiter zu Stufe 4. Schwelle ist tageszeitabhängig.</p>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="ps-num">04</div>
+      <div class="ps-content">
+        <h5>LLM-Feinbewertung (semantisch)</h5>
+        <p>Das LLM bekommt: Ereignis, Vorab-Score, Personen-Eintrag, aktive Themen, letzte Interaktionen. Entscheidet: melden / später / verwerfen. Wenn melden – formuliert Nachricht und ggf. Vorlage.</p>
+      </div>
+    </div>
+  </div>
+
+  <p><strong>Effizienz:</strong> ~80–90 % der Ereignisse landen in Stufen 1–3, nur der Rest braucht das LLM. Das macht das System auf einem Mini-PC praktikabel.</p>
+
+  <div class="example">
+<b>// Reflection-Loop, alle 5–10 Min</b>
+async Task ReflectionCycle() {
+    var events = await CollectNewEvents();    <b>// Mails, Slack, Kalender-Diffs</b>
+    foreach (var e in events) {
+        if (!HardFilters.Pass(e)) continue;             <b>// Stufe 1</b>
+        var preScore = FactorExtractor.Score(e);        <b>// Stufe 2</b>
+        if (preScore &lt; CurrentThreshold()) continue;    <b>// Stufe 3</b>
+        var decision = await Llm.JudgeWithContext(e);   <b>// Stufe 4</b>
+        if (decision.ShouldNotify) await Notifier.Send(decision);
+        ThoughtLog.Append(decision);
+    }
+}
+  </div>
+</section>
+
+<section class="section" id="gedaechtnis">
+  <div class="section-num">— 04</div>
+  <h2 class="section-title">Gedächtnis-Architektur</h2>
+  <p class="lede">Vier Schichten mit unterschiedlichen Speichertypen und Zugriffslogiken. Keine universelle Vector-DB für alles – jede Rolle bekommt das passende Werkzeug.</p>
+
+  <p>Information wird beim Eintreffen <strong>klassifiziert und auf die passenden Schichten verteilt</strong>. Das ist der Memory-Routing-Mechanismus: jeder Update landet dort wo er hingehört.</p>
+
+  <div class="layers">
+    <div class="layer-card" data-tag="Schicht 01 · Deklarativ">
+      <h5>Regeln &amp; Präferenzen</h5>
+      <p>Harte oder weiche Anweisungen die immer gelten. "Sperrzone 22–7 Uhr." "Bei Mama immer sofort melden." Wird nicht gesucht – wird bei jeder Bewertung mitgeladen. Speicherform: strukturierte Liste / Regel-Set, jede mit Geltungsbereich und Priorität.</p>
+    </div>
+    <div class="layer-card" data-tag="Schicht 02 · Strukturiert">
+      <h5>Entitäten</h5>
+      <p>Personen, Orte, Projekte, Geräte als "Karten" mit Feldern. Wird aufgeschlagen wenn die Entität im Ereignis vorkommt – nicht semantisch gesucht. Beispiel: Mail von marc.huber@... → Karte für Marc wird direkt geladen. Speicherform: SQLite mit definiertem Schema pro Entitäts-Typ.</p>
+    </div>
+    <div class="layer-card" data-tag="Schicht 03 · Working Memory">
+      <h5>Aktive Themen</h5>
+      <p>Was gerade im Leben läuft. "Diese Woche: Release X." "Offene Frage von Lisa wartet." Wichtigster Kontext für Reflection-Loop. Klein, aktuell, vergänglich – Themen rotieren rein und raus, alte werden archiviert. Speicherform: SQLite mit Aktivitäts-Markierung.</p>
+    </div>
+    <div class="layer-card" data-tag="Schicht 04 · Assoziativ">
+      <h5>Episodisches Gedächtnis</h5>
+      <p>Vergangene Gespräche, Beobachtungen, beiläufige Bemerkungen. Wird durchsucht bei semantischen Anfragen ("hat er schonmal über X geredet?"). Wächst über Zeit. Speicherform: Vector-DB (Qdrant oder SQLite-vec). Zugriff nur bei Bedarf in Stufe 4 der Bewertung.</p>
+    </div>
+  </div>
+
+  <h3>Pflege-Modell: Hybrid mit Sichtbarkeit</h3>
+  <p>Der Agent pflegt das Gedächtnis selbstständig – extrahiert aus Gesprächen, klassifiziert Updates, schreibt in die richtigen Schichten. Aber: <strong>jede Änderung ist in der UI sichtbar und reversibel</strong>. Der Nutzer kann jederzeit eine Regel löschen, eine Personen-Karte korrigieren oder eine ganze Erinnerung verwerfen.</p>
+
+  <div class="pull">Der Agent vergisst noch nicht. Vergessen kommt später als bewusst designte Funktion.</div>
+
+  <h4>Memory-Routing am Beispiel</h4>
+  <div class="example">
+<b>// Nutzer: "Stör mich nie wieder mit Wetter-Updates."</b>
+→ Schicht 01: neue Regel "Themen-Filter: Wetter → unterdrücken"
+→ Schicht 04: optional, als Kontext warum
+
+<b>// Nutzer: "Marc hat einen neuen Job bei Bosch."</b>
+→ Schicht 02: Entitätskarte Marc, Feld "Arbeitgeber" = Bosch
+→ Schicht 04: Aussage mit Zeitstempel
+
+<b>// Mail kommt rein zu laufendem Projekt</b>
+→ Schicht 03: Projekt-Status "neuer Input erhalten"
+→ Schicht 02: Personen-Karte Absender, "letzte Interaktion" aktualisiert
+→ Schicht 04: Mail-Kontext abgelegt
+  </div>
+</section>
+
+<section class="section" id="extension">
+  <div class="section-num">— 05</div>
+  <h2 class="section-title">Self-Extension</h2>
+  <p class="lede">Der Agent kann sich selbst erweitern. Zwei Phasen mit klarem Übergang dazwischen. Phase 1 ist Standardbetrieb, Phase 2 wird bei Bedarf temporär freigeschaltet.</p>
+
+  <h3>Phase 1 — Tool-Erweiterung (Standardbetrieb)</h3>
+  <p>Der Agent baut sich neue Funktionen die innerhalb des bestehenden Habitats operieren. Greift auf APIs zu, verarbeitet Daten, erweitert seine Fähigkeiten. Keine neuen Pakete, keine Hintergrund-Dienste, keine System-Konfiguration.</p>
+
+  <h3>Phase 2 — Habitat-Erweiterung (Auftragsbetrieb)</h3>
+  <p>Wenn der Nutzer eine größere Aufgabe gibt die mit Tools nicht lösbar ist, fordert der Agent <strong>erweiterte Befugnisse auftragsgebunden</strong> an. Darf dann tiefer ins System eingreifen – Pakete installieren, Dienste anlegen. Nach Auftragsende kehrt er in Standardbetrieb zurück. Befugnis ist nicht permanent.</p>
+
+  <div class="example">
+<b>// Phase-2-Beispiel</b>
+Nutzer: "Sortiere alle Familienfotos der letzten 10 Jahre nach
+         Ereignissen mit Gesichtserkennung."
+
+Agent: "Für diese Aufgabe brauche ich:
+  - Gesichtserkennungs-Modell (lokal)
+  - Datenbank für Bild-Embeddings
+  - Hintergrund-Worker für Batch-Verarbeitung
+  Geschätzte Verarbeitungsdauer: ~6 Stunden
+  Geschätzter Speicherbedarf: ~12 GB
+  Genehmigung erteilen?"
+  </div>
+
+  <h3>Bedarfs-Erkennung: Vorschlags-Modus</h3>
+  <p>Im Reflection-Loop führt der Agent eine <strong>Schwächen-Liste</strong> – Situationen in denen er etwas nicht oder schlecht konnte. Wenn ein Eintrag eine bestimmte Häufigkeit erreicht, generiert er einen Vorschlag und legt ihn in der UI vor. Nicht den Code – die Idee.</p>
+
+  <div class="example">
+"Mir ist aufgefallen, dass du regelmäßig nach Spritpreisen fragst.
+Soll ich mir ein Tool dafür bauen das die Tankerkönig-API nutzt?
+Es würde nichts schreiben, nur lesen.
+Geschätzte Entwicklungszeit: 30 Sekunden."
+  </div>
+
+  <h3>Lebenszyklus eines Tools</h3>
+  <div class="lifecycle">
+    <span class="state"><b>vorgeschlagen</b></span>
+    <span class="state"><b>genehmigt</b> · in Entwicklung</span>
+    <span class="state"><b>bereit</b> · wartet auf Aktivierung</span>
+    <span class="state"><b>aktiv</b></span>
+    <span class="state"><b>verfallen</b> · lange ungenutzt</span>
+    <span class="state"><b>deaktiviert</b></span>
+    <span class="state"><b>gelöscht</b></span>
+  </div>
+
+  <h3>Versionierung: alle Versionen behalten</h3>
+  <p>Wenn der Agent ein Tool verbessert, wird die alte Version <strong>nicht überschrieben</strong> sondern archiviert. Genau eine Version ist zu jedem Zeitpunkt als <em>aktiv</em> markiert. Vorteile: Rollback möglich, Versions-Vergleich für Lernen, Dokumentations-Spur über Zeit.</p>
+
+  <h3>Phase-2-Spezifika</h3>
+  <p><strong>Auftragsgebundene Genehmigung</strong> – nicht "darf jetzt Pakete installieren" sondern "für diesen Auftrag darf er". Nach Auftrag fällt die Befugnis weg.</p>
+  <p><strong>Veränderungs-Buchhaltung</strong> – jede Veränderung am System wird transaktional protokolliert. "Was hat der Agent in der letzten Woche geändert?" muss beantwortbar sein. Rollback-fähig.</p>
+  <p><strong>Definiertes Ende</strong> – nach Auftragsabschluss fragt der Agent: "Diese Komponenten habe ich gebaut. Behalten, archivieren oder zurückbauen?"</p>
+</section>
+
+<section class="section" id="trennung">
+  <div class="section-num">— 06</div>
+  <h2 class="section-title">Architektonische Trennung</h2>
+  <p class="lede">Kernwelt und Erweiterungs-Welt liegen in <em>strikt getrennten Verzeichnissen</em>. Diese Grenze ist die wichtigste architektonische Entscheidung des Projekts.</p>
+
+  <div class="split">
+    <div>
+      <h6>Kernwelt</h6>
+      <p>Der Agent als Produkt. Code von Menschen geschrieben. Stabil, geprüft, getestet. Ändert sich nur durch echte Updates. <strong>Der Agent darf hier nicht schreiben.</strong></p>
+    </div>
+    <div>
+      <h6>Erweiterungs-Welt</h6>
+      <p>Separater Ordner mit allem Selbst-Geschaffenen. Tools, Versionen, Specs, Buchhaltung, Logs. <strong>Hier darf der Agent vollständig schalten und walten.</strong></p>
+    </div>
+  </div>
+
+  <h3>Was diese Trennung erkauft</h3>
+  <p><strong>Sauberes Update-Verhalten</strong> – Kern wird ersetzt, Erweiterungen bleiben unberührt.</p>
+  <p><strong>Klare Backup-Strategie</strong> – Erweiterungs-Ordner ist die "Persönlichkeit", separat sicherbar. Beim Umzug auf andere Hardware: Ordner mitnehmen, Kern frisch installieren. Genau die Portabilität von Prinzip 7.</p>
+  <p><strong>Eingrenzung von Schaden</strong> – Falls der Agent Tools baut die Probleme machen, ist klar wo sie leben. Ganzer Erweiterungs-Ordner kann in Quarantäne oder gelöscht werden, ohne Kern zu beschädigen.</p>
+  <p><strong>Lesbarkeit für den Nutzer</strong> – Was hat der Agent dazugelernt? Antwort: alles in genau diesem einen Ordner.</p>
+  <p><strong>Klarheit für den Agent selbst</strong> – Er weiß wo seine Grenzen sind. Ordnerzugehörigkeit klärt was "seins" ist.</p>
+
+  <h3>Was in den Erweiterungs-Ordner gehört</h3>
+  <p>Nicht nur selbstgebauter Code, sondern <strong>alle Artefakte der Selbst-Erweiterung</strong>:</p>
+
+  <div class="example">
+extensions/
+├── tools/
+│   ├── fuel_price_checker/
+│   │   ├── v0.1/   <b>(archiviert)</b>
+│   │   ├── v0.2/   <b>(aktiv)</b>
+│   │   └── spec.md
+│   └── time_tracker/
+├── specifications/    <b>(Tool-Specs in lesbarer Form)</b>
+├── changelog/         <b>(was wurde wann installiert/geändert)</b>
+├── weakness_log/      <b>(Schwächen-Liste für Vorschlags-Modus)</b>
+├── usage_logs/        <b>(Tool-Aufrufe, Häufigkeit, Fehler)</b>
+└── phase2_jobs/       <b>(Auftragsbezogene Komponenten)</b>
+  </div>
+
+  <p>Damit ist dieser Ordner faktisch eine <strong>fünfte Schicht des Gedächtnisses</strong> – eine Schicht aus Code statt aus Daten. Wenn das Gedächtnis gesichert wird, muss dieser Ordner mit. Wenn das Gedächtnis komplett gelöscht wird, sollte der Ordner auch geleert werden – sonst hat der Agent Tools ohne Kontext.</p>
+
+  <div class="pull">Die Erweiterungs-Welt ist das Tagebuch der Eigenständigkeit des Agenten.</div>
+</section>
+
+<section class="section" id="implementierung">
+  <div class="section-num">— 07</div>
+  <h2 class="section-title">Implementierungsplan</h2>
+  <p class="lede">Sechs Etappen, vertikal gedacht: nach jeder steht ein lauffähiges System. Der Agent wird nicht in Schichten gebaut, sondern <em>wächst als Wesen</em> – erst Stimme, dann Innenwelt, dann Zeitgefühl, dann Hände, dann Eigenleben, dann ein Gesicht.</p>
+
+  <h3>Leitprinzip: vertikal statt horizontal</h3>
+  <p>Statt erst alle Grundlagen und dann alle Features zu bauen, bekommt der Agent in jeder Etappe eine qualitativ neue Eigenschaft. Das hat drei konkrete Vorteile: nach jeder Etappe ist etwas <strong>tatsächlich nutzbar</strong>. Konzeptionelle Annahmen werden früh getestet und können korrigiert werden, bevor zu viel darauf aufbaut. Und das Schwerste (Reflection-Loop, Bewertungs-Pipeline) kommt erst spät, wenn das Fundament steht.</p>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 01</span>
+      <span class="etappe-title">Stimme &amp; Ohren</span>
+    </div>
+    <p class="etappe-claim">Du redest mit dem Agent, er redet zurück. Sonst nichts.</p>
+    <div class="etappe-body">
+      <p>Das absolute Fundament. Sprache wird aufgenommen, transkribiert, an Ollama geschickt, die Antwort wird gesprochen. Was hier entsteht: STT (Whisper.NET), TTS (Piper), die komplette Audio-Pipeline. Wake Word kommt noch nicht – Aktivierung per Tastendruck oder Schlüsselwort.</p>
+      <p>Was bewusst noch nicht drin ist: kein Gedächtnis, keine Tools, keine Zeitwahrnehmung. Der Agent vergisst alles sobald die Konversation endet. Er ist ein freundlicher dummer Sprecher.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> Hier wird der Tonfall des Systems geprägt – wie schnell antwortet er, wie klingt seine Stimme. Die Latenz-Disziplin entsteht hier oder gar nicht. Würde Sprache erst spät kommen, wäre das ganze System zu langsam und müsste umgebaut werden.
+    </div>
+  </div>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 02</span>
+      <span class="etappe-title">Gehirn</span>
+    </div>
+    <p class="etappe-claim">Der Agent erinnert sich. Er weiß wer du bist.</p>
+    <div class="etappe-body">
+      <p>Jetzt entstehen die strukturierten Gedächtnis-Schichten 1, 2 und 3. SQLite-Schema für Regeln, Entitäten, aktive Themen. Das Memory-Routing – die Logik die beim Eintreffen entscheidet was wo landet. Und die Lese-Operationen: der Agent durchsucht sein Gedächtnis und nutzt es im Gespräch.</p>
+      <p>Erst ab hier ist der Agent <em>persönlich</em>. Du erzählst ihm etwas, beim nächsten Gespräch erinnert er sich. Personen-Karten füllen sich. Aktive Themen rotieren rein und raus.</p>
+      <p>Was bewusst noch nicht drin ist: Vector-DB / Schicht 4. Bis dahin lebt das episodische Gedächtnis als simples Gesprächs-Log mit Volltextsuche – das reicht für diese Etappe.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> Das Memory-Routing erzwingt viele Detail-Entscheidungen die wir nur abstrakt diskutiert haben. Was ist eine Regel vs. eine beiläufige Bemerkung? Wann wird eine Personen-Karte angelegt? Wann konsolidiert sich Information? Diese Fragen werden hier konkret beantwortet.
+    </div>
+  </div>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 03</span>
+      <span class="etappe-title">Zeitgefühl</span>
+    </div>
+    <p class="etappe-claim">Der Agent versteht Zukunft. Er kann Termine planen und einhalten.</p>
+    <div class="etappe-body">
+      <p>Der Scheduler entsteht (Quartz.NET mit persistentem Job-Store), und das erste Tool-Aufruf-System überhaupt. Der Agent bekommt sein erstes Werkzeug: ein Tool das einen Job in seine Zukunft einplanen kann.</p>
+      <p>Du sagst "weck mich morgen um 7" – passiert. "Erinner mich in 20 Minuten" – passiert. Der Agent weiß plötzlich dass es einen Moment gibt in dem er etwas tun wird. Und wegen Etappe 2 weiß er <em>warum</em> – er kann den Auftrag in deinen Kontext einbetten.</p>
+      <p>Hier entsteht außerdem das <strong>Pattern für alle weiteren Tools</strong>: wie definiert das Backend eine Funktion, wie reicht es das Schema an das LLM, wie ruft es nach Antwort die Funktion auf, wie speist es das Ergebnis zurück. Diese Schiene fährt später alles andere.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> Der Scheduler ist die Voraussetzung für alles Proaktive das später kommt. Reflection-Loop, Erinnerungen, verzögerte Aktionen – alles sind im Kern geplante Tasks. Wenn der Scheduler hier solide steht, ist die Mechanik für vieles spätere bereits da.
+    </div>
+  </div>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 04</span>
+      <span class="etappe-title">Fähigkeiten</span>
+    </div>
+    <p class="etappe-claim">Der Agent greift in die Welt. Tool für Tool, eines nach dem anderen.</p>
+    <div class="etappe-body">
+      <p>Jetzt kommen die Tools. Aber nicht alle gleichzeitig – nacheinander, jedes vollständig durchgedrückt bevor das nächste angefangen wird. Reihenfolge:</p>
+      <p>Erst die <strong>Lese-Tools</strong>: Kalender (CalDAV), dann Mail (IMAP, ein Postfach), dann ein Messenger nach Wahl. Dann das erste <strong>Schreib-Tool</strong> mit dem Vorlage-Mechanismus (Mail-Entwurf vorbereiten zur Freigabe). Dann <strong>Home Assistant</strong> mit Auto-Discovery. Dann <strong>Web-Suche</strong> über SearXNG.</p>
+      <p>Am Ende dieser Etappe weißt du sehr gut welche Tools dir noch fehlen. Das ist Material für die spätere Self-Extension.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> In dieser Etappe wird der <em>Vorlage-Mechanismus</em> geboren – der Knoten den wir vertagt hatten. Sobald das erste Schreib-Tool entsteht, brauchst du eine Antwort darauf wo Vorlagen leben und wie du sie freigibst. Bis zur richtigen UI ist das pragmatisch eine Datei in einem speziellen Verzeichnis – hässlich, aber funktional.
+    </div>
+  </div>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 05</span>
+      <span class="etappe-title">Eigenleben</span>
+    </div>
+    <p class="etappe-claim">Der Agent denkt von selbst nach. Er meldet sich – oder schweigt.</p>
+    <div class="etappe-body">
+      <p>Jetzt erst kommt der Reflection-Loop und die vierstufige Bewertungs-Pipeline. Der Agent beobachtet die Quellen die in Etappe 4 angeschlossen wurden. Er bewertet ob etwas wert ist dich zu unterbrechen. Stille ist der Standardzustand.</p>
+      <p>Diese Etappe ist die längste und experimentellste. Du wirst Schwellenwerte feinjustieren, Regeln eintragen, dem Agent über Tage und Wochen beibringen was wichtig ist. Das war geplant – die Lernschleife funktioniert nur durch Nutzung.</p>
+      <p>Output erstmal direkt über Lautsprecher (wenn zuhause) oder als System-Benachrichtigung. Die richtige UI kommt erst danach.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> Hier wird die hybride Pipeline (deterministische Filter + LLM-Bewertung) auf die Probe gestellt. Wenn die Annahmen aus den Konzeptgesprächen stimmen, funktioniert sie. Wenn nicht, wird hier nachgebessert.
+    </div>
+  </div>
+
+  <div class="etappe">
+    <div class="etappe-head">
+      <span class="etappe-num">ETAPPE 06</span>
+      <span class="etappe-title">Sichtbarkeit</span>
+    </div>
+    <p class="etappe-claim">Die React-UI. Mit voller Kenntnis was sie zeigen muss.</p>
+    <div class="etappe-body">
+      <p>Jetzt kommt das Frontend. Status, Chat, Anrufen, Extensions, Gedächtnis, Gedanken, Quellen – die Tabs aus dem Mockup. Aber gebaut nicht für vermutete sondern für <strong>erfahrene</strong> Bedürfnisse, weil das Backend seit Wochen läuft und du es benutzt hast.</p>
+      <p>Die UI wird wahrscheinlich kleiner und anders als ursprünglich gedacht – manche Dinge werden sich als unwichtig erwiesen haben, andere als wichtiger. Das ist gut so. Eine UI die aus Erfahrung wächst statt aus Spekulation ist immer besser.</p>
+    </div>
+    <div class="etappe-aside">
+      <strong>Konzeptionell entscheidend.</strong> Bis zu dieser Etappe nutzt du den Agent über Stimme und rohe Hilfsmittel (Logs, Datei-Vorlagen, System-Notifications). Diese Übergangsphase ist die beste UX-Forschung die du machen kannst – du merkst genau was dir an Information fehlt.
+    </div>
+  </div>
+
+  <div class="spaeter">
+    <h4>Was nach Etappe 6 kommt</h4>
+    <p><strong>Self-Extension Phase 1</strong> – der Agent baut sich selbst Tools. Erst sinnvoll wenn er eine Weile gelaufen ist und seine Schwächen-Liste gefüllt hat.</p>
+    <p><strong>Vector-DB / Schicht 4</strong> – wenn genug episodisches Material gesammelt ist um Vector-Suche zu rechtfertigen.</p>
+    <p><strong>Notifications nach außen</strong> – Push, SMS, Telegram. Wenn du den Agent auch unterwegs nutzen willst.</p>
+    <p><strong>Self-Extension Phase 2</strong> – Habitat-Erweiterung. Der Agent darf das System verändern. Nur wenn alles davor stabil ist.</p>
+  </div>
+
+  <div class="pull">Der Agent wird nicht in Schichten gebaut. Er wächst als Wesen.</div>
+
+  <h3>Tech-Stack (Status: vorgesehen)</h3>
+  <p><strong>Backend</strong> – .NET 9 mit Microsoft Semantic Kernel als Agent-Framework, Ollama als LLM-Server, Gemma 4 E4B als Modell. Quartz.NET für den Scheduler. SQLite für strukturierte Schichten. Qdrant oder SQLite-vec für Vector-Memory. Roslyn für dynamische Code-Generierung.</p>
+  <p><strong>Frontend</strong> – React-App, kommuniziert mit Backend via REST + WebSocket. Erst in Etappe 6.</p>
+  <p><strong>Sprache</strong> – Whisper.NET für STT, Piper TTS für Sprachausgabe, openWakeWord für Wake-Word-Erkennung (kommt später).</p>
+  <p><strong>Hardware</strong> – Lokales Testing auf Entwickler-Maschine. Später: AMD Ryzen Mini-PC mit 32 GB DDR5. Portabel als Container.</p>
+</section>
+
+<section class="section" id="offen">
+  <div class="section-num">— 08</div>
+  <h2 class="section-title">Was noch konzeptionell offen ist</h2>
+  <p class="lede">Diese Punkte sind bewusst noch nicht entschieden. Sie sollten vor oder während der Implementierung geklärt werden.</p>
+
+  <div class="open">
+    <h4>Konzept-Lücken</h4>
+    <ul>
+      <li><strong>Vorlage-Mechanik</strong> – wie eine vom Agent vorbereitete Aktion (Mail, Antwort, Termin) beim Nutzer ankommt. Wo lebt die Vorlage, wie wird sie präsentiert, was passiert wenn sie liegen bleibt? Wird konkret in Etappe 4.</li>
+      <li><strong>Vergessen als Funktion</strong> – Verfall, Konsolidierung, bewusstes Löschen. Wurde vertagt aber wird relevant sobald das Gedächtnis wächst.</li>
+      <li><strong>Identität &amp; Persönlichkeit</strong> – Name, Tonfall, Ansprache. Wurde vertagt bis die Features stehen, aber wird in Etappe 1 spürbar.</li>
+      <li><strong>Vector-DB-Interaktion in der UI</strong> – wie der Nutzer Schicht 4 durchsucht und einsehen kann. Wurde der UI-Phase zugewiesen.</li>
+      <li><strong>Eigenes Wissen einspielen</strong> – Datei/Ordner-Upload des Nutzers in die Vector-DB. UI-Phase.</li>
+      <li><strong>Memory-Routing-Detail</strong> – wie der Agent zwischen "Regel" und "beiläufige Bemerkung" unterscheidet. Wird in Etappe 2 konkret.</li>
+      <li><strong>Notifications nach außen</strong> – Push, SMS, Telegram. Erstmal vertagt.</li>
+    </ul>
+  </div>
+</section>
+
+<div class="footer">
+  <span>· Konzept-Handout v1.1 · Implementierungsplan ergänzt</span>
+  <span>29.04.2026</span>
+</div>
+
+</div>
+</body>
+</html>

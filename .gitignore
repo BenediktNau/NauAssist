@@ -55,3 +55,15 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# IDE / Editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# NauAssist runtime state (nicht eingecheckt, vom Agenten/Container befüllt)
+/data/
+/models/
+appsettings.Local.json
