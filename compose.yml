@@ -1,0 +1,66 @@
+# NauAssist — Compose-Setup für 5-Minuten-Inbetriebnahme.
+# Profile:
+#   --profile dev   → nur agent, Ollama läuft auf dem Host
+#   --profile prod  → agent + ollama-Container (Fallback ohne Host-Ollama)
+#
+# Standard ist dev. host-gateway erlaubt dem Container, Ollama auf dem
+# Host unter host.docker.internal:11434 anzusprechen.
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nauassist:dev
+    container_name: nauassist-agent
+    profiles: ["dev", "prod"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./extensions:/var/nauassist/extensions
+      - ./data:/var/nauassist/data
+      - ./logs:/var/nauassist/logs
+      - ./models:/var/nauassist/models
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Llm__Endpoint: http://host.docker.internal:11434
+      Llm__Model: gemma4:e4b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # Ollama im Container — nur für Maschinen ohne Host-Ollama.
+  # Im Dev-Profil deaktiviert; Prinzip vii bleibt erhalten (alles
+  # mit `--profile prod up` kommt hoch ohne weitere Hand-Konfiguration).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nauassist-ollama
+    profiles: ["prod"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+  # Vector-DB für Layer 4 (episodisches Gedächtnis). Etappe 2/4 aktiviert
+  # diesen Service; vorerst auskommentiert, damit `compose up` schlank bleibt.
+  #
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   container_name: nauassist-qdrant
+  #   profiles: ["prod"]
+  #   ports:
+  #     - "6333:6333"
+  #   volumes:
+  #     - qdrant-data:/qdrant/storage
+  #   restart: unless-stopped
+
+volumes:
+  ollama-models:
+  # qdrant-data:

@@ -50,7 +50,40 @@ dotnet test  NauAssist.slnx --filter "FullyQualifiedName~MyTestClass"
 dotnet run   --project Api
 ```
 
-Container-basierte Inbetriebnahme folgt mit Etappe 0 / Issue #3.
+## Inbetriebnahme in 5 Minuten
+
+Voraussetzung: x86_64-Linux, Docker mit Compose, Ollama auf dem Host
+(`ollama serve`) mit gezogenem Modell `gemma4:e4b`.
+
+```bash
+git clone <repo> nauassist && cd nauassist
+cp .env.example .env
+# optional: cp src/Api/appsettings.Local.json.example src/Api/appsettings.Local.json
+docker compose --profile dev up -d --build
+./scripts/smoke.sh
+```
+
+`smoke.sh` wartet bis zu 60 s auf `/health`. Erfolgreich, sobald der
+Endpunkt JSON liefert. Container und Image stoppen:
+
+```bash
+docker compose --profile dev down
+```
+
+Wenn auf der Maschine kein Host-Ollama läuft:
+
+```bash
+docker compose --profile prod up -d --build
+docker exec -it nauassist-ollama ollama pull gemma4:e4b
+```
+
+## Container-Layout
+
+- `/app` — die Kernwelt (publishter ASP.NET-Output, read-only zur Laufzeit)
+- `/var/nauassist/extensions` — Erweiterungs-Welt (Volume-Mount auf `./extensions`)
+- `/var/nauassist/data` — SQLite-Dateien (Volume-Mount auf `./data`)
+- `/var/nauassist/logs` — Serilog-Output (Volume-Mount auf `./logs`)
+- `/var/nauassist/models` — STT/TTS-Modelle (Volume-Mount auf `./models`)
 
 ## Roadmap
 

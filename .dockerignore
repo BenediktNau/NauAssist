@@ -1,0 +1,31 @@
+# Build-Output und IDE-Müll nicht in den Build-Kontext ziehen
+**/bin
+**/obj
+**/.vs
+**/.vscode
+**/.idea
+**/*.user
+
+# Repository-/Projekt-Metadaten
+.git
+.gitignore
+.dockerignore
+.editorconfig
+.env
+.env.example
+.claude
+
+# Laufzeit-State, kommt zur Container-Laufzeit per Volume
+data
+logs
+models
+
+# Frontend ist Etappe 6, im Backend-Image nicht nötig
+frontend
+
+# Pläne und Planungs-Artefakte (nicht im Repo, aber falls vorhanden)
+agent-konzept-handout.html
+
+# Documentation — README ist nützlich, restliche md kann weg
+*.md
+!README.md
