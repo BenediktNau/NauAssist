@@ -1,0 +1,12 @@
+{
+  "_comment": "Lokale Overrides. Diese Datei nach 'appsettings.Local.json' kopieren — sie wird gitignored. Hier nichts mit Secrets, dafür gibt es .env / Docker-Secrets.",
+  "Llm": {
+    "Endpoint": "http://localhost:11434",
+    "Model": "gemma4:e4b"
+  },
+  "Sources": {
+    "Mailboxes": [],
+    "CalendarEndpoints": [],
+    "ChatChannels": []
+  }
+}
