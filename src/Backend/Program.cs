@@ -27,6 +27,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapHealthEndpoints();
+app.MapRulesEndpoints();
 
 app.Run();
 
