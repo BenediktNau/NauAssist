@@ -46,4 +46,19 @@ public sealed class DbInitializerTests
         var count = conn.ExecuteScalar<long>("SELECT COUNT(*) FROM schema_version WHERE version='0001';");
         count.Should().Be(1);
     }
+
+    [Fact]
+    public void Initialize_AppliesMigration0003_CreatesMessagesAndAuditLog()
+    {
+        using var db = new TempSqliteDb();
+        using var conn = db.AppDb.OpenConnection();
+
+        var versions = conn.Query<string>("SELECT version FROM schema_version;").ToList();
+        versions.Should().Contain("0003");
+
+        var tables = conn.Query<string>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('messages','audit_log');")
+            .ToList();
+        tables.Should().Contain("messages").And.Contain("audit_log");
+    }
 }
