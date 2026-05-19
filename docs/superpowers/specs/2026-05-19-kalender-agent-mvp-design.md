@@ -18,6 +18,7 @@ Am Ende des MVP läuft folgender Workflow vollständig durch:
 4. Der User bestätigt einen Slot im Chat.
 5. Der Agent legt den Termin im Google Kalender an, schreibt einen Audit-Eintrag und bestätigt.
 6. Der User kann Regeln im Chat hinzufügen, auflisten und löschen.
+7. Agent-Antworten werden token-weise per **Server-Sent Events (SSE)** in das UI gestreamt; strukturierte Vorschläge erscheinen als separates Event, sobald der Agent sie ausgewählt hat.
 
 ## 3. Nicht-Ziele (MVP)
 
@@ -45,6 +46,7 @@ Am Ende des MVP läuft folgender Workflow vollständig durch:
 | Frontend-Stack | Vite + React + TypeScript (strict) | Schnell, klein, gut tooling |
 | Frontend-UI-Bibliothek | shadcn/ui + Tailwind CSS | Vom User vorgegeben; nur diese Komponenten |
 | Test-Framework | xUnit | Standard im .NET-Ökosystem |
+| Streaming-Protokoll | Server-Sent Events (SSE) | Standard für LLM-Streaming, einfacher als WebSockets, läuft durch jeden Proxy |
 
 ## 5. Solution-Struktur
 
@@ -103,9 +105,26 @@ Jede fachliche Aktion ist ein Mediator-Request — gleich, ob sie von einem HTTP
 
 ### 6.1 Chat Surface
 
-- **Endpoint:** `POST /api/chat` — nimmt `{ message: string }`, gibt `{ reply: string, proposals?: Slot[] }` zurück. `GET /api/chat/history` liefert die letzten 50 Nachrichten für den Initial-Render.
-- **Synchrones Request/Response**, kein Streaming im MVP. Loading-Spinner im Frontend reicht.
+- **Endpoint:** `POST /api/chat` — nimmt `{ message: string }`, antwortet als **SSE-Stream** (`Content-Type: text/event-stream`). Server hält die Verbindung offen, bis alle Events versandt sind.
+- **`GET /api/chat/history`** liefert die letzten 50 Nachrichten als gewöhnliches JSON, für den Initial-Render des Chats nach Page-Load.
 - **Single Session:** `session_id` ist eine Konstante in der Config; kein Multi-Tab- oder Multi-User-State.
+
+#### SSE-Event-Protokoll
+
+Jedes Event hat ein `event:`-Feld und ein `data:`-Feld (JSON). Frontend nutzt `EventSource` und reagiert pro Event-Typ:
+
+| Event | `data`-Inhalt | Bedeutung |
+|---|---|---|
+| `token` | `{"text":"..."}` | Ein Text-Stück des LLM-Outputs. Wird im UI ans Ende der laufenden Agent-Bubble gehängt. |
+| `tool_started` | `{"name":"lookup_free_slots"}` | Agent ruft gerade ein Tool. UI kann das als dezenten Status zeigen („Kalender wird durchsucht…"). |
+| `tool_finished` | `{"name":"...", "ok": true\|false}` | Tool ist fertig. Bei Fehler kann UI eine kleine Warnung zeigen. |
+| `proposals` | `[{...slot...}, ...]` | Strukturierte Slot-Vorschläge, vom Agent ausgewählt. UI rendert Slot-Karten. |
+| `done` | `{"messageId": 42}` | Stream abgeschlossen. Komplette Agent-Message ist persistiert; UI weiß, dass die Bubble final ist. |
+| `error` | `{"message":"...", "correlationId":"..."}` | Etwas ist schiefgegangen, Stream wird danach geschlossen. |
+
+#### Persistierung während des Streams
+
+Während Tokens reinkommen, sammelt der Server sie im Speicher. Am Ende (bei `done`) wird die komplette Agent-Message in einem einzigen Write in `messages` persistiert (zusammen mit eventuellen `proposals` als JSON-Spalte). Bei Stream-Abbruch (Crash, Disconnect) wird die bis dahin akkumulierte Teil-Antwort trotzdem persistiert — als "incomplete" markiert — damit die History keine Lücken hat.
 
 ### 6.2 Agent Runner (Microsoft Agent Framework)
 
@@ -119,18 +138,25 @@ Jede fachliche Aktion ist ein Mediator-Request — gleich, ob sie von einem HTTP
 | Tool | Zweck |
 |---|---|
 | `lookup_free_slots(from, to, duration_minutes)` | Sucht freie Slots im Range, filtert gegen Regeln, liefert ~5–8 Kandidaten |
+| `present_proposals(slots: Slot[])` | Veröffentlicht die finalen 2–3 Vorschläge ans UI. Server löst beim Aufruf ein `proposals`-SSE-Event aus; Tool-Result ans LLM ist nur `{"ok": true}`. Das LLM ruft dieses Tool, sobald es seine Auswahl getroffen hat, und formuliert danach die natürliche Erklärung. |
 | `create_event(title, start, end, description?)` | Legt Termin im Kalender an |
 | `get_calendar_range(from, to)` | Roh-Lookup für Kontextfragen („was steht morgen an?") |
 | `list_rules()` | Listet aktive Regeln |
 | `add_rule(natural_text)` | Parst Klartext-Regel in strukturierte Form und speichert |
 | `delete_rule(rule_id)` | Entfernt Regel |
 
+**Streaming-Orchestrierung:**
+
+Der AgentRunner arbeitet in einer Schleife: Er fordert vom LLM einen Stream an, leitet Text-Tokens direkt als `token`-Events weiter, fängt aber Tool-Calls ab. Bei einem Tool-Call wird der Stream pausiert, das Tool synchron ausgeführt (mit `tool_started`/`tool_finished`-Events zwischendurch), das Ergebnis an die Konversation angehängt, und der Stream-Loop neu gestartet. Erst wenn das LLM eine pure Text-Antwort produziert (ohne weitere Tool-Calls), endet die Schleife und das `done`-Event geht raus.
+
 ### 6.3 LLM Client
 
-- Schmaler Wrapper um Ollamas OpenAI-kompatibles Endpoint (`/v1/chat/completions`), inkl. Tool-Calling.
-- `Task<LlmResponse> ChatAsync(messages, tools, ct)` — Antwort ist entweder Text oder eine Liste von Tool-Calls.
+- Schmaler Wrapper um Ollamas OpenAI-kompatibles Endpoint (`/v1/chat/completions?stream=true`), inkl. Tool-Calling und Streaming.
+- `IAsyncEnumerable<LlmStreamChunk> ChatStreamAsync(messages, tools, ct)` — liefert Chunks: entweder Text-Delta (ein paar Tokens) oder einen vollständigen Tool-Call (Ollama streamt Tool-Calls atomar, nicht token-weise).
 - Konfiguration (Host, Modell, Timeout) aus `appsettings.json`.
-- Hard Timeout 60 s pro Call, 1× Retry nach 2 s bei kurzzeitigem Netzfehler.
+- **Token-Timeout** 30 s ohne neuen Chunk → Stream wird abgebrochen.
+- **Initial-Timeout** 60 s bis zum ersten Chunk, sonst Abbruch.
+- 1× Retry für Initial-Connect bei kurzzeitigem Netzfehler; **kein Retry** wenn der Stream einmal angefangen hat (sonst Doppel-Output).
 
 ### 6.4 Calendar Provider
 
@@ -180,13 +206,17 @@ Audit-Schreiben passiert **nach** der externen Aktion. Wenn das Audit-Schreiben 
 ### Szenario A — Terminanfrage rein, Vorschläge raus
 
 ```
-React POST /api/chat
-   → ChatEndpoint → Mediator.Send(SendMessageRequest)
-   → SendMessageHandler
+React POST /api/chat (öffnet SSE-Verbindung)
+   → ChatEndpoint → Mediator.Send(SendMessageRequest) als Async-Stream
+   → SendMessageHandler (yield IAsyncEnumerable<SseEvent>)
        ├─ User-Message in DB
        ├─ History laden (letzte ~15)
-       └─ AgentRunner.HandleAsync
-            └─ Ollama-LLM → Tool-Call: lookup_free_slots(from, to, duration)
+       └─ AgentRunner.HandleStreamAsync
+            │
+            │  Iteration 1
+            └─ LLM-Stream startet
+                 → Tool-Call: lookup_free_slots(from, to, duration)
+                    yield SSE: tool_started("lookup_free_slots")
                  → LookupFreeSlots-Tool → Mediator.Send(LookupFreeSlotsRequest)
                     → Handler
                        ├─ aktive Rules aus DB
@@ -194,10 +224,24 @@ React POST /api/chat
                        ├─ freie Lücken berechnen, ≥duration, in Arbeitszeit
                        └─ RuleApplicator: harte raus, weiche annotieren
                           → ~5–8 Kandidaten
-                 → LLM bekommt Tool-Result
-                 → LLM formuliert Antwort: „Ich hab drei Slots für dich" + 3 strukturierte Vorschläge (ausgewählt aus den Kandidaten)
-       └─ Agent-Message in DB
-   → Response
+                    yield SSE: tool_finished("lookup_free_slots", ok=true)
+                 → Tool-Result an Konversation anhängen
+            │
+            │  Iteration 2
+            └─ LLM-Stream startet erneut
+                 → Tool-Call: present_proposals([slot1, slot2, slot3])
+                    yield SSE: proposals([slot1, slot2, slot3])
+                    yield SSE: tool_finished("present_proposals", ok=true)
+                 → Tool-Result `{"ok": true}` an Konversation anhängen
+            │
+            │  Iteration 3
+            └─ LLM-Stream startet erneut
+                 → Text-Tokens: "Ich", " hab", " drei", " Slots", " für", " dich..."
+                    yield SSE: token({"text":"Ich"}), token({"text":" hab"}), ...
+                 → Stream endet (kein Tool-Call mehr)
+       │
+       ├─ akkumulierte Agent-Message in DB persistieren
+       └─ yield SSE: done({"messageId": 42})
 ```
 
 ### Szenario B — Bestätigung
@@ -246,9 +290,11 @@ Leitprinzip: Fehler landen im Chat, nicht in HTTP-500-Stack-Traces.
 | Slot inzwischen belegt | Chat: „Der Slot ist nicht mehr frei. Neue suchen?" |
 | LLM-Tool-Call mit invaliden Args | Handler liefert strukturierten Fehler als Tool-Result zurück; LLM korrigiert sich selbst oder fragt nach |
 | LLM ruft nicht-existentes Tool | Strukturierter Fehler ans LLM, Selbstkorrektur |
-| Tool-Loop > 5 Iterationen | Hard Stop. Chat: „Ich komme da gerade nicht weiter." |
+| Tool-Loop > 5 Iterationen | Hard Stop. SSE-`error`-Event: „Ich komme da gerade nicht weiter." Stream wird sauber geschlossen. |
 | SQLite-Migration schlägt fehl | App startet nicht (lautes Crashen) |
 | Audit-Write schlägt fehl | Log-Warning, User-Aktion bleibt erfolgreich |
+| SSE-Verbindung bricht ab (Client disconnect, Netzwerk) | Server beendet sauber, bis dahin akkumulierte Teil-Antwort wird als "incomplete" in DB persistiert. UI kann beim Reconnect die unvollständige Bubble anzeigen. |
+| Token-Timeout (30 s ohne neuen Token aus Ollama) | SSE-`error`-Event mit Hinweis "Ollama antwortet zu langsam"; Stream-Schließung. Die Teil-Antwort wird persistiert. |
 
 Logging: `Microsoft.Extensions.Logging` Default, stdout/stderr, Levels via `appsettings.json`. Jede Außenwirkung loggt auf Info mit Correlation-ID.
 
@@ -261,8 +307,9 @@ Logging: `Microsoft.Extensions.Logging` Default, stdout/stderr, Levels via `apps
 
 **Test-Doubles:**
 - `FakeCalendarProvider` — in-memory Event-Liste, `.Seed(...)` in Tests
-- `FakeLlmClient` — gescriptete Antworten auf bestimmte Inputs
+- `FakeLlmClient` — gescriptete Stream-Sequenzen (Tokens, Tool-Calls in beliebiger Reihenfolge), gibt `IAsyncEnumerable<LlmStreamChunk>` zurück; deterministisch
 - SQLite in Tests: pro Test eine Temp-Datei, nach Fehlern inspizierbar
+- **SSE-Integration-Tests:** Consumer-Helper sammelt alle SSE-Events aus der Response in eine Liste, Tests assertieren auf die Sequenz (z.B. `[tool_started, tool_finished, proposals, token, token, done]`)
 
 **Test-Benennung:** Szenario-basiert, nicht implementierungsbasiert. Beispiel: `LookupFreeSlots_RespectsHardRules_NoEveningSlotsReturned`.
 
@@ -282,16 +329,17 @@ Diese Punkte sind bewusst nicht im Detail festgelegt und werden in der Implement
 - **Such-Horizont** für `lookup_free_slots` ohne explizite Range: nächste 14 Tage
 - **Frontend-Port / Backend-Port:** Default-Vite-Port (5173) bzw. ASP.NET-Default (5000/5001), CORS für `localhost` offen
 - **Ollama-Modell-Default:** wird nach Hardware-Test gewählt (Kandidaten: `qwen2.5:7b-instruct`, `llama3.1:8b-instruct`)
+- **SSE-Token-Timeout:** 30 s ohne neuen Chunk → Stream-Abbruch
+- **SSE-Initial-Timeout:** 60 s bis zum ersten Chunk → Stream-Abbruch
 
 ## 11. Spätere Etappen (explizit nicht MVP)
 
 In dieser Reihenfolge denkbar, jeweils als eigene Spec wenn relevant:
 
-1. **Streaming der LLM-Antworten** via SSE
-2. **Implizites Lernen:** „du lehnst Slots immer zwischen 17–18 ab — Regel daraus machen?" (mit Bestätigung)
-3. **Inbound-Provider** für E-Mail (IMAP)
-4. **Inbound-Provider** für WhatsApp (über Matrix-Bridge, mit oder ohne Zweitnummer)
-5. **Antwort-Vorlagen** an den Anfragesteller (Vorlage-Mechanismus)
-6. **CalDAV-** und **Microsoft-365-Calendar-Provider** als weitere Implementierungen des bestehenden Interfaces
-7. **Container-Setup** (Dockerfile + Compose) wenn der MVP läuft und produktiv auf der Box als Daemon laufen soll
-8. **Multi-Kalender-Sicht** (Privat + Beruflich vereint)
+1. **Implizites Lernen:** „du lehnst Slots immer zwischen 17–18 ab — Regel daraus machen?" (mit Bestätigung)
+2. **Inbound-Provider** für E-Mail (IMAP)
+3. **Inbound-Provider** für WhatsApp (über Matrix-Bridge, mit oder ohne Zweitnummer)
+4. **Antwort-Vorlagen** an den Anfragesteller (Vorlage-Mechanismus)
+5. **CalDAV-** und **Microsoft-365-Calendar-Provider** als weitere Implementierungen des bestehenden Interfaces
+6. **Container-Setup** (Dockerfile + Compose) wenn der MVP läuft und produktiv auf der Box als Daemon laufen soll
+7. **Multi-Kalender-Sicht** (Privat + Beruflich vereint)
