@@ -52,9 +52,11 @@ Am Ende des MVP läuft folgender Workflow vollständig durch:
 /
 ├── src/
 │   ├── Backend/                  ← Minimal API + Core AI + Mediator (alles hier)
-│   ├── Backend.Tests/            ← xUnit
+│   ├── Backend.Tests/            ← xUnit, automatisierte Tests
 │   └── NauAssist.slnx
 ├── frontend/                     ← Vite + React + TS, getrennt vom .NET-Build
+├── tests/
+│   └── manual-scenarios/         ← Markdown-Goldfiles für LLM-Verhalten (manuell)
 └── docs/
     └── superpowers/specs/
 ```
@@ -110,6 +112,7 @@ Jede fachliche Aktion ist ein Mediator-Request — gleich, ob sie von einem HTTP
 - Orchestriert eine Konversation gegen das LLM mit den registrierten Tools.
 - Stateless pro Aufruf: lädt sich die letzten ~15 Nachrichten aus der Persistence, baut den Prompt, lässt das LLM laufen, gibt die finale Antwort zurück.
 - **Tool-Loop-Limit:** Maximal 5 Tool-Iterationen pro User-Message, dann muss eine finale Text-Antwort kommen.
+- **Tool-Adapter rufen Mediator:** Jeder im Agent registrierte Tool-Adapter ist ein dünner Wrapper, der die Argumente in einen Mediator-Request umwandelt und `Mediator.Send(...)` ausführt. Die fachliche Logik lebt im jeweiligen Handler, nicht im Tool-Adapter selbst.
 
 **Registrierte Tools:**
 
