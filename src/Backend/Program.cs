@@ -11,6 +11,9 @@ builder.Services.AddSingleton<DbInitializer>();
 
 builder.Services.AddSingleton<Func<DateTimeOffset>>(_ => () => DateTimeOffset.UtcNow);
 builder.Services.AddScoped<NauAssist.Backend.Features.Rules.RuleRepository>();
+builder.Services.AddSingleton(_ =>
+    new NauAssist.Backend.Features.Rules.RuleApplicator(
+        TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
 
 builder.Services.AddMediator(options =>
 {
