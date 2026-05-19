@@ -9,6 +9,8 @@ builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
 
+builder.Services.AddScoped<NauAssist.Backend.Features.Rules.RuleRepository>();
+
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
