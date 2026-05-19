@@ -1,8 +1,12 @@
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using NauAssist.Backend.Endpoints;
+using NauAssist.Backend.Features.Agent;
+using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.Google;
+using NauAssist.Backend.Features.Infrastructure.Llm;
+using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 using NauAssist.Backend.Features.Rules;
 
@@ -10,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection("Persistence"));
 builder.Services.Configure<CalendarOptions>(builder.Configuration.GetSection("Calendar"));
+builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
@@ -33,6 +39,23 @@ builder.Services.AddSingleton(sp =>
         DayOfWeekFlags.WeekdaysOnly);
 });
 
+// LLM
+builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>((sp, client) =>
+{
+    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+    client.BaseAddress = new Uri(opts.Host);
+});
+
+// Agent-Tools (alle Scoped, weil sie IMediator brauchen)
+builder.Services.AddScoped<ITool, LookupFreeSlotsTool>();
+builder.Services.AddScoped<ITool, CreateEventTool>();
+builder.Services.AddScoped<ITool, GetCalendarRangeTool>();
+builder.Services.AddScoped<ITool, ListRulesTool>();
+builder.Services.AddScoped<ITool, AddRuleTool>();
+builder.Services.AddScoped<ITool, DeleteRuleTool>();
+builder.Services.AddScoped<ITool, PresentProposalsTool>();
+builder.Services.AddScoped<AgentRunner>();
+
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
@@ -47,7 +70,7 @@ using (var scope = app.Services.CreateScope())
     initializer.Initialize();
 }
 
-// Sub-Command "auth": OAuth-Flow ausführen und beenden, ohne den Web-Host zu starten
+// Sub-Command "auth"
 if (args.Contains("auth"))
 {
     return await GoogleAuthCommand.RunAsync(app.Services, CancellationToken.None);
