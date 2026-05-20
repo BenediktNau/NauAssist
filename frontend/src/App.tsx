@@ -1,7 +1,5 @@
+import { ChatView } from "@/components/ChatView";
+
 export default function App() {
-  return (
-    <main className="min-h-screen">
-      <h1>NauAssist</h1>
-    </main>
-  );
+  return <ChatView />;
 }
