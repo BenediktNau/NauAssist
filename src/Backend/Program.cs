@@ -10,6 +10,7 @@ using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
+using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +57,9 @@ builder.Services.AddScoped<ITool, ListRulesTool>();
 builder.Services.AddScoped<ITool, AddRuleTool>();
 builder.Services.AddScoped<ITool, DeleteRuleTool>();
 builder.Services.AddScoped<ITool, PresentProposalsTool>();
+builder.Services.AddSingleton(new ClockContext(
+    () => DateTimeOffset.UtcNow,
+    TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
 builder.Services.AddScoped<AgentRunner>();
 
 // Chat & Audit

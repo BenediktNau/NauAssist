@@ -5,12 +5,16 @@ using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Infrastructure.Llm;
+using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Features.Agent;
 
 public sealed class AgentRunnerTests
 {
+    private static readonly ClockContext DefaultClock = new ClockContext(
+        () => DateTimeOffset.UtcNow, TimeZoneInfo.Utc);
+
     [Fact]
     public async Task Run_PureTextResponse_YieldsTokensAndDone()
     {
@@ -22,7 +26,8 @@ public sealed class AgentRunnerTests
 
         var runner = new AgentRunner(llm, Array.Empty<ITool>(),
             Options.Create(new AgentOptions()),
-            NullLogger<AgentRunner>.Instance);
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -48,7 +53,8 @@ public sealed class AgentRunnerTests
         var echoTool = new EchoTool();
         var runner = new AgentRunner(llm, new[] { (ITool)echoTool },
             Options.Create(new AgentOptions()),
-            NullLogger<AgentRunner>.Instance);
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -82,7 +88,8 @@ public sealed class AgentRunnerTests
         var present = new PresentProposalsTool();
         var runner = new AgentRunner(llm, new[] { (ITool)present },
             Options.Create(new AgentOptions()),
-            NullLogger<AgentRunner>.Instance);
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -111,7 +118,8 @@ public sealed class AgentRunnerTests
         var echoTool = new EchoTool();
         var runner = new AgentRunner(llm, new[] { (ITool)echoTool },
             Options.Create(new AgentOptions { MaxToolIterations = 5 }),
-            NullLogger<AgentRunner>.Instance);
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -133,7 +141,8 @@ public sealed class AgentRunnerTests
 
         var runner = new AgentRunner(llm, new[] { (ITool)new ThrowingTool() },
             Options.Create(new AgentOptions()),
-            NullLogger<AgentRunner>.Instance);
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(

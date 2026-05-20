@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Infrastructure.Llm;
+using NauAssist.Backend.Features.Infrastructure.Time;
 
 namespace NauAssist.Backend.Features.Agent;
 
@@ -13,17 +14,20 @@ public sealed class AgentRunner
     private readonly IReadOnlyDictionary<string, ITool> _tools;
     private readonly AgentOptions _options;
     private readonly ILogger<AgentRunner> _logger;
+    private readonly ClockContext _clockContext;
 
     public AgentRunner(
         ILlmClient llm,
         IEnumerable<ITool> tools,
         IOptions<AgentOptions> options,
-        ILogger<AgentRunner> logger)
+        ILogger<AgentRunner> logger,
+        ClockContext clockContext)
     {
         _llm = llm;
         _tools = tools.ToDictionary(t => t.Name);
         _options = options.Value;
         _logger = logger;
+        _clockContext = clockContext;
     }
 
     public async IAsyncEnumerable<AgentStreamEvent> HandleAsync(
@@ -31,7 +35,9 @@ public sealed class AgentRunner
         [EnumeratorCancellation] CancellationToken ct)
     {
         var toolDefs = _tools.Values.Select(t => t.ToDefinition()).ToList();
-        var conversation = history.ToList();
+        var snapshot = _clockContext.Build();
+        var conversation = new List<LlmMessage> { new LlmMessage("system", BuildTimeContextBlock(snapshot)) };
+        conversation.AddRange(history);
 
         for (var iteration = 0; iteration < _options.MaxToolIterations; iteration++)
         {
@@ -136,5 +142,38 @@ public sealed class AgentRunner
             slots.Add(new SlotInfo(start, end, note));
         }
         return slots;
+    }
+
+    private static string BuildTimeContextBlock(TimeSnapshot s)
+    {
+        static string ShortDay(DayOfWeek d) => d switch
+        {
+            DayOfWeek.Monday => "Mo",
+            DayOfWeek.Tuesday => "Di",
+            DayOfWeek.Wednesday => "Mi",
+            DayOfWeek.Thursday => "Do",
+            DayOfWeek.Friday => "Fr",
+            DayOfWeek.Saturday => "Sa",
+            DayOfWeek.Sunday => "So",
+            _ => "?",
+        };
+
+        var nowIso = s.NowLocal.ToString("yyyy-MM-ddTHH:mm:sszzz");
+
+        return
+            $"[Zeit-Kontext — verbindlich, alle Daten in {s.Timezone}]\n" +
+            $"Jetzt:          {nowIso} ({s.WeekdayDe}, KW {s.IsoWeek})\n" +
+            $"Heute:          {s.Today:yyyy-MM-dd} ({ShortDay(s.Today.DayOfWeek)})\n" +
+            $"Morgen:         {s.Tomorrow:yyyy-MM-dd} ({ShortDay(s.Tomorrow.DayOfWeek)})\n" +
+            $"Diese Woche:    {s.ThisWeek.Start:yyyy-MM-dd} (Mo) bis {s.ThisWeek.End:yyyy-MM-dd} (So)\n" +
+            $"Nächste Woche:  {s.NextWeek.Start:yyyy-MM-dd} (Mo) bis {s.NextWeek.End:yyyy-MM-dd} (So)\n" +
+            $"Dieses WE:      {s.ThisWeekend.Start:yyyy-MM-dd} (Sa) bis {s.ThisWeekend.End:yyyy-MM-dd} (So)\n" +
+            $"Nächstes WE:    {s.NextWeekend.Start:yyyy-MM-dd} (Sa) bis {s.NextWeekend.End:yyyy-MM-dd} (So)\n" +
+            "\n" +
+            "Wochenkonvention: Montag ist der erste Tag der Woche (ISO 8601).\n" +
+            "\"Nächste Woche\" = Mo–So der KW nach der aktuellen.\n" +
+            "\"Dieses Wochenende\" = der Sa+So in der aktuellen KW.\n" +
+            "\"Nächstes Wochenende\" = der Sa+So in der nächsten KW.\n" +
+            "Wenn heute Sa/So ist, ist \"dieses Wochenende\" das laufende; \"nächstes Wochenende\" ist 7 Tage später.";
     }
 }

@@ -7,6 +7,7 @@ using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Chat.SendMessage;
 using NauAssist.Backend.Features.Infrastructure.Llm;
+using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Features.Chat;
@@ -131,15 +132,20 @@ public sealed class SendMessageHandlerTests
 
         fakeLlm.CapturedCalls.Should().ContainSingle();
         var sent = fakeLlm.CapturedCalls[0].Messages;
-        sent.Select(m => m.Content).Should().Equal("alt-frage", "alt-antwort", "neue-frage");
+        // First message is the prepended time-context system message; skip it.
+        sent.Skip(1).Select(m => m.Content).Should().Equal("alt-frage", "alt-antwort", "neue-frage");
     }
+
+    private static readonly ClockContext DefaultClock = new ClockContext(
+        () => DateTimeOffset.UtcNow, TimeZoneInfo.Utc);
 
     private static AgentRunner BuildRunner(ILlmClient llm) =>
         new(
             llm,
             tools: Array.Empty<ITool>(),
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
-            logger: NullLogger<AgentRunner>.Instance);
+            logger: NullLogger<AgentRunner>.Instance,
+            clockContext: DefaultClock);
 
     private static SendMessageHandler BuildHandler(MessageRepository messages, AgentRunner runner) =>
         new(
