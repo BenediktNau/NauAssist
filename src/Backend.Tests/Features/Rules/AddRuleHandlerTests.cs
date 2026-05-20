@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Rules;
 using NauAssist.Backend.Features.Rules.AddRule;
 using NauAssist.Backend.Tests.Helpers;
@@ -12,7 +14,8 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var handler = new AddRuleHandler(repo, () => DateTimeOffset.Parse("2026-05-19T12:00:00+02:00"));
+        var audit = new AuditLogRepository(db.AppDb);
+        var handler = BuildHandler(repo, audit, () => DateTimeOffset.Parse("2026-05-19T12:00:00+02:00"));
 
         var request = new AddRuleRequest(
             Text: "Mi 19–20 Uhr Sport",
@@ -35,7 +38,8 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var handler = new AddRuleHandler(repo, () => DateTimeOffset.UtcNow);
+        var audit = new AuditLogRepository(db.AppDb);
+        var handler = BuildHandler(repo, audit);
 
         var request = new AddRuleRequest(
             Text: "",
@@ -54,7 +58,8 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var handler = new AddRuleHandler(repo, () => DateTimeOffset.UtcNow);
+        var audit = new AuditLogRepository(db.AppDb);
+        var handler = BuildHandler(repo, audit);
 
         var request = new AddRuleRequest(
             Text: "Quatsch-Range",
@@ -67,4 +72,36 @@ public sealed class AddRuleHandlerTests
 
         await act.Should().ThrowAsync<ArgumentException>().WithMessage("*TimeRange*");
     }
+
+    [Fact]
+    public async Task Handle_AfterAdd_WritesAuditEntry()
+    {
+        using var db = new TempSqliteDb();
+        var repo = new RuleRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb);
+        var handler = BuildHandler(repo, audit);
+
+        await handler.Handle(new AddRuleRequest(
+            Text: "Mi Sport",
+            DaysOfWeek: DayOfWeekFlags.Wednesday,
+            TimeRangeStart: null,
+            TimeRangeEnd: null,
+            Hardness: RuleHardness.Soft), CancellationToken.None);
+
+        (await audit.CountAsync(CancellationToken.None)).Should().Be(1);
+        using var conn = db.AppDb.OpenConnection();
+        var toolName = await Dapper.SqlMapper.ExecuteScalarAsync<string>(conn,
+            "SELECT tool_name FROM audit_log LIMIT 1");
+        toolName.Should().Be("add_rule");
+    }
+
+    private static AddRuleHandler BuildHandler(
+        RuleRepository repo,
+        AuditLogRepository audit,
+        Func<DateTimeOffset>? clock = null) =>
+        new(
+            repo,
+            audit,
+            clock ?? (() => DateTimeOffset.UtcNow),
+            NullLogger<AddRuleHandler>.Instance);
 }

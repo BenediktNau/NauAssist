@@ -1,16 +1,32 @@
+using System.Text.Json;
 using Mediator;
+using Microsoft.Extensions.Logging;
+using NauAssist.Backend.Features.Infrastructure.Audit;
 
 namespace NauAssist.Backend.Features.Rules.AddRule;
 
 public sealed class AddRuleHandler : IRequestHandler<AddRuleRequest, AddRuleResponse>
 {
-    private readonly RuleRepository _repo;
-    private readonly Func<DateTimeOffset> _clock;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
-    public AddRuleHandler(RuleRepository repo, Func<DateTimeOffset> clock)
+    private readonly RuleRepository _repo;
+    private readonly AuditLogRepository _audit;
+    private readonly Func<DateTimeOffset> _clock;
+    private readonly ILogger<AddRuleHandler> _logger;
+
+    public AddRuleHandler(
+        RuleRepository repo,
+        AuditLogRepository audit,
+        Func<DateTimeOffset> clock,
+        ILogger<AddRuleHandler> logger)
     {
         _repo = repo;
+        _audit = audit;
         _clock = clock;
+        _logger = logger;
     }
 
     public async ValueTask<AddRuleResponse> Handle(AddRuleRequest request, CancellationToken cancellationToken)
@@ -41,6 +57,34 @@ public sealed class AddRuleHandler : IRequestHandler<AddRuleRequest, AddRuleResp
             CreatedAt: _clock());
 
         var saved = await _repo.AddAsync(draft, cancellationToken);
+
+        await TryWriteAuditAsync(
+            toolName: "add_rule",
+            argsJson: JsonSerializer.Serialize(request, JsonOptions),
+            resultJson: JsonSerializer.Serialize(new { ruleId = saved.Id }, JsonOptions),
+            cancellationToken);
+
         return new AddRuleResponse(saved);
+    }
+
+    private async Task TryWriteAuditAsync(
+        string toolName, string argsJson, string resultJson, CancellationToken ct)
+    {
+        try
+        {
+            await _audit.AppendAsync(new AuditEntry(
+                Id: 0,
+                TriggeringMessageId: null,
+                ToolName: toolName,
+                ToolArgsJson: argsJson,
+                ResultJson: resultJson,
+                ProviderEventId: null,
+                CreatedAt: _clock()),
+                ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Audit-Eintrag für {Tool} fehlgeschlagen.", toolName);
+        }
     }
 }
