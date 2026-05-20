@@ -5,6 +5,8 @@ using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.Google;
+using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
@@ -56,6 +58,10 @@ builder.Services.AddScoped<ITool, DeleteRuleTool>();
 builder.Services.AddScoped<ITool, PresentProposalsTool>();
 builder.Services.AddScoped<AgentRunner>();
 
+// Chat & Audit
+builder.Services.AddScoped<MessageRepository>();
+builder.Services.AddScoped<AuditLogRepository>();
+
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
@@ -78,6 +84,7 @@ if (args.Contains("auth"))
 
 app.MapHealthEndpoints();
 app.MapRulesEndpoints();
+app.MapChatEndpoints();
 
 await app.RunAsync();
 return 0;
