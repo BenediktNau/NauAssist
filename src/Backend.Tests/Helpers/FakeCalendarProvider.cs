@@ -8,8 +8,14 @@ namespace NauAssist.Backend.Tests.Helpers;
 public sealed class FakeCalendarProvider : ICalendarProvider
 {
     private readonly List<CalendarEvent> _events = new();
+    private readonly List<NewEvent> _created = new();
     private int _idCounter = 0;
     private readonly object _lock = new();
+
+    public IReadOnlyList<NewEvent> CreatedEvents
+    {
+        get { lock (_lock) { return _created.ToList(); } }
+    }
 
     public void Seed(params CalendarEvent[] events)
     {
@@ -41,6 +47,7 @@ public sealed class FakeCalendarProvider : ICalendarProvider
             _idCounter++;
             var id = $"fake-{_idCounter}";
             _events.Add(new CalendarEvent(id, ev.Title, ev.Start, ev.End, ev.Description, ev.Location));
+            _created.Add(ev);
             return Task.FromResult(id);
         }
     }
