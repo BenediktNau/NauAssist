@@ -1,5 +1,6 @@
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NauAssist.Backend.Endpoints;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
@@ -19,14 +20,26 @@ builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<CalendarOptions>(builder.Configuration.GetSection("Calendar"));
 builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
+builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time"));
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
 
 builder.Services.AddSingleton<Func<DateTimeOffset>>(_ => () => DateTimeOffset.UtcNow);
+builder.Services.AddSingleton<TimeZoneInfo>(sp =>
+{
+    var opts = sp.GetRequiredService<IOptions<TimeOptions>>().Value;
+    return TimeZoneInfo.FindSystemTimeZoneById(opts.Zone);
+});
+builder.Services.AddSingleton<ClockContext>(sp =>
+{
+    var clock = sp.GetRequiredService<Func<DateTimeOffset>>();
+    var zone = sp.GetRequiredService<TimeZoneInfo>();
+    return new ClockContext(clock, zone);
+});
 builder.Services.AddScoped<RuleRepository>();
-builder.Services.AddSingleton(_ =>
-    new RuleApplicator(TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
+builder.Services.AddSingleton(sp =>
+    new RuleApplicator(sp.GetRequiredService<TimeZoneInfo>()));
 
 // Calendar
 builder.Services.AddSingleton<SqliteDataStore>();
@@ -34,9 +47,9 @@ builder.Services.AddSingleton<GoogleAuthService>();
 builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
 builder.Services.AddSingleton(sp =>
 {
-    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CalendarOptions>>().Value;
+    var opts = sp.GetRequiredService<IOptions<CalendarOptions>>().Value;
     return new FreeSlotCalculator(
-        TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"),
+        sp.GetRequiredService<TimeZoneInfo>(),
         TimeOnly.Parse(opts.WorkingHoursStart),
         TimeOnly.Parse(opts.WorkingHoursEnd),
         DayOfWeekFlags.WeekdaysOnly);
@@ -57,9 +70,7 @@ builder.Services.AddScoped<ITool, ListRulesTool>();
 builder.Services.AddScoped<ITool, AddRuleTool>();
 builder.Services.AddScoped<ITool, DeleteRuleTool>();
 builder.Services.AddScoped<ITool, PresentProposalsTool>();
-builder.Services.AddSingleton(new ClockContext(
-    () => DateTimeOffset.UtcNow,
-    TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
+builder.Services.AddScoped<ITool, GetCurrentTimeTool>();
 builder.Services.AddScoped<AgentRunner>();
 
 // Chat & Audit
