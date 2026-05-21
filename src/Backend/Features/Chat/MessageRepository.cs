@@ -48,6 +48,35 @@ public sealed class MessageRepository
         return rows.Select(MapToDomain).ToList();
     }
 
+    public async Task<IReadOnlyList<Message>> GetSinceAsync(string sessionId, DateTimeOffset since, int take, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<MessageRow>(
+            """
+            SELECT id, session_id, role, content, proposals_json, incomplete, created_at
+            FROM messages
+            WHERE session_id = @sessionId AND created_at > @since
+            ORDER BY id DESC
+            LIMIT @take;
+            """,
+            new { sessionId, since = since.ToString("O"), take });
+        return rows.Select(MapToDomain).ToList();
+    }
+
+    public async Task<IReadOnlyList<Message>> GetAllSinceAsync(string sessionId, DateTimeOffset since, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<MessageRow>(
+            """
+            SELECT id, session_id, role, content, proposals_json, incomplete, created_at
+            FROM messages
+            WHERE session_id = @sessionId AND created_at >= @since
+            ORDER BY id ASC;
+            """,
+            new { sessionId, since = since.ToString("O") });
+        return rows.Select(MapToDomain).ToList();
+    }
+
     public async Task MarkIncompleteAsync(long id, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();

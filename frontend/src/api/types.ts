@@ -18,8 +18,14 @@ export interface MessageDto {
   createdAt: string;
 }
 
+export interface ClearMarkerDto {
+  id: number;
+  createdAt: string;
+}
+
 export interface ChatHistoryDto {
   messages: MessageDto[];
+  markers: ClearMarkerDto[];
 }
 
 export interface RuleDto {

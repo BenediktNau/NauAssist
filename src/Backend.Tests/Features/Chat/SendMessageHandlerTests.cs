@@ -115,6 +115,35 @@ public sealed class SendMessageHandlerTests
     }
 
     [Fact]
+    public async Task Handle_RespectsClearMarker_ExcludesMessagesBefore()
+    {
+        using var temp = new TempSqliteDb();
+        var messages = new MessageRepository(temp.AppDb);
+
+        // Sechs alte Messages am 2026-05-19 vormittags …
+        await messages.AddAsync(new Message(0, "default", MessageRole.User, "alt-frage", null, false,
+            DateTimeOffset.Parse("2026-05-19T07:00:00Z")), CancellationToken.None);
+        await messages.AddAsync(new Message(0, "default", MessageRole.Assistant, "alt-antwort", null, false,
+            DateTimeOffset.Parse("2026-05-19T07:01:00Z")), CancellationToken.None);
+
+        var fakeLlm = new FakeLlmClient();
+        fakeLlm.QueueResponse(new TextDeltaChunk("ok"));
+
+        // … und ein Clear-Marker um 09:30 verschiebt den Cutoff auf nach den alten Messages.
+        var markers = new FixedMarker(DateTimeOffset.Parse("2026-05-19T09:30:00Z"));
+        var now = DateTimeOffset.Parse("2026-05-19T10:00:00Z");
+        var handler = BuildHandler(messages, BuildRunner(fakeLlm), markers, now);
+
+        await Collect(handler, new SendMessageRequest("default", "neue-frage"));
+
+        fakeLlm.CapturedCalls.Should().ContainSingle();
+        var sent = fakeLlm.CapturedCalls[0].Messages;
+        // Erste system-Message ist Zeit-Kontext, ggf. weitere für Kalender-Kontext. Wir
+        // erwarten unter den nicht-system-Messages NUR die neue Frage, nicht die alten.
+        sent.Where(m => m.Role != "system").Select(m => m.Content).Should().Equal("neue-frage");
+    }
+
+    [Fact]
     public async Task Handle_PassesPriorHistoryToRunner()
     {
         using var temp = new TempSqliteDb();
@@ -155,12 +184,40 @@ public sealed class SendMessageHandlerTests
             clockContext: DefaultClock,
             calendarContext: DefaultCalendarContext);
 
-    private static SendMessageHandler BuildHandler(MessageRepository messages, AgentRunner runner) =>
-        new(
+    private static SendMessageHandler BuildHandler(
+        MessageRepository messages,
+        AgentRunner runner,
+        IChatClearMarkerSource? markers = null,
+        DateTimeOffset? now = null)
+    {
+        var clock = now is DateTimeOffset fixedNow
+            ? (Func<DateTimeOffset>)(() => fixedNow)
+            : () => DateTimeOffset.Parse("2026-05-19T10:00:00Z");
+        var cutoff = new ChatContextCutoff(
+            markers ?? new NoMarkers(),
+            clock,
+            TimeZoneInfo.Utc);
+        return new SendMessageHandler(
             messages,
             runner,
-            clock: () => DateTimeOffset.Parse("2026-05-19T10:00:00Z"),
+            cutoff,
+            clock: clock,
             logger: NullLogger<SendMessageHandler>.Instance);
+    }
+
+    private sealed class NoMarkers : IChatClearMarkerSource
+    {
+        public Task<DateTimeOffset?> GetLatestCreatedAtSinceAsync(string sessionId, DateTimeOffset since, CancellationToken ct) =>
+            Task.FromResult<DateTimeOffset?>(null);
+    }
+
+    private sealed class FixedMarker : IChatClearMarkerSource
+    {
+        private readonly DateTimeOffset _markerAt;
+        public FixedMarker(DateTimeOffset markerAt) { _markerAt = markerAt; }
+        public Task<DateTimeOffset?> GetLatestCreatedAtSinceAsync(string sessionId, DateTimeOffset since, CancellationToken ct) =>
+            Task.FromResult(_markerAt > since ? (DateTimeOffset?)_markerAt : null);
+    }
 
     private static async Task<List<SseEvent>> Collect(SendMessageHandler handler, SendMessageRequest request)
     {

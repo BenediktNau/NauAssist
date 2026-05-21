@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getHistory } from "@/api/client";
+import { clearSession, getHistory } from "@/api/client";
 import { sendMessage } from "@/api/chatStream";
-import type { MessageDto, SlotInfo } from "@/api/types";
+import type { ClearMarkerDto, MessageDto, SlotInfo } from "@/api/types";
 
-export interface ChatBubble {
+export interface MessageBubble {
+  kind: "message";
   /**
    * Server-ID, sobald bekannt (nach `done`). Bis dahin temporäre Negativ-IDs.
    */
@@ -14,6 +15,20 @@ export interface ChatBubble {
   incomplete: boolean;
   /** true, solange die Antwort live reinkommt. */
   streaming: boolean;
+  /** ISO-8601 Timestamp der Nachricht (server-seitig bei History, sonst Client-Zeit). */
+  createdAt: string;
+}
+
+export interface ClearMarkerBubble {
+  kind: "clear-marker";
+  id: number;
+  createdAt: string;
+}
+
+export type ChatBubble = MessageBubble | ClearMarkerBubble;
+
+export function isMessageBubble(b: ChatBubble): b is MessageBubble {
+  return b.kind === "message";
 }
 
 export interface ToolStatus {
@@ -42,15 +57,50 @@ function parseProposals(json: string | null): SlotInfo[] | null {
   }
 }
 
-function mapHistory(msgs: MessageDto[]): ChatBubble[] {
-  return msgs.map((m) => ({
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    proposals: parseProposals(m.proposalsJson),
-    incomplete: m.incomplete,
-    streaming: false,
-  }));
+const DAY_START_HOUR = 5;
+
+/**
+ * Jüngste vergangene 5-Uhr-Marke in der Browser-Lokalzeit.
+ * Vor 5 Uhr morgens zählt der Vortag noch zum aktuellen "Chat-Tag".
+ */
+function currentDayStart(now: Date): Date {
+  const cutoff = new Date(now);
+  cutoff.setHours(DAY_START_HOUR, 0, 0, 0);
+  if (now.getTime() < cutoff.getTime()) {
+    cutoff.setDate(cutoff.getDate() - 1);
+  }
+  return cutoff;
+}
+
+const CLEAR_MARKER_ID_BIAS = 1_000_000; // Marker-IDs werden offset, um Kollision mit message.id zu vermeiden
+
+function mapHistory(msgs: MessageDto[], markers: ClearMarkerDto[]): ChatBubble[] {
+  const cutoff = currentDayStart(new Date()).getTime();
+
+  const messageBubbles: ChatBubble[] = msgs
+    .filter((m) => new Date(m.createdAt).getTime() >= cutoff)
+    .map((m): MessageBubble => ({
+      kind: "message",
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      proposals: parseProposals(m.proposalsJson),
+      incomplete: m.incomplete,
+      streaming: false,
+      createdAt: m.createdAt,
+    }));
+
+  const markerBubbles: ChatBubble[] = markers
+    .filter((m) => new Date(m.createdAt).getTime() >= cutoff)
+    .map((m): ClearMarkerBubble => ({
+      kind: "clear-marker",
+      id: m.id + CLEAR_MARKER_ID_BIAS,
+      createdAt: m.createdAt,
+    }));
+
+  return [...messageBubbles, ...markerBubbles].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 export function useChat(): ChatState & {
@@ -63,12 +113,17 @@ export function useChat(): ChatState & {
 
   const abortRef = useRef<AbortController | null>(null);
 
+  const reloadHistory = useCallback(async () => {
+    const dto = await getHistory();
+    setBubbles(mapHistory(dto.messages, dto.markers));
+  }, []);
+
   // Initial-History laden
   useEffect(() => {
     let cancelled = false;
     getHistory()
       .then((dto) => {
-        if (!cancelled) setBubbles(mapHistory(dto.messages));
+        if (!cancelled) setBubbles(mapHistory(dto.messages, dto.markers));
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "History-Load fehlgeschlagen");
@@ -83,21 +138,40 @@ export function useChat(): ChatState & {
     (text: string) => {
       if (sending || !text.trim()) return;
 
-      const userBubble: ChatBubble = {
+      const trimmed = text.trim();
+
+      if (trimmed === "/clear") {
+        setError(null);
+        setSending(true);
+        clearSession()
+          .then(() => reloadHistory())
+          .catch((e: unknown) => {
+            setError(e instanceof Error ? e.message : "Clear fehlgeschlagen");
+          })
+          .finally(() => setSending(false));
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const userBubble: MessageBubble = {
+        kind: "message",
         id: freshTempId(),
         role: "user",
         content: text,
         proposals: null,
         incomplete: false,
         streaming: false,
+        createdAt: nowIso,
       };
-      const agentBubble: ChatBubble = {
+      const agentBubble: MessageBubble = {
+        kind: "message",
         id: freshTempId(),
         role: "assistant",
         content: "",
         proposals: null,
         incomplete: false,
         streaming: true,
+        createdAt: nowIso,
       };
       const agentTempId = agentBubble.id;
 
@@ -119,7 +193,9 @@ export function useChat(): ChatState & {
             case "token":
               setBubbles((prev) =>
                 prev.map((b) =>
-                  b.id === agentTempId ? { ...b, content: b.content + ev.data.text } : b,
+                  isMessageBubble(b) && b.id === agentTempId
+                    ? { ...b, content: b.content + ev.data.text }
+                    : b,
                 ),
               );
               break;
@@ -131,14 +207,20 @@ export function useChat(): ChatState & {
               break;
             case "proposals":
               setBubbles((prev) =>
-                prev.map((b) => (b.id === agentTempId ? { ...b, proposals: ev.data } : b)),
+                prev.map((b) =>
+                  isMessageBubble(b) && b.id === agentTempId
+                    ? { ...b, proposals: ev.data }
+                    : b,
+                ),
               );
               break;
             case "done":
               doneSeen = true;
               setBubbles((prev) =>
                 prev.map((b) =>
-                  b.id === agentTempId ? { ...b, id: ev.data.messageId, streaming: false } : b,
+                  isMessageBubble(b) && b.id === agentTempId
+                    ? { ...b, id: ev.data.messageId, streaming: false }
+                    : b,
                 ),
               );
               setToolStatus(null);
@@ -147,7 +229,9 @@ export function useChat(): ChatState & {
               setError(ev.data.message);
               setBubbles((prev) =>
                 prev.map((b) =>
-                  b.id === agentTempId ? { ...b, streaming: false, incomplete: true } : b,
+                  isMessageBubble(b) && b.id === agentTempId
+                    ? { ...b, streaming: false, incomplete: true }
+                    : b,
                 ),
               );
               break;
@@ -159,7 +243,9 @@ export function useChat(): ChatState & {
             setError("Verbindung wurde unerwartet beendet.");
             setBubbles((prev) =>
               prev.map((b) =>
-                b.id === agentTempId ? { ...b, streaming: false, incomplete: true } : b,
+                isMessageBubble(b) && b.id === agentTempId
+                  ? { ...b, streaming: false, incomplete: true }
+                  : b,
               ),
             );
           }
@@ -168,7 +254,9 @@ export function useChat(): ChatState & {
           setError(e instanceof Error ? e.message : "Stream-Fehler");
           setBubbles((prev) =>
             prev.map((b) =>
-              b.id === agentTempId ? { ...b, streaming: false, incomplete: true } : b,
+              isMessageBubble(b) && b.id === agentTempId
+                ? { ...b, streaming: false, incomplete: true }
+                : b,
             ),
           );
         })
@@ -178,7 +266,7 @@ export function useChat(): ChatState & {
           abortRef.current = null;
         });
     },
-    [sending],
+    [sending, reloadHistory],
   );
 
   return { bubbles, toolStatus, error, sending, send };

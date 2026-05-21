@@ -1,6 +1,7 @@
 using Mediator;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Chat.ChatHistory;
+using NauAssist.Backend.Features.Chat.ClearSession;
 using NauAssist.Backend.Features.Chat.SendMessage;
 
 namespace NauAssist.Backend.Endpoints;
@@ -30,11 +31,18 @@ public static class ChatEndpoints
             }
         });
 
+        app.MapPost("/api/chat/clear", async (IMediator mediator, CancellationToken ct) =>
+        {
+            var response = await mediator.Send(new ClearSessionRequest(DefaultSessionId), ct);
+            return Results.Ok(new ClearMarkerDto(response.Id, response.CreatedAt));
+        });
+
         app.MapGet("/api/chat/history", async (IMediator mediator, CancellationToken ct) =>
         {
             var response = await mediator.Send(new GetChatHistoryRequest(DefaultSessionId), ct);
             var messages = response.Messages.Select(ToDto).ToList();
-            return Results.Ok(new ChatHistoryDto(messages));
+            var markers = response.Markers.Select(m => new ClearMarkerDto(m.Id, m.CreatedAt)).ToList();
+            return Results.Ok(new ChatHistoryDto(messages, markers));
         });
 
         return app;
@@ -51,7 +59,9 @@ public static class ChatEndpoints
 
     public sealed record SendMessagePayload(string Message);
 
-    private sealed record ChatHistoryDto(IReadOnlyList<MessageDto> Messages);
+    private sealed record ChatHistoryDto(
+        IReadOnlyList<MessageDto> Messages,
+        IReadOnlyList<ClearMarkerDto> Markers);
 
     private sealed record MessageDto(
         long Id,
@@ -61,4 +71,6 @@ public static class ChatEndpoints
         string? ProposalsJson,
         bool Incomplete,
         DateTimeOffset CreatedAt);
+
+    private sealed record ClearMarkerDto(long Id, DateTimeOffset CreatedAt);
 }

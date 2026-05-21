@@ -4,17 +4,26 @@ namespace NauAssist.Backend.Features.Chat.ChatHistory;
 
 public sealed class GetChatHistoryHandler : IRequestHandler<GetChatHistoryRequest, GetChatHistoryResponse>
 {
-    private readonly MessageRepository _repo;
+    private readonly MessageRepository _messages;
+    private readonly ChatClearMarkerRepository _markers;
+    private readonly ChatContextCutoff _cutoff;
 
-    public GetChatHistoryHandler(MessageRepository repo)
+    public GetChatHistoryHandler(
+        MessageRepository messages,
+        ChatClearMarkerRepository markers,
+        ChatContextCutoff cutoff)
     {
-        _repo = repo;
+        _messages = messages;
+        _markers = markers;
+        _cutoff = cutoff;
     }
 
     public async ValueTask<GetChatHistoryResponse> Handle(
         GetChatHistoryRequest request, CancellationToken cancellationToken)
     {
-        var recent = await _repo.GetRecentAsync(request.SessionId, request.Take, cancellationToken);
-        return new GetChatHistoryResponse(recent.Reverse().ToList());
+        var dayStart = _cutoff.ComputeDayStart();
+        var messages = await _messages.GetAllSinceAsync(request.SessionId, dayStart, cancellationToken);
+        var markers = await _markers.GetAllSinceAsync(request.SessionId, dayStart, cancellationToken);
+        return new GetChatHistoryResponse(messages, markers);
     }
 }

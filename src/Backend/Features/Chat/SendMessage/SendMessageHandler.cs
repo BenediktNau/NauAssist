@@ -19,17 +19,20 @@ public sealed class SendMessageHandler : IStreamCommandHandler<SendMessageReques
 
     private readonly MessageRepository _messages;
     private readonly AgentRunner _runner;
+    private readonly ChatContextCutoff _cutoff;
     private readonly Func<DateTimeOffset> _clock;
     private readonly ILogger<SendMessageHandler> _logger;
 
     public SendMessageHandler(
         MessageRepository messages,
         AgentRunner runner,
+        ChatContextCutoff cutoff,
         Func<DateTimeOffset> clock,
         ILogger<SendMessageHandler> logger)
     {
         _messages = messages;
         _runner = runner;
+        _cutoff = cutoff;
         _clock = clock;
         _logger = logger;
     }
@@ -42,7 +45,8 @@ public sealed class SendMessageHandler : IStreamCommandHandler<SendMessageReques
             new Message(0, request.SessionId, MessageRole.User, request.UserText, null, false, _clock()),
             ct);
 
-        var recent = await _messages.GetRecentAsync(request.SessionId, HistoryWindow, ct);
+        var cutoffTime = await _cutoff.ComputeAsync(request.SessionId, ct);
+        var recent = await _messages.GetSinceAsync(request.SessionId, cutoffTime, HistoryWindow, ct);
         var ordered = recent.Reverse().ToList();
         var history = ordered.Select(MapToLlmMessage).ToList();
 

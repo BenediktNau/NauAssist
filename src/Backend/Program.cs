@@ -78,6 +78,12 @@ builder.Services.AddScoped<AgentRunner>();
 
 // Chat & Audit
 builder.Services.AddScoped<MessageRepository>();
+builder.Services.AddScoped<ChatClearMarkerRepository>();
+builder.Services.AddScoped<IChatClearMarkerSource>(sp => sp.GetRequiredService<ChatClearMarkerRepository>());
+builder.Services.AddScoped<ChatContextCutoff>(sp => new ChatContextCutoff(
+    sp.GetRequiredService<IChatClearMarkerSource>(),
+    sp.GetRequiredService<Func<DateTimeOffset>>(),
+    sp.GetRequiredService<TimeZoneInfo>()));
 builder.Services.AddScoped<AuditLogRepository>();
 
 builder.Services.AddMediator(options =>

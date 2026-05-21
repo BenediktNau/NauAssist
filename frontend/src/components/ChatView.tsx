@@ -1,23 +1,33 @@
 import { useEffect, useRef } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { SlotInfo } from "@/api/types";
 import { useChat } from "@/hooks/useChat";
 import { ChatBubble } from "./ChatBubble";
+import { ClearDivider } from "./ClearDivider";
 import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
+import { Header } from "./nau/Header";
+import { CalendarCard } from "./nau/CalendarCard";
+import { FocusPanel } from "./nau/FocusPanel";
+import { ThinkingTerminal } from "./nau/ThinkingTerminal";
+import type { AppPage } from "@/App";
 
 const TOOL_STATUS_LABEL: Record<string, string> = {
-  lookup_free_slots: "Kalender wird durchsucht…",
-  get_calendar_range: "Kalender wird gelesen…",
-  create_event: "Termin wird angelegt…",
-  add_rule: "Regel wird gespeichert…",
-  delete_rule: "Regel wird gelöscht…",
-  list_rules: "Regeln werden geladen…",
-  present_proposals: "Vorschläge werden vorbereitet…",
+  lookup_free_slots: "SUCHE FREIE SLOTS",
+  get_calendar_range: "LESE KALENDER",
+  create_event: "LEGE TERMIN AN",
+  add_rule: "SPEICHERE REGEL",
+  delete_rule: "LÖSCHE REGEL",
+  list_rules: "LADE REGELN",
+  present_proposals: "BEREITE VORSCHLÄGE VOR",
 };
 
-export function ChatView() {
+interface ChatViewProps {
+  onNavigate: (page: AppPage) => void;
+}
+
+export function ChatView({ onNavigate }: ChatViewProps) {
   const { bubbles, toolStatus, error, sending, send } = useChat();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -28,33 +38,120 @@ export function ChatView() {
     send(`Ich nehme den Slot ${formatSlot(slot)}.`);
   };
 
-  const liveStatus =
-    toolStatus && toolStatus.state === "started"
-      ? (TOOL_STATUS_LABEL[toolStatus.name] ?? `Werkzeug läuft: ${toolStatus.name}`)
+  const lastBubble = bubbles[bubbles.length - 1];
+  const nauIsWriting =
+    lastBubble?.kind === "message" &&
+    lastBubble.role === "assistant" &&
+    lastBubble.streaming &&
+    lastBubble.content.length > 0;
+
+  const liveLabel =
+    sending && !nauIsWriting
+      ? toolStatus && toolStatus.state === "started"
+        ? (TOOL_STATUS_LABEL[toolStatus.name] ?? `WERKZEUG: ${toolStatus.name.toUpperCase()}`)
+        : "DENKE NACH"
       : null;
 
   return (
-    <div className="flex flex-col h-screen max-w-3xl mx-auto bg-white">
-      <header className="p-4 border-b">
-        <h1 className="text-xl font-semibold">NauAssist</h1>
-      </header>
+    <div className="flex h-screen flex-col bg-nau-bg text-nau-fg">
+      <Header onOpenSettings={() => onNavigate("settings")} />
 
-      <ScrollArea className="flex-1 px-4 py-4">
-        <div className="flex flex-col gap-4">
-          {bubbles.map((b) => (
-            <ChatBubble key={b.id} bubble={b} onPickSlot={onPickSlot} pickDisabled={sending} />
-          ))}
-          {liveStatus && <div className="text-sm text-slate-500 italic">{liveStatus}</div>}
-          {error && (
-            <div className="text-sm text-red-600 border border-red-200 rounded p-2 bg-red-50">
-              {error}
+      <main className="min-h-0 flex-1 px-6 py-6 lg:px-10 lg:py-8">
+        <div className="mx-auto flex h-full w-full max-w-[1480px] gap-6">
+          {/* ── Chat card ───────────────────────────────────── */}
+          <section className="flex min-w-0 flex-1 flex-col rounded-[4px] border border-nau-line bg-nau-bg-alt">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 lg:px-8">
+              {bubbles.length === 0 && (
+                <WelcomeBlock onPickPrompt={(text) => send(text)} />
+              )}
+              {bubbles.map((b) =>
+                b.kind === "clear-marker" ? (
+                  <ClearDivider key={b.id} createdAt={b.createdAt} />
+                ) : (
+                  <ChatBubble
+                    key={b.id}
+                    bubble={b}
+                    onPickSlot={onPickSlot}
+                    pickDisabled={sending}
+                  />
+                ),
+              )}
+              {liveLabel && <ThinkingTerminal label={liveLabel} />}
+              {error && (
+                <div className="mt-4 border border-nau-danger bg-white/[0.02] p-4 font-mono text-sm leading-relaxed text-nau-danger">
+                  [ ! ] {error}
+                </div>
+              )}
+              <div ref={bottomRef} />
             </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
 
-      <MessageInput onSend={send} disabled={sending} />
+            <div className="border-t border-nau-line px-5 py-4 lg:px-8">
+              <MessageInput onSend={send} disabled={sending} />
+            </div>
+          </section>
+
+          {/* ── Calendar card column ─────────────────────────── */}
+          <aside className="hidden w-[460px] shrink-0 flex-col gap-5 overflow-y-auto lg:flex">
+            <CalendarCard onTitleClick={() => onNavigate("calendar")} />
+            <FocusPanel />
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+interface WelcomeBlockProps {
+  onPickPrompt: (text: string) => void;
+}
+
+function WelcomeBlock({ onPickPrompt }: WelcomeBlockProps) {
+  const prompts = [
+    { cmd: "/frei", text: "Wann hab ich Zeit für einen Friseur diese Woche?" },
+    { cmd: "/verschieben", text: "Verschiebe das 1:1 mit Lina auf morgen" },
+    { cmd: "/termin", text: "Plane mir 2h Deep Work für die Spec" },
+  ];
+
+  return (
+    <div className="flex flex-col justify-center py-14">
+      <div className="mb-10 flex items-center gap-3.5">
+        <span className="font-mono text-[15px] font-bold text-nau-accent">01</span>
+        <span className="h-px w-10 bg-nau-line" />
+        <span className="font-mono text-[12px] tracking-mono-wide text-nau-fg-dim">
+          GUTEN MORGEN, NAU
+        </span>
+      </div>
+
+      <h1 className="m-0 mb-5 font-sans text-6xl font-normal leading-[1.05] tracking-tight text-nau-fg">
+        Was steht heute
+        <br />
+        auf{" "}
+        <span className="font-mono font-bold text-nau-accent">deinem Plan</span>?
+      </h1>
+      <p className="m-0 mb-10 max-w-[560px] font-sans text-lg leading-relaxed text-nau-fg-dim">
+        Ich lese deine Kalender, finde freie Slots, mache dir Vorschläge — und verschiebe
+        Termine, bevor sie kollidieren.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        <span className="mb-1 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
+          // SCHNELLSTART
+        </span>
+        {prompts.map((p) => (
+          <button
+            key={p.text}
+            type="button"
+            onClick={() => onPickPrompt(p.text)}
+            className="flex cursor-pointer items-center gap-4 border border-nau-line bg-white/[0.02] px-5 py-4 text-left font-sans text-base text-nau-fg transition-colors hover:border-nau-accent hover:bg-white/[0.04]"
+          >
+            <span className="w-[88px] font-mono text-[11px] tracking-mono text-nau-accent">
+              {p.cmd}
+            </span>
+            <span className="flex-1">{p.text}</span>
+            <span className="text-lg text-nau-fg-dim">→</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
