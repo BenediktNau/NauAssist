@@ -46,7 +46,8 @@ public sealed class CreateEventHandler : IRequestHandler<CreateEventRequest, Cre
             Start: request.Start,
             End: request.End,
             Description: request.Description,
-            Location: request.Location);
+            Location: request.Location,
+            IsAllDay: request.IsAllDay);
 
         var id = await _calendar.CreateEventAsync(newEvent, cancellationToken);
 

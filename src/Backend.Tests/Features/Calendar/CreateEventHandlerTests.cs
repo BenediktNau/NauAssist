@@ -92,6 +92,27 @@ public sealed class CreateEventHandlerTests
         providerEventId.Should().Be(response.EventId);
     }
 
+    [Fact]
+    public async Task Handle_AllDayRequest_ForwardsIsAllDayToProvider()
+    {
+        using var db = new TempSqliteDb();
+        var provider = new FakeCalendarProvider();
+        var audit = new AuditLogRepository(db.AppDb);
+        var handler = BuildHandler(provider, audit);
+
+        await handler.Handle(new CreateEventRequest(
+            Title: "Urlaub",
+            Start: DateTimeOffset.Parse("2026-06-01T00:00:00+02:00"),
+            End:   DateTimeOffset.Parse("2026-06-08T00:00:00+02:00"),
+            Description: null,
+            Location: null,
+            IsAllDay: true), CancellationToken.None);
+
+        provider.CreatedEvents.Should().HaveCount(1);
+        provider.CreatedEvents[0].IsAllDay.Should().BeTrue();
+        provider.CreatedEvents[0].Title.Should().Be("Urlaub");
+    }
+
     private static CreateEventHandler BuildHandler(ICalendarProvider provider, AuditLogRepository audit) =>
         new(
             provider,
