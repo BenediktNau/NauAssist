@@ -43,6 +43,7 @@ public sealed class GetCalendarRangeTool : ITool
                 end = e.End.ToString("O"),
                 description = e.Description,
                 location = e.Location,
+                is_all_day = e.IsAllDay,
             }),
         };
         return JsonSerializer.SerializeToElement(resultObj);
