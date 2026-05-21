@@ -32,6 +32,7 @@ public sealed class FreeSlotCalculator
 
         var duration = TimeSpan.FromMinutes(durationMinutes);
         var eventList = events
+            .Where(e => !e.IsAllDay)
             .Select(e => (Start: e.Start, End: e.End))
             .OrderBy(e => e.Start)
             .ToList();
