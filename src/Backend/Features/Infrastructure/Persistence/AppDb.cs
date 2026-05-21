@@ -12,14 +12,18 @@ public sealed class AppDb
 {
     private readonly string _connectionString;
 
+    public string DatabasePath { get; }
+
     public AppDb(IOptions<PersistenceOptions> options)
     {
-        var path = options.Value.DatabasePath;
-        var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+        var path = Path.GetFullPath(options.Value.DatabasePath);
+        var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
             Directory.CreateDirectory(dir);
         }
+
+        DatabasePath = path;
 
         _connectionString = new SqliteConnectionStringBuilder
         {

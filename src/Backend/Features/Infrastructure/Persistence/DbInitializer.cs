@@ -58,6 +58,25 @@ public sealed class DbInitializer
                 throw;
             }
         }
+
+        HardenPermissions();
+    }
+
+    private void HardenPermissions()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        if (!File.Exists(_db.DatabasePath)) return;
+
+        try
+        {
+            File.SetUnixFileMode(
+                _db.DatabasePath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "DB-Permission-Härtung auf 0600 fehlgeschlagen.");
+        }
     }
 
     private static IReadOnlyList<(string Version, string Sql)> LoadMigrations()

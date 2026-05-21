@@ -61,4 +61,31 @@ public sealed class DbInitializerTests
             .ToList();
         tables.Should().Contain("messages").And.Contain("audit_log");
     }
+
+    [Fact]
+    public void Initialize_CreatesAppSettingsTable_WithSeedValues()
+    {
+        using var db = new TempSqliteDb();
+
+        using var conn = db.AppDb.OpenConnection();
+        var rows = conn.Query<(string Key, string Value)>(
+            "SELECT key, value FROM app_settings ORDER BY key;").ToList();
+
+        rows.Should().Contain(r => r.Key == "llm.provider" && r.Value == "ollama");
+        rows.Should().Contain(r => r.Key == "llm.ollama.model" && r.Value == "gemma4:26b");
+        rows.Should().Contain(r => r.Key == "llm.gemini.model" && r.Value == "gemini-2.5-flash");
+        rows.Should().Contain(r => r.Key == "llm.gemini.api_key" && r.Value == "");
+    }
+
+    [Fact]
+    public void Initialize_OnLinux_SetsDbPermissionsToOwnerOnly()
+    {
+        if (!OperatingSystem.IsLinux()) return; // Test ist Linux-spezifisch
+
+        using var db = new TempSqliteDb();
+
+        var mode = File.GetUnixFileMode(db.Path);
+        var ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        mode.Should().Be(ownerOnly);
+    }
 }
