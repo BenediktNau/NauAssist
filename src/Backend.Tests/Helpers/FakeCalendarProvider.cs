@@ -46,7 +46,7 @@ public sealed class FakeCalendarProvider : ICalendarProvider
         {
             _idCounter++;
             var id = $"fake-{_idCounter}";
-            _events.Add(new CalendarEvent(id, ev.Title, ev.Start, ev.End, ev.Description, ev.Location));
+            _events.Add(new CalendarEvent(id, ev.Title, ev.Start, ev.End, ev.Description, ev.Location, ev.IsAllDay));
             _created.Add(ev);
             return Task.FromResult(id);
         }
