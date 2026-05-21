@@ -5,4 +5,5 @@ public sealed record NewEvent(
     DateTimeOffset Start,
     DateTimeOffset End,
     string? Description,
-    string? Location);
+    string? Location,
+    bool IsAllDay = false);

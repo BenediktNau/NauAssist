@@ -6,4 +6,5 @@ public sealed record CalendarEvent(
     DateTimeOffset Start,
     DateTimeOffset End,
     string? Description,
-    string? Location);
+    string? Location,
+    bool IsAllDay = false);

@@ -7,6 +7,7 @@ public sealed record CreateEventRequest(
     DateTimeOffset Start,
     DateTimeOffset End,
     string? Description,
-    string? Location) : IRequest<CreateEventResponse>;
+    string? Location,
+    bool IsAllDay = false) : IRequest<CreateEventResponse>;
 
 public sealed record CreateEventResponse(string EventId);
