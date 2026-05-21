@@ -38,8 +38,9 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
         var resp = await req.ExecuteAsync(ct);
 
         return resp.Items
-            .Where(e => e.Start?.DateTimeDateTimeOffset is not null && e.End?.DateTimeDateTimeOffset is not null)
-            .Select(MapToDomain)
+            .Select(e => GoogleEventMapper.Map(e, TimeZoneInfo.Utc))
+            .Where(e => e is not null)
+            .Select(e => e!)
             .ToList();
     }
 
@@ -69,12 +70,4 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
             ApplicationName = "NauAssist",
         });
     }
-
-    private static CalendarEvent MapToDomain(Event e) => new(
-        Id: e.Id,
-        Title: e.Summary ?? "(ohne Titel)",
-        Start: e.Start!.DateTimeDateTimeOffset!.Value,
-        End: e.End!.DateTimeDateTimeOffset!.Value,
-        Description: e.Description,
-        Location: e.Location);
 }
