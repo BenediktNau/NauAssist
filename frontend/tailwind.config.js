@@ -3,10 +3,7 @@ import tailwindcssAnimate from "tailwindcss-animate";
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
-  content: [
-    "./index.html",
-    "./src/**/*.{ts,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {
       center: true,
@@ -50,6 +47,27 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        nau: {
+          bg: "#0a0a0a",
+          "bg-alt": "#0f0f10",
+          fg: "#f5f5f4",
+          "fg-dim": "#888885",
+          line: "rgba(255,255,255,0.10)",
+          "line-strong": "rgba(255,255,255,0.20)",
+          accent: "#facc15",
+          "accent-2": "#f472b6",
+          blue: "#60a5fa",
+          danger: "#f472b6",
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', '"SF Mono"', 'Menlo', 'Consolas', 'monospace'],
+      },
+      letterSpacing: {
+        mono: "0.12em",
+        "mono-wide": "0.14em",
+        "mono-xwide": "0.18em",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,10 +83,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "nau-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.35" },
+        },
+        "nau-blink": {
+          "0%, 49%": { opacity: "1" },
+          "50%, 100%": { opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "nau-pulse": "nau-pulse 1.2s ease-in-out infinite",
+        "nau-blink": "nau-blink 0.8s steps(1) infinite",
       },
     },
   },
