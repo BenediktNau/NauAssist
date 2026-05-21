@@ -1,4 +1,5 @@
 using Dapper;
+using Microsoft.Data.Sqlite;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.Settings;
@@ -61,8 +62,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     }
 
     private static Task UpsertAsync(
-        Microsoft.Data.Sqlite.SqliteConnection conn,
-        Microsoft.Data.Sqlite.SqliteTransaction tx,
+        SqliteConnection conn,
+        SqliteTransaction tx,
         string key,
         string value,
         CancellationToken ct)

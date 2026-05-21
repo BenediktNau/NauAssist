@@ -1,3 +1,4 @@
+using Dapper;
 using FluentAssertions;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Tests.Helpers;
@@ -54,6 +55,11 @@ public sealed class AppSettingsRepositoryTests
 
         var loaded = await repo.GetLlmAsync(CancellationToken.None);
         loaded.GeminiApiKey.Should().BeNull();
+
+        using var conn = db.AppDb.OpenConnection();
+        var raw = await conn.ExecuteScalarAsync<string>(
+            "SELECT value FROM app_settings WHERE key = 'llm.gemini.api_key';");
+        raw.Should().Be("");
     }
 
     [Fact]
