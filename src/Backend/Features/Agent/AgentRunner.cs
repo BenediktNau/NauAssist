@@ -95,6 +95,8 @@ public sealed class AgentRunner
 
                 yield return new ToolStartedEvent(call.Name);
 
+                _logger.LogInformation("Tool-Call {Name} args={Args}", call.Name, call.Arguments.GetRawText());
+
                 JsonElement result;
                 bool ok;
                 try

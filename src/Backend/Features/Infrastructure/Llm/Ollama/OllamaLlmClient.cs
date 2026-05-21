@@ -168,6 +168,11 @@ public sealed class OllamaLlmClient : ILlmClient
             }).ToArray();
         }
 
+        var ollamaOptions = new Dictionary<string, object?>();
+        if (_options.NumCtx is { } numCtx) ollamaOptions["num_ctx"] = numCtx;
+        if (_options.Temperature is { } temperature) ollamaOptions["temperature"] = temperature;
+        if (ollamaOptions.Count > 0) payload["options"] = ollamaOptions;
+
         return payload;
     }
 

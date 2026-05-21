@@ -7,4 +7,6 @@ public sealed class OllamaOptions
     public int InitialTimeoutSeconds { get; set; } = 60;
     public int TokenTimeoutSeconds { get; set; } = 30;
     public string? SystemPrompt { get; set; }
+    public int? NumCtx { get; set; }
+    public double? Temperature { get; set; }
 }
