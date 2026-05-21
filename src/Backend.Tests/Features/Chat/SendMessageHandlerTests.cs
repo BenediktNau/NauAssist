@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
+using NauAssist.Backend.Features.Calendar;
+using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Chat.SendMessage;
 using NauAssist.Backend.Features.Infrastructure.Llm;
@@ -139,13 +141,19 @@ public sealed class SendMessageHandlerTests
     private static readonly ClockContext DefaultClock = new ClockContext(
         () => DateTimeOffset.UtcNow, TimeZoneInfo.Utc);
 
+    private static readonly CalendarContextBuilder DefaultCalendarContext = new CalendarContextBuilder(
+        new FakeCalendarProvider(),
+        Options.Create(new CalendarOptions { SearchHorizonDays = 14 }),
+        TimeZoneInfo.Utc);
+
     private static AgentRunner BuildRunner(ILlmClient llm) =>
         new(
             llm,
             tools: Array.Empty<ITool>(),
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             logger: NullLogger<AgentRunner>.Instance,
-            clockContext: DefaultClock);
+            clockContext: DefaultClock,
+            calendarContext: DefaultCalendarContext);
 
     private static SendMessageHandler BuildHandler(MessageRepository messages, AgentRunner runner) =>
         new(

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent.Tools;
+using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Time;
 
@@ -15,19 +16,22 @@ public sealed class AgentRunner
     private readonly AgentOptions _options;
     private readonly ILogger<AgentRunner> _logger;
     private readonly ClockContext _clockContext;
+    private readonly CalendarContextBuilder _calendarContext;
 
     public AgentRunner(
         ILlmClient llm,
         IEnumerable<ITool> tools,
         IOptions<AgentOptions> options,
         ILogger<AgentRunner> logger,
-        ClockContext clockContext)
+        ClockContext clockContext,
+        CalendarContextBuilder calendarContext)
     {
         _llm = llm;
         _tools = tools.ToDictionary(t => t.Name);
         _options = options.Value;
         _logger = logger;
         _clockContext = clockContext;
+        _calendarContext = calendarContext;
     }
 
     public async IAsyncEnumerable<AgentStreamEvent> HandleAsync(
@@ -37,6 +41,13 @@ public sealed class AgentRunner
         var toolDefs = _tools.Values.Select(t => t.ToDefinition()).ToList();
         var snapshot = _clockContext.Build();
         var conversation = new List<LlmMessage> { new LlmMessage("system", BuildTimeContextBlock(snapshot)) };
+
+        var calendarBlock = await _calendarContext.BuildAsync(snapshot, ct);
+        if (!string.IsNullOrWhiteSpace(calendarBlock))
+        {
+            conversation.Add(new LlmMessage("system", calendarBlock));
+        }
+
         conversation.AddRange(history);
 
         for (var iteration = 0; iteration < _options.MaxToolIterations; iteration++)

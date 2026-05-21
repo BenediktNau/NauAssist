@@ -2,6 +2,8 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent;
+using NauAssist.Backend.Features.Calendar;
+using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Tests.Helpers;
@@ -22,12 +24,19 @@ public sealed class AgentRunnerTimeContextTests
         var llm = new FakeLlmClient();
         llm.QueueResponse(new TextDeltaChunk("Alles klar."));
 
+        var calendarContextProvider = new FakeCalendarProvider();
+        var calendarContext = new CalendarContextBuilder(
+            calendarContextProvider,
+            Options.Create(new CalendarOptions { SearchHorizonDays = 14 }),
+            Berlin);
+
         var runner = new AgentRunner(
             llm,
             tools: Array.Empty<NauAssist.Backend.Features.Agent.ITool>(),
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             logger: NullLogger<AgentRunner>.Instance,
-            clockContext: clock);
+            clockContext: clock,
+            calendarContext: calendarContext);
 
         var history = new[]
         {

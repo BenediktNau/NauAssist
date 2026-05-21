@@ -5,6 +5,7 @@ using NauAssist.Backend.Endpoints;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Calendar;
+using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Audit;
@@ -54,6 +55,8 @@ builder.Services.AddSingleton(sp =>
         TimeOnly.Parse(opts.WorkingHoursEnd),
         DayOfWeekFlags.WeekdaysOnly);
 });
+
+builder.Services.AddScoped<CalendarContextBuilder>();
 
 // LLM
 builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>((sp, client) =>
