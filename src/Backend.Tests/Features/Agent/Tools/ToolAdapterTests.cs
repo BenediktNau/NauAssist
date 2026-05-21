@@ -41,7 +41,7 @@ public sealed class ToolAdapterTests
         var mediator = new FakeMediator();
         mediator.SetupResponse<CreateEventRequest, CreateEventResponse>(
             new CreateEventResponse("event-id-42"));
-        var tool = new CreateEventTool(mediator);
+        var tool = new CreateEventTool(mediator, TimeZoneInfo.Utc);
 
         var args = JsonDocument.Parse("""
             {"title":"Pierre","start":"2026-05-27T14:00:00+02:00","end":"2026-05-27T15:00:00+02:00"}
