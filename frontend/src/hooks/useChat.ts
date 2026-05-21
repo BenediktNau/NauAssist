@@ -109,6 +109,8 @@ export function useChat(): ChatState & {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
+      let doneSeen = false;
+
       sendMessage({
         message: text,
         signal: ctrl.signal,
@@ -133,6 +135,7 @@ export function useChat(): ChatState & {
               );
               break;
             case "done":
+              doneSeen = true;
               setBubbles((prev) =>
                 prev.map((b) =>
                   b.id === agentTempId ? { ...b, id: ev.data.messageId, streaming: false } : b,
@@ -151,6 +154,16 @@ export function useChat(): ChatState & {
           }
         },
       })
+        .then(() => {
+          if (!doneSeen) {
+            setError("Verbindung wurde unerwartet beendet.");
+            setBubbles((prev) =>
+              prev.map((b) =>
+                b.id === agentTempId ? { ...b, streaming: false, incomplete: true } : b,
+              ),
+            );
+          }
+        })
         .catch((e: unknown) => {
           setError(e instanceof Error ? e.message : "Stream-Fehler");
           setBubbles((prev) =>
@@ -161,6 +174,7 @@ export function useChat(): ChatState & {
         })
         .finally(() => {
           setSending(false);
+          setToolStatus(null);
           abortRef.current = null;
         });
     },

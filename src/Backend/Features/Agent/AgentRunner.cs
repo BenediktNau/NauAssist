@@ -124,7 +124,7 @@ public sealed class AgentRunner
         yield return new ErrorEvent("Ich komme da gerade nicht weiter (Tool-Loop-Limit erreicht).");
     }
 
-    private static IReadOnlyList<SlotInfo> ParseSlotsFromPresentProposalsArgs(JsonElement args)
+    private IReadOnlyList<SlotInfo> ParseSlotsFromPresentProposalsArgs(JsonElement args)
     {
         var slots = new List<SlotInfo>();
         if (!args.TryGetProperty("slots", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -134,8 +134,18 @@ public sealed class AgentRunner
 
         foreach (var s in arr.EnumerateArray())
         {
-            var start = DateTimeOffset.Parse(s.GetProperty("start").GetString()!);
-            var end = DateTimeOffset.Parse(s.GetProperty("end").GetString()!);
+            var startRaw = s.TryGetProperty("start", out var sEl) ? sEl.GetString() : null;
+            var endRaw = s.TryGetProperty("end", out var eEl) ? eEl.GetString() : null;
+
+            if (!DateTimeOffset.TryParse(startRaw, out var start) ||
+                !DateTimeOffset.TryParse(endRaw, out var end))
+            {
+                _logger.LogWarning(
+                    "present_proposals: Slot mit ungültigem Datum übersprungen (start={Start}, end={End}).",
+                    startRaw, endRaw);
+                continue;
+            }
+
             string? note = null;
             if (s.TryGetProperty("note", out var noteEl) && noteEl.ValueKind == JsonValueKind.String)
             {

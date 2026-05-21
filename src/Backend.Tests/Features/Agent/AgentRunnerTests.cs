@@ -104,6 +104,39 @@ public sealed class AgentRunnerTests
     }
 
     [Fact]
+    public async Task Run_PresentProposals_WithMalformedDate_SkipsInvalidSlot_NoCrash()
+    {
+        var llm = new FakeLlmClient();
+        llm.QueueResponse(new ToolCallChunk(new LlmToolCall(
+            Id: "call-1",
+            Name: "present_proposals",
+            Arguments: JsonDocument.Parse("""
+                {"slots":[
+                    {"start":"20to6-05-28T15:00:00+02:00","end":"2026-05-28T16:00:00+02:00"},
+                    {"start":"2026-05-27T10:00:00+02:00","end":"2026-05-27T11:00:00+02:00","note":"valid"}
+                ]}
+                """).RootElement)));
+        llm.QueueResponse(new TextDeltaChunk("done"));
+
+        var runner = new AgentRunner(llm, new[] { (ITool)new PresentProposalsTool() },
+            Options.Create(new AgentOptions()),
+            NullLogger<AgentRunner>.Instance,
+            DefaultClock);
+
+        var events = new List<AgentStreamEvent>();
+        await foreach (var ev in runner.HandleAsync(
+            new List<LlmMessage> { new("user", "?") }, CancellationToken.None))
+        {
+            events.Add(ev);
+        }
+
+        var proposals = events.OfType<ProposalsEvent>().Single();
+        proposals.Slots.Should().HaveCount(1);
+        proposals.Slots[0].Note.Should().Be("valid");
+        events.Last().Should().BeOfType<DoneEvent>();
+    }
+
+    [Fact]
     public async Task Run_ExceedsIterationLimit_EmitsErrorEvent()
     {
         var llm = new FakeLlmClient();
