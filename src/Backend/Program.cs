@@ -116,6 +116,7 @@ if (args.Contains("auth"))
 app.MapHealthEndpoints();
 app.MapRulesEndpoints();
 app.MapChatEndpoints();
+app.MapSettingsEndpoints();
 
 await app.RunAsync();
 return 0;
