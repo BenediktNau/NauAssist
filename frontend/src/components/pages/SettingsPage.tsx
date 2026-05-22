@@ -542,65 +542,68 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
                 </select>
               </Row>
 
-              {llm.provider === "gemini" && (
-                <Row
-                  label="Gemini API-Key"
-                  hint="Wird sicher lokal gespeichert. Hol dir einen Key bei aistudio.google.com."
-                >
-                  {llm.hasGeminiApiKey && !editingKey ? (
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
-                        •••••••••• GESPEICHERT
-                      </span>
+              <Row
+                label="Gemini API-Key"
+                hint="Wird sicher lokal gespeichert. Hol dir einen Key bei aistudio.google.com — kannst du auch eintragen bevor du auf Gemini umschaltest."
+              >
+                {llm.hasGeminiApiKey && !editingKey ? (
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
+                      •••••••••• GESPEICHERT
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingKey(true)}
+                      className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg"
+                    >
+                      ÄNDERN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveLlm({ geminiApiKey: "" })}
+                      disabled={saving || llm.provider === "gemini"}
+                      title={
+                        llm.provider === "gemini"
+                          ? "Erst auf Ollama wechseln, dann Key entfernen"
+                          : undefined
+                      }
+                      className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim disabled:opacity-40"
+                    >
+                      ENTFERNEN
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="password"
+                      value={draftKey}
+                      onChange={(e) => setDraftKey(e.target.value)}
+                      placeholder="AIza..."
+                      className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveLlm({ geminiApiKey: draftKey })}
+                      disabled={saving || draftKey.length === 0}
+                      className="cursor-pointer border-none bg-nau-accent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-bg"
+                    >
+                      ÜBERNEHMEN ↵
+                    </button>
+                    {llm.hasGeminiApiKey && (
                       <button
                         type="button"
-                        onClick={() => setEditingKey(true)}
-                        className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg"
+                        onClick={() => {
+                          setEditingKey(false);
+                          setDraftKey("");
+                        }}
+                        className="cursor-pointer bg-transparent px-2 py-2 font-mono text-[10px] tracking-mono text-nau-fg-dim"
                       >
-                        ÄNDERN
+                        ABBRECHEN
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => saveLlm({ geminiApiKey: "" })}
-                        disabled={saving}
-                        className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim"
-                      >
-                        ENTFERNEN
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="password"
-                        value={draftKey}
-                        onChange={(e) => setDraftKey(e.target.value)}
-                        placeholder="AIza..."
-                        className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => saveLlm({ geminiApiKey: draftKey })}
-                        disabled={saving || draftKey.length === 0}
-                        className="cursor-pointer border-none bg-nau-accent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-bg"
-                      >
-                        ÜBERNEHMEN ↵
-                      </button>
-                      {llm.hasGeminiApiKey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingKey(false);
-                            setDraftKey("");
-                          }}
-                          className="cursor-pointer bg-transparent px-2 py-2 font-mono text-[10px] tracking-mono text-nau-fg-dim"
-                        >
-                          ABBRECHEN
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </Row>
-              )}
+                    )}
+                  </div>
+                )}
+              </Row>
 
               {savedFlash && (
                 <div className="border-b border-nau-line py-3 font-mono text-[10px] tracking-mono-wide text-nau-accent">
