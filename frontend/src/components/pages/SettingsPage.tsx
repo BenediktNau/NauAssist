@@ -1,5 +1,13 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { AppPage } from "@/App";
+import {
+  getLlmSettings,
+  updateLlmSettings,
+  OLLAMA_MODELS,
+  GEMINI_MODELS,
+  type LlmSettings,
+} from "@/api/settings";
 
 interface SettingsPageProps {
   onNavigate: (page: AppPage) => void;
@@ -257,6 +265,45 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "06", label: "Datenschutz" },
   ];
 
+  const [llm, setLlm] = useState<LlmSettings | null>(null);
+  const [llmError, setLlmError] = useState<string | null>(null);
+  const [draftKey, setDraftKey] = useState<string>("");
+  const [editingKey, setEditingKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    getLlmSettings()
+      .then(setLlm)
+      .catch((e) => setLlmError(String(e.message ?? e)));
+  }, []);
+
+  const saveLlm = async (
+    patch: Partial<LlmSettings> & { geminiApiKey?: string | null },
+  ) => {
+    if (!llm) return;
+    setSaving(true);
+    setLlmError(null);
+    try {
+      await updateLlmSettings({
+        provider: patch.provider ?? llm.provider,
+        ollamaModel: patch.ollamaModel ?? llm.ollamaModel,
+        geminiModel: patch.geminiModel ?? llm.geminiModel,
+        geminiApiKey: patch.geminiApiKey ?? null,
+      });
+      const fresh = await getLlmSettings();
+      setLlm(fresh);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2500);
+    } catch (e) {
+      setLlmError(String((e as Error).message ?? e));
+    } finally {
+      setSaving(false);
+      setEditingKey(false);
+      setDraftKey("");
+    }
+  };
+
   const shortcuts = [
     { cmd: "/termin", desc: "Neuen Termin anlegen", keys: "⌘ T" },
     { cmd: "/verschieben", desc: "Letzten Termin verschieben", keys: "⌘ ⇧ V" },
@@ -441,6 +488,137 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             title="Wie Nau plant."
             kicker="Stelle ein, wie Nau Termine setzt, wie er antwortet und wann er dich in Ruhe lässt."
           />
+
+          {llmError && !llm && (
+            <div className="border border-nau-line bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-fg-dim">
+              // SETTINGS NICHT LADBAR — BACKEND OFFLINE?
+            </div>
+          )}
+
+          {llm && (
+            <>
+              <Row label="AI-Provider" hint="Welche AI Nau für seine Antworten nutzt.">
+                <div className="inline-flex border border-nau-line">
+                  {(["ollama", "gemini"] as const).map((p, i) => {
+                    const active = llm.provider === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => saveLlm({ provider: p })}
+                        disabled={saving}
+                        className="cursor-pointer bg-transparent px-4 py-2.5 font-mono text-[11px] uppercase tracking-mono"
+                        style={{
+                          background: active ? "#facc15" : "transparent",
+                          color: active ? "#0a0a0a" : "#f5f5f4",
+                          borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.10)" : "none",
+                        }}
+                      >
+                        {p === "ollama" ? "Ollama (lokal)" : "Gemini (Cloud)"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Row>
+
+              <Row label="Modell" hint="Welches Modell verwendet wird.">
+                <select
+                  value={llm.provider === "ollama" ? llm.ollamaModel : llm.geminiModel}
+                  disabled={saving}
+                  onChange={(e) =>
+                    saveLlm(
+                      llm.provider === "ollama"
+                        ? { ollamaModel: e.target.value }
+                        : { geminiModel: e.target.value },
+                    )
+                  }
+                  className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+                >
+                  {(llm.provider === "ollama" ? OLLAMA_MODELS : GEMINI_MODELS).map((m) => (
+                    <option key={m} value={m} className="bg-nau-bg text-nau-fg">
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Row>
+
+              {llm.provider === "gemini" && (
+                <Row
+                  label="Gemini API-Key"
+                  hint="Wird sicher lokal gespeichert. Hol dir einen Key bei aistudio.google.com."
+                >
+                  {llm.hasGeminiApiKey && !editingKey ? (
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
+                        •••••••••• GESPEICHERT
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingKey(true)}
+                        className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg"
+                      >
+                        ÄNDERN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveLlm({ geminiApiKey: "" })}
+                        disabled={saving}
+                        className="cursor-pointer border border-nau-line bg-transparent px-3.5 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim"
+                      >
+                        ENTFERNEN
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="password"
+                        value={draftKey}
+                        onChange={(e) => setDraftKey(e.target.value)}
+                        placeholder="AIza..."
+                        className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveLlm({ geminiApiKey: draftKey })}
+                        disabled={saving || draftKey.length === 0}
+                        className="cursor-pointer border-none bg-nau-accent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-bg"
+                      >
+                        ÜBERNEHMEN ↵
+                      </button>
+                      {llm.hasGeminiApiKey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingKey(false);
+                            setDraftKey("");
+                          }}
+                          className="cursor-pointer bg-transparent px-2 py-2 font-mono text-[10px] tracking-mono text-nau-fg-dim"
+                        >
+                          ABBRECHEN
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </Row>
+              )}
+
+              {savedFlash && (
+                <div className="border-b border-nau-line py-3 font-mono text-[10px] tracking-mono-wide text-nau-accent">
+                  // PROVIDER AKTUALISIERT — WIRD AB DEINER NÄCHSTEN NACHRICHT GENUTZT
+                </div>
+              )}
+              {llmError && llm && (
+                <div className="border-b border-nau-line py-3 font-mono text-[10px] tracking-mono-wide text-nau-danger">
+                  // FEHLER: {llmError}
+                </div>
+              )}
+
+              <div className="border-b border-nau-line py-4 font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
+                // ↓ ABSCHNITT UNTEN IST MOCKUP — NOCH NICHT VERDRAHTET
+              </div>
+            </>
+          )}
+
           <Row label="Tonalität" hint="So klingt Nau in seinen Antworten.">
             <SegRadio
               value="warm"
@@ -609,10 +787,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         </div>
 
         {/* sticky-feeling footer */}
-        <div className="mt-14 flex items-center justify-between border-t border-nau-line pt-6">
-          <div className="font-mono text-[10px] tracking-mono-wide text-nau-fg-dim">
-            // ALLE ÄNDERUNGEN WERDEN AUTOMATISCH GESPEICHERT
-          </div>
+        <div className="mt-14 flex items-center justify-end border-t border-nau-line pt-6">
           <div className="flex gap-3">
             <button
               type="button"
