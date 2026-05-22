@@ -38,12 +38,16 @@ public sealed class GoogleAuthService
         await using var stream = File.OpenRead(credentialsPath);
         var clientSecrets = (await GoogleClientSecrets.FromStreamAsync(stream, ct)).Secrets;
 
+        var isContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+        ICodeReceiver? codeReceiver = isContainer ? new ConsoleCodeReceiver() : null;
+
         var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
             clientSecrets,
             new[] { CalendarService.Scope.Calendar },
             user: "nauassist-default",
             taskCancellationToken: ct,
-            dataStore: _dataStore);
+            dataStore: _dataStore,
+            codeReceiver: codeReceiver);
 
         if (credential.Token.IsStale)
         {
