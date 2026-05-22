@@ -5,6 +5,7 @@ public static class SupportedModels
     public static readonly IReadOnlyList<string> Ollama = new[]
     {
         "gemma4:26b",
+        "qwen3.5:4b",
         "qwen2.5:7b-instruct",
         "llama3.2:3b",
     };
