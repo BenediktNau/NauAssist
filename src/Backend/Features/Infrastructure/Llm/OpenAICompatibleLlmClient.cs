@@ -3,20 +3,22 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
-namespace NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
+namespace NauAssist.Backend.Features.Infrastructure.Llm;
 
-public sealed class OllamaLlmClient : ILlmClient
+public sealed class OpenAICompatibleLlmClient : ILlmClient
 {
     private readonly HttpClient _http;
-    private readonly OllamaOptions _options;
-    private readonly ILogger<OllamaLlmClient> _logger;
+    private readonly OpenAICompatibleLlmOptions _options;
+    private readonly ILogger<OpenAICompatibleLlmClient> _logger;
 
-    public OllamaLlmClient(HttpClient http, IOptions<OllamaOptions> options, ILogger<OllamaLlmClient> logger)
+    public OpenAICompatibleLlmClient(
+        HttpClient http,
+        OpenAICompatibleLlmOptions options,
+        ILogger<OpenAICompatibleLlmClient> logger)
     {
         _http = http;
-        _options = options.Value;
+        _options = options;
         _logger = logger;
     }
 
@@ -26,7 +28,7 @@ public sealed class OllamaLlmClient : ILlmClient
         [EnumeratorCancellation] CancellationToken ct)
     {
         var payload = BuildPayload(messages, tools);
-        var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions")
+        var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
         {
             Content = JsonContent.Create(payload),
         };
@@ -154,6 +156,11 @@ public sealed class OllamaLlmClient : ILlmClient
             ["stream"] = true,
         };
 
+        if (_options.Temperature is { } temperature)
+        {
+            payload["temperature"] = temperature;
+        }
+
         if (tools.Count > 0)
         {
             payload["tools"] = tools.Select(t => new
@@ -168,10 +175,10 @@ public sealed class OllamaLlmClient : ILlmClient
             }).ToArray();
         }
 
-        var ollamaOptions = new Dictionary<string, object?>();
-        if (_options.NumCtx is { } numCtx) ollamaOptions["num_ctx"] = numCtx;
-        if (_options.Temperature is { } temperature) ollamaOptions["temperature"] = temperature;
-        if (ollamaOptions.Count > 0) payload["options"] = ollamaOptions;
+        if (_options.NumCtx is { } numCtx)
+        {
+            payload["options"] = new Dictionary<string, object?> { ["num_ctx"] = numCtx };
+        }
 
         return payload;
     }

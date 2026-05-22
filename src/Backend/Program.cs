@@ -58,11 +58,21 @@ builder.Services.AddSingleton(sp =>
 
 builder.Services.AddScoped<CalendarContextBuilder>();
 
-// LLM
-builder.Services.AddHttpClient<ILlmClient, OllamaLlmClient>((sp, client) =>
+// LLM — provisorisch, finalisiert in Task 7
+builder.Services.AddHttpClient<ILlmClient, OpenAICompatibleLlmClient>((sp, client) =>
 {
     var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
-    client.BaseAddress = new Uri(opts.Host);
+    client.BaseAddress = new Uri(opts.Host.TrimEnd('/') + "/v1/");
+}).Services.AddSingleton(sp =>
+{
+    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+    return new OpenAICompatibleLlmOptions(
+        Model: opts.Model,
+        InitialTimeoutSeconds: opts.InitialTimeoutSeconds,
+        TokenTimeoutSeconds: opts.TokenTimeoutSeconds,
+        SystemPrompt: opts.SystemPrompt,
+        Temperature: opts.Temperature,
+        NumCtx: opts.NumCtx);
 });
 
 // Agent-Tools (alle Scoped, weil sie IMediator brauchen)
