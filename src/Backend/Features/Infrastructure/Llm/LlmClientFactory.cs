@@ -61,6 +61,11 @@ public sealed class LlmClientFactory : ILlmClientFactory
         var http = _httpFactory.CreateClient("Ollama");
         http.BaseAddress = new Uri(_ollamaDefaults.Host.TrimEnd('/') + "/v1/");
 
+        if (!string.IsNullOrWhiteSpace(_ollamaDefaults.ApiKey))
+        {
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _ollamaDefaults.ApiKey);
+        }
+
         var options = new OpenAICompatibleLlmOptions(
             Model: s.OllamaModel,
             InitialTimeoutSeconds: _ollamaDefaults.InitialTimeoutSeconds,

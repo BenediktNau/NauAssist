@@ -22,6 +22,20 @@ public sealed class LlmClientFactoryTests
     }
 
     [Fact]
+    public async Task Create_OllamaProvider_WithApiKey_BuildsClient_WithBearer()
+    {
+        var factory = NewFactory(
+            new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null),
+            ollamaApiKey: "tok-abc");
+        var (client, http) = await factory.CreateInternalForTestAsync();
+
+        client.Should().BeOfType<OpenAICompatibleLlmClient>();
+        http.BaseAddress!.AbsoluteUri.Should().Be("http://localhost:11434/v1/");
+        http.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
+        http.DefaultRequestHeaders.Authorization.Parameter.Should().Be("tok-abc");
+    }
+
+    [Fact]
     public async Task Create_GeminiProvider_WithKey_BuildsClient_WithBearer()
     {
         var factory = NewFactory(new LlmSettings("gemini", "gemma4:26b", "gemini-2.5-flash", "AIza-xyz"));
@@ -52,11 +66,12 @@ public sealed class LlmClientFactoryTests
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    private static LlmClientFactory NewFactory(LlmSettings settings)
+    private static LlmClientFactory NewFactory(LlmSettings settings, string? ollamaApiKey = null)
     {
         var ollama = Options.Create(new OllamaOptions
         {
             Host = "http://localhost:11434",
+            ApiKey = ollamaApiKey,
             Model = "gemma4:26b",
             InitialTimeoutSeconds = 60,
             TokenTimeoutSeconds = 30,
