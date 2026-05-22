@@ -43,6 +43,7 @@ public sealed class OpenAICompatibleLlmClient : ILlmClient
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
         var toolCallBuffer = new Dictionary<int, ToolCallBuilder>();
+        var thoughtStripper = new ThoughtTagStripper();
 
         while (true)
         {
@@ -72,7 +73,11 @@ public sealed class OpenAICompatibleLlmClient : ILlmClient
                 var text = contentEl.GetString();
                 if (!string.IsNullOrEmpty(text))
                 {
-                    yield return new TextDeltaChunk(text);
+                    var stripped = thoughtStripper.Process(text);
+                    if (stripped.Length > 0)
+                    {
+                        yield return new TextDeltaChunk(stripped);
+                    }
                 }
             }
 
@@ -120,6 +125,12 @@ public sealed class OpenAICompatibleLlmClient : ILlmClient
                 }
                 toolCallBuffer.Clear();
             }
+        }
+
+        var leftover = thoughtStripper.Flush();
+        if (leftover.Length > 0)
+        {
+            yield return new TextDeltaChunk(leftover);
         }
     }
 
