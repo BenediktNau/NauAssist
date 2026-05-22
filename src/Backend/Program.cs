@@ -10,16 +10,17 @@ using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
+using NauAssist.Backend.Features.Infrastructure.Llm.Gemini;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
+using NauAssist.Backend.Features.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection("Persistence"));
 builder.Services.Configure<CalendarOptions>(builder.Configuration.GetSection("Calendar"));
-builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
 builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time"));
 
@@ -58,21 +59,17 @@ builder.Services.AddSingleton(sp =>
 
 builder.Services.AddScoped<CalendarContextBuilder>();
 
-// LLM — provisorisch, finalisiert in Task 7
-builder.Services.AddHttpClient<ILlmClient, OpenAICompatibleLlmClient>((sp, client) =>
+// LLM
+builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
+builder.Services.AddHttpClient("Ollama");
+builder.Services.AddHttpClient("Gemini");
+builder.Services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
+builder.Services.AddScoped<ILlmClientFactory, LlmClientFactory>();
+builder.Services.AddScoped<ILlmClient>(sp =>
 {
-    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
-    client.BaseAddress = new Uri(opts.Host.TrimEnd('/') + "/v1/");
-}).Services.AddSingleton(sp =>
-{
-    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
-    return new OpenAICompatibleLlmOptions(
-        Model: opts.Model,
-        InitialTimeoutSeconds: opts.InitialTimeoutSeconds,
-        TokenTimeoutSeconds: opts.TokenTimeoutSeconds,
-        SystemPrompt: opts.SystemPrompt,
-        Temperature: opts.Temperature,
-        NumCtx: opts.NumCtx);
+    var factory = sp.GetRequiredService<ILlmClientFactory>();
+    return factory.CreateAsync(CancellationToken.None).GetAwaiter().GetResult();
 });
 
 // Agent-Tools (alle Scoped, weil sie IMediator brauchen)
