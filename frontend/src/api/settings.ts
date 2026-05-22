@@ -21,6 +21,7 @@ export const OLLAMA_MODELS = [
 export const GEMINI_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-pro",
+  "gemma-4-31b-it",
 ] as const;
 
 export async function getLlmSettings(): Promise<LlmSettings> {

@@ -13,5 +13,6 @@ public static class SupportedModels
     {
         "gemini-2.5-flash",
         "gemini-2.5-pro",
+        "gemma-4-31b-it",
     };
 }
