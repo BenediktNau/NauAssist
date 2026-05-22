@@ -1,0 +1,17 @@
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.vs
+**/.vscode
+**/.idea
+src/Backend/data
+docs
+.github
+.git
+.gitignore
+.claude
+*.md
+LICENSE
+.dockerignore
+Dockerfile

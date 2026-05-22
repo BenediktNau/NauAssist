@@ -113,10 +113,15 @@ if (args.Contains("auth"))
     return await GoogleAuthCommand.RunAsync(app.Services, CancellationToken.None);
 }
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapHealthEndpoints();
 app.MapRulesEndpoints();
 app.MapChatEndpoints();
 app.MapSettingsEndpoints();
+
+app.MapFallbackToFile("index.html");
 
 await app.RunAsync();
 return 0;
