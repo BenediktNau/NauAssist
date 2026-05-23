@@ -2,8 +2,10 @@ using System.Text.Json;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using NauAssist.Backend.Features.Infrastructure.Audit;
+using NauAssist.Backend.Features.Settings.GetCalendarSettings;
 using NauAssist.Backend.Features.Settings.GetLlmSettings;
 using NauAssist.Backend.Features.Settings.GetOllamaSettings;
+using NauAssist.Backend.Features.Settings.UpdateCalendarSettings;
 using NauAssist.Backend.Features.Settings.UpdateLlmSettings;
 using NauAssist.Backend.Features.Settings.UpdateOllamaSettings;
 
@@ -156,6 +158,54 @@ public static class SettingsEndpoints
             }
         });
 
+        app.MapGet("/api/settings/calendar", async (IMediator mediator, CancellationToken ct) =>
+        {
+            var r = await mediator.Send(new GetCalendarSettingsRequest(), ct);
+            return Results.Ok(new CalendarSettingsDto(
+                r.CalendarId, r.WorkingHoursStart, r.WorkingHoursEnd,
+                r.DefaultDurationMinutes, r.SearchHorizonDays,
+                r.HasGoogleCredentials, r.IsConnected));
+        });
+
+        app.MapPut("/api/settings/calendar", async (
+            UpdateCalendarSettingsPayload payload,
+            IMediator mediator,
+            AuditLogRepository audit,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            var result = await mediator.Send(new UpdateCalendarSettingsRequest(
+                CalendarId: payload.CalendarId ?? "",
+                WorkingHoursStart: payload.WorkingHoursStart ?? "",
+                WorkingHoursEnd: payload.WorkingHoursEnd ?? "",
+                DefaultDurationMinutes: payload.DefaultDurationMinutes,
+                SearchHorizonDays: payload.SearchHorizonDays,
+                GoogleClientId: payload.GoogleClientId,
+                GoogleClientSecret: payload.GoogleClientSecret), ct);
+
+            if (!result.Ok) return Results.BadRequest(new { error = result.Error });
+
+            var args = JsonSerializer.Serialize(new
+            {
+                calendarId = payload.CalendarId,
+                workingHoursStart = payload.WorkingHoursStart,
+                workingHoursEnd = payload.WorkingHoursEnd,
+                clientIdAction = payload.GoogleClientId switch
+                {
+                    null => "unchanged", "" => "cleared", _ => "set",
+                },
+                clientSecretAction = payload.GoogleClientSecret switch
+                {
+                    null => "unchanged", "" => "cleared", _ => "set",
+                },
+            });
+            await audit.AppendAsync(
+                new AuditEntry(0, null, "settings.calendar.update", args, "{\"ok\":true}", null, clock()),
+                ct);
+
+            return Results.Ok(new { ok = true });
+        });
+
         return app;
     }
 
@@ -185,4 +235,22 @@ public static class SettingsEndpoints
 
     public sealed record TestOllamaPayload(string Host, string? ApiKey);
     private sealed record TestOllamaResult(bool Ok, string[]? Models, string? Error);
+
+    public sealed record UpdateCalendarSettingsPayload(
+        string? CalendarId,
+        string? WorkingHoursStart,
+        string? WorkingHoursEnd,
+        int DefaultDurationMinutes,
+        int SearchHorizonDays,
+        string? GoogleClientId,
+        string? GoogleClientSecret);
+
+    private sealed record CalendarSettingsDto(
+        string CalendarId,
+        string WorkingHoursStart,
+        string WorkingHoursEnd,
+        int DefaultDurationMinutes,
+        int SearchHorizonDays,
+        bool HasGoogleCredentials,
+        bool IsConnected);
 }
