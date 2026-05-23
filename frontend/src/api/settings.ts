@@ -14,6 +14,7 @@ export interface UpdateLlmSettingsPayload {
 
 export const OLLAMA_MODELS = [
   "gemma4:26b",
+  "gemma4:e2b",
   "qwen3.5:4b",
   "qwen2.5:7b-instruct",
   "llama3.2:3b",

@@ -21,17 +21,31 @@ public sealed class UpdateLlmSettingsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_InvalidOllamaModel_ReturnsError()
+    public async Task Handle_EmptyOllamaModel_ReturnsError()
     {
         var repo = new InMemorySettingsRepo();
         var handler = new UpdateLlmSettingsHandler(repo);
 
         var result = await handler.Handle(
-            new UpdateLlmSettingsRequest("ollama", "gpt-4", "gemini-2.5-flash", null),
+            new UpdateLlmSettingsRequest("ollama", "", "gemini-2.5-flash", null),
             CancellationToken.None);
 
         result.Ok.Should().BeFalse();
         result.Error.Should().Contain("ollamaModel");
+    }
+
+    [Fact]
+    public async Task Handle_CustomOllamaModel_Succeeds()
+    {
+        var repo = new InMemorySettingsRepo();
+        var handler = new UpdateLlmSettingsHandler(repo);
+
+        var result = await handler.Handle(
+            new UpdateLlmSettingsRequest("ollama", "mistral:7b", "gemini-2.5-flash", null),
+            CancellationToken.None);
+
+        result.Ok.Should().BeTrue();
+        repo.Current.OllamaModel.Should().Be("mistral:7b");
     }
 
     [Fact]

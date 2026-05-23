@@ -21,9 +21,9 @@ public sealed class UpdateLlmSettingsHandler
             return new UpdateLlmSettingsResult(false, $"Ungültiger provider: '{request.Provider}'.");
         }
 
-        if (!SupportedModels.Ollama.Contains(request.OllamaModel))
+        if (string.IsNullOrWhiteSpace(request.OllamaModel))
         {
-            return new UpdateLlmSettingsResult(false, $"Ungültiges ollamaModel: '{request.OllamaModel}'.");
+            return new UpdateLlmSettingsResult(false, "ollamaModel darf nicht leer sein.");
         }
 
         if (!SupportedModels.Gemini.Contains(request.GeminiModel))

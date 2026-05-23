@@ -347,24 +347,42 @@ function LlmSection({
         </div>
       </Row>
 
-      <Row label="Modell" hint="Welches Modell verwendet wird.">
-        <select
-          value={llm.provider === "ollama" ? llm.ollamaModel : llm.geminiModel}
-          onChange={(e) =>
-            saveLlm(
-              llm.provider === "ollama"
-                ? { ollamaModel: e.target.value }
-                : { geminiModel: e.target.value },
-            )
-          }
-          className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-        >
-          {(llm.provider === "ollama" ? OLLAMA_MODELS : GEMINI_MODELS).map((m) => (
-            <option key={m} value={m} className="bg-nau-bg text-nau-fg">
-              {m}
-            </option>
-          ))}
-        </select>
+      <Row
+        label="Modell"
+        hint={
+          llm.provider === "ollama"
+            ? "Vorschläge — oder eigenes lokal gepulltes Modell eintippen."
+            : "Welches Modell verwendet wird."
+        }
+      >
+        {llm.provider === "ollama" ? (
+          <>
+            <input
+              list="ollama-models"
+              value={llm.ollamaModel}
+              onChange={(e) => saveLlm({ ollamaModel: e.target.value })}
+              className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+              placeholder="z.B. gemma4:26b"
+            />
+            <datalist id="ollama-models">
+              {OLLAMA_MODELS.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+          </>
+        ) : (
+          <select
+            value={llm.geminiModel}
+            onChange={(e) => saveLlm({ geminiModel: e.target.value })}
+            className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+          >
+            {GEMINI_MODELS.map((m) => (
+              <option key={m} value={m} className="bg-nau-bg text-nau-fg">
+                {m}
+              </option>
+            ))}
+          </select>
+        )}
       </Row>
 
       <Row
