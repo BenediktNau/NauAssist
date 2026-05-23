@@ -44,7 +44,9 @@ builder.Services.AddSingleton(sp =>
 
 // Calendar
 builder.Services.AddSingleton<SqliteDataStore>();
-builder.Services.AddSingleton<GoogleAuthService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<AuthSessionStore>();
+builder.Services.AddScoped<GoogleAuthService>();
 builder.Services.AddScoped<ICalendarProvider, GoogleCalendarProvider>();
 builder.Services.AddScoped(sp =>
 {
@@ -120,6 +122,7 @@ app.MapHealthEndpoints();
 app.MapRulesEndpoints();
 app.MapChatEndpoints();
 app.MapSettingsEndpoints();
+app.MapCalendarAuthEndpoints();
 
 app.MapFallbackToFile("index.html");
 
