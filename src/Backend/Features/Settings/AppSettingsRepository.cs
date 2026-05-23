@@ -14,6 +14,11 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyOllamaApiKey = "ollama.api_key";
     private const string KeyOllamaNumCtx = "ollama.num_ctx";
     private const string KeyOllamaTemperature = "ollama.temperature";
+    private const string KeyCalendarId      = "calendar.google.calendar_id";
+    private const string KeyWorkingStart    = "calendar.working_hours_start";
+    private const string KeyWorkingEnd      = "calendar.working_hours_end";
+    private const string KeyDefaultDuration = "calendar.default_duration_min";
+    private const string KeySearchHorizon   = "calendar.search_horizon_days";
 
     private readonly AppDb _db;
 
@@ -127,10 +132,50 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             throw;
         }
     }
-    public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
-        throw new NotImplementedException();
-    public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>
-        throw new NotImplementedException();
+    public async Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2, @k3, @k4, @k5);",
+            new
+            {
+                k1 = KeyCalendarId,
+                k2 = KeyWorkingStart,
+                k3 = KeyWorkingEnd,
+                k4 = KeyDefaultDuration,
+                k5 = KeySearchHorizon,
+            },
+            cancellationToken: ct));
+
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+
+        return new CalendarUserSettings(
+            CalendarId: map.GetValueOrDefault(KeyCalendarId, "primary"),
+            WorkingHoursStart: TimeOnly.Parse(map.GetValueOrDefault(KeyWorkingStart, "09:00")),
+            WorkingHoursEnd: TimeOnly.Parse(map.GetValueOrDefault(KeyWorkingEnd, "18:00")),
+            DefaultDurationMinutes: int.Parse(map.GetValueOrDefault(KeyDefaultDuration, "60")),
+            SearchHorizonDays: int.Parse(map.GetValueOrDefault(KeySearchHorizon, "14")));
+    }
+
+    public async Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyCalendarId, settings.CalendarId, ct);
+            await UpsertAsync(conn, tx, KeyWorkingStart, settings.WorkingHoursStart.ToString("HH:mm"), ct);
+            await UpsertAsync(conn, tx, KeyWorkingEnd, settings.WorkingHoursEnd.ToString("HH:mm"), ct);
+            await UpsertAsync(conn, tx, KeyDefaultDuration, settings.DefaultDurationMinutes.ToString(), ct);
+            await UpsertAsync(conn, tx, KeySearchHorizon, settings.SearchHorizonDays.ToString(), ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
     public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
         throw new NotImplementedException();
     public Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct) =>
