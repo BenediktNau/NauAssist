@@ -77,4 +77,17 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             transaction: tx,
             cancellationToken: ct));
     }
+
+    public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
+        throw new NotImplementedException();
+    public Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct) =>
+        throw new NotImplementedException();
+    public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
+        throw new NotImplementedException();
+    public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>
+        throw new NotImplementedException();
+    public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
+        throw new NotImplementedException();
+    public Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct) =>
+        throw new NotImplementedException();
 }

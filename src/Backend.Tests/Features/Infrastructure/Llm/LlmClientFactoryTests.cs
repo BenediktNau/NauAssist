@@ -101,6 +101,19 @@ public sealed class LlmClientFactoryTests
         public FakeSettingsRepo(LlmSettings s) => _settings = s;
         public Task<LlmSettings> GetLlmAsync(CancellationToken ct) => Task.FromResult(_settings);
         public Task SetLlmAsync(LlmSettings s, CancellationToken ct) { _settings = s; return Task.CompletedTask; }
+
+        public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct) =>
+            throw new NotImplementedException();
     }
 
     private sealed class TestHttpClientFactory : IHttpClientFactory

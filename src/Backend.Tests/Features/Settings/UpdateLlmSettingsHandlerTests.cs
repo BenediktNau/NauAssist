@@ -125,5 +125,24 @@ public sealed class UpdateLlmSettingsHandlerTests
             Current = settings;
             return Task.CompletedTask;
         }
+
+        public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
+            Task.FromResult(new OllamaUserSettings("http://localhost:11434", null, 16384, 0.3));
+
+        public Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
+            Task.FromResult(new CalendarUserSettings(
+                "primary", new TimeOnly(9, 0), new TimeOnly(18, 0), 60, 14));
+
+        public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
+            Task.FromResult<GoogleCredentials?>(null);
+
+        public Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct) =>
+            Task.CompletedTask;
     }
 }
