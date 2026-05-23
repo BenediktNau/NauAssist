@@ -10,6 +10,10 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyOllamaModel = "llm.ollama.model";
     private const string KeyGeminiModel = "llm.gemini.model";
     private const string KeyGeminiApiKey = "llm.gemini.api_key";
+    private const string KeyOllamaHost = "ollama.host";
+    private const string KeyOllamaApiKey = "ollama.api_key";
+    private const string KeyOllamaNumCtx = "ollama.num_ctx";
+    private const string KeyOllamaTemperature = "ollama.temperature";
 
     private readonly AppDb _db;
 
@@ -78,10 +82,51 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             cancellationToken: ct));
     }
 
-    public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
-        throw new NotImplementedException();
-    public Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct) =>
-        throw new NotImplementedException();
+    public async Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2, @k3, @k4);",
+            new
+            {
+                k1 = KeyOllamaHost,
+                k2 = KeyOllamaApiKey,
+                k3 = KeyOllamaNumCtx,
+                k4 = KeyOllamaTemperature,
+            },
+            cancellationToken: ct));
+
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        var apiKeyRaw = map.GetValueOrDefault(KeyOllamaApiKey, "");
+
+        return new OllamaUserSettings(
+            Host: map.GetValueOrDefault(KeyOllamaHost, "http://localhost:11434"),
+            ApiKey: string.IsNullOrEmpty(apiKeyRaw) ? null : apiKeyRaw,
+            NumCtx: int.Parse(map.GetValueOrDefault(KeyOllamaNumCtx, "16384")),
+            Temperature: double.Parse(
+                map.GetValueOrDefault(KeyOllamaTemperature, "0.3"),
+                System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    public async Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyOllamaHost, settings.Host, ct);
+            await UpsertAsync(conn, tx, KeyOllamaApiKey, settings.ApiKey ?? "", ct);
+            await UpsertAsync(conn, tx, KeyOllamaNumCtx, settings.NumCtx.ToString(), ct);
+            await UpsertAsync(conn, tx, KeyOllamaTemperature,
+                settings.Temperature.ToString(System.Globalization.CultureInfo.InvariantCulture), ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
     public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
         throw new NotImplementedException();
     public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>
