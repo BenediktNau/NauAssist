@@ -44,3 +44,55 @@ export async function updateLlmSettings(
     throw new Error(body.error ?? `PUT /api/settings/llm failed: ${res.status}`);
   }
 }
+
+export interface OllamaSettings {
+  host: string;
+  hasApiKey: boolean;
+  numCtx: number;
+  temperature: number;
+}
+
+export interface UpdateOllamaSettingsPayload {
+  host: string;
+  apiKey: string | null;
+  numCtx: number;
+  temperature: number;
+}
+
+export async function getOllamaSettings(): Promise<OllamaSettings> {
+  const res = await fetch("/api/settings/ollama");
+  if (!res.ok) throw new Error(`GET /api/settings/ollama failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateOllamaSettings(
+  payload: UpdateOllamaSettingsPayload,
+): Promise<void> {
+  const res = await fetch("/api/settings/ollama", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: "Unbekannter Fehler" }));
+    throw new Error(body.error ?? `PUT /api/settings/ollama failed: ${res.status}`);
+  }
+}
+
+export interface OllamaTestResult {
+  ok: boolean;
+  models?: string[] | null;
+  error?: string | null;
+}
+
+export async function testOllamaConnection(
+  host: string,
+  apiKey: string | null,
+): Promise<OllamaTestResult> {
+  const res = await fetch("/api/settings/ollama/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ host, apiKey }),
+  });
+  return res.json();
+}
