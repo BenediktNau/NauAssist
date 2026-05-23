@@ -19,6 +19,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyWorkingEnd      = "calendar.working_hours_end";
     private const string KeyDefaultDuration = "calendar.default_duration_min";
     private const string KeySearchHorizon   = "calendar.search_horizon_days";
+    private const string KeyGoogleClientId     = "calendar.google.client_id";
+    private const string KeyGoogleClientSecret = "calendar.google.client_secret";
 
     private readonly AppDb _db;
 
@@ -176,8 +178,44 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             throw;
         }
     }
-    public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
-        throw new NotImplementedException();
-    public Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct) =>
-        throw new NotImplementedException();
+    public async Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2);",
+            new { k1 = KeyGoogleClientId, k2 = KeyGoogleClientSecret },
+            cancellationToken: ct));
+
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        var clientId = map.GetValueOrDefault(KeyGoogleClientId, "");
+        var clientSecret = map.GetValueOrDefault(KeyGoogleClientSecret, "");
+
+        if (string.IsNullOrEmpty(clientId))
+        {
+            return null;
+        }
+
+        return new GoogleCredentials(clientId, clientSecret);
+    }
+
+    public async Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyGoogleClientId, credentials.ClientId, ct);
+            await UpsertAsync(conn, tx, KeyGoogleClientSecret, credentials.ClientSecret, ct);
+            await conn.ExecuteAsync(new CommandDefinition(
+                "DELETE FROM google_oauth;",
+                transaction: tx,
+                cancellationToken: ct));
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
 }
