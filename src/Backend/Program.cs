@@ -47,13 +47,14 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<SqliteDataStore>();
 builder.Services.AddSingleton<GoogleAuthService>();
 builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
-builder.Services.AddSingleton(sp =>
+builder.Services.AddScoped(sp =>
 {
-    var opts = sp.GetRequiredService<IOptions<CalendarOptions>>().Value;
+    var settings = sp.GetRequiredService<IAppSettingsRepository>();
+    var cal = settings.GetCalendarAsync(CancellationToken.None).GetAwaiter().GetResult();
     return new FreeSlotCalculator(
         sp.GetRequiredService<TimeZoneInfo>(),
-        TimeOnly.Parse(opts.WorkingHoursStart),
-        TimeOnly.Parse(opts.WorkingHoursEnd),
+        cal.WorkingHoursStart,
+        cal.WorkingHoursEnd,
         DayOfWeekFlags.WeekdaysOnly);
 });
 
