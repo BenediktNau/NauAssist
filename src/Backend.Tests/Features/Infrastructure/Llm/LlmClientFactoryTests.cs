@@ -70,14 +70,10 @@ public sealed class LlmClientFactoryTests
     {
         var ollama = Options.Create(new OllamaOptions
         {
-            Host = "http://localhost:11434",
-            ApiKey = ollamaApiKey,
             Model = "gemma4:26b",
             InitialTimeoutSeconds = 60,
             TokenTimeoutSeconds = 30,
             SystemPrompt = "sys",
-            NumCtx = 16384,
-            Temperature = 0.3,
         });
         var gemini = Options.Create(new GeminiOptions
         {
@@ -88,7 +84,9 @@ public sealed class LlmClientFactoryTests
             Temperature = 0.3,
         });
 
-        var repo = new FakeSettingsRepo(settings);
+        var repo = new FakeSettingsRepo(
+            settings,
+            new OllamaUserSettings("http://localhost:11434", ollamaApiKey, 16384, 0.3));
         var httpFactory = new TestHttpClientFactory();
         var loggerFactory = NullLoggerFactory.Instance;
 
@@ -98,14 +96,24 @@ public sealed class LlmClientFactoryTests
     private sealed class FakeSettingsRepo : IAppSettingsRepository
     {
         private LlmSettings _settings;
-        public FakeSettingsRepo(LlmSettings s) => _settings = s;
+        private readonly OllamaUserSettings _ollama;
+        public FakeSettingsRepo(LlmSettings s, OllamaUserSettings ollama)
+        {
+            _settings = s;
+            _ollama = ollama;
+        }
+
         public Task<LlmSettings> GetLlmAsync(CancellationToken ct) => Task.FromResult(_settings);
-        public Task SetLlmAsync(LlmSettings s, CancellationToken ct) { _settings = s; return Task.CompletedTask; }
+        public Task SetLlmAsync(LlmSettings s, CancellationToken ct)
+        {
+            _settings = s; return Task.CompletedTask;
+        }
 
         public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
-            throw new NotImplementedException();
+            Task.FromResult(_ollama);
         public Task SetOllamaAsync(OllamaUserSettings settings, CancellationToken ct) =>
-            throw new NotImplementedException();
+            Task.CompletedTask;
+
         public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
             throw new NotImplementedException();
         public Task SetCalendarAsync(CalendarUserSettings settings, CancellationToken ct) =>

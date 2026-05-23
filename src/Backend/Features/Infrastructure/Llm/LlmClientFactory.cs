@@ -50,20 +50,23 @@ public sealed class LlmClientFactory : ILlmClientFactory
         var s = await _settings.GetLlmAsync(ct);
         return s.Provider switch
         {
-            LlmProviders.Ollama => BuildOllama(s),
+            LlmProviders.Ollama => await BuildOllamaAsync(s, ct),
             LlmProviders.Gemini => BuildGemini(s),
             _ => throw new InvalidOperationException($"Unbekannter LLM-Provider: '{s.Provider}'."),
         };
     }
 
-    private (ILlmClient, HttpClient) BuildOllama(LlmSettings s)
+    private async Task<(ILlmClient, HttpClient)> BuildOllamaAsync(LlmSettings s, CancellationToken ct)
     {
-        var http = _httpFactory.CreateClient("Ollama");
-        http.BaseAddress = new Uri(_ollamaDefaults.Host.TrimEnd('/') + "/v1/");
+        var ollamaUser = await _settings.GetOllamaAsync(ct);
 
-        if (!string.IsNullOrWhiteSpace(_ollamaDefaults.ApiKey))
+        var http = _httpFactory.CreateClient("Ollama");
+        http.BaseAddress = new Uri(ollamaUser.Host.TrimEnd('/') + "/v1/");
+
+        if (!string.IsNullOrWhiteSpace(ollamaUser.ApiKey))
         {
-            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _ollamaDefaults.ApiKey);
+            http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", ollamaUser.ApiKey);
         }
 
         var options = new OpenAICompatibleLlmOptions(
@@ -71,8 +74,8 @@ public sealed class LlmClientFactory : ILlmClientFactory
             InitialTimeoutSeconds: _ollamaDefaults.InitialTimeoutSeconds,
             TokenTimeoutSeconds: _ollamaDefaults.TokenTimeoutSeconds,
             SystemPrompt: _ollamaDefaults.SystemPrompt,
-            Temperature: _ollamaDefaults.Temperature,
-            NumCtx: _ollamaDefaults.NumCtx);
+            Temperature: ollamaUser.Temperature,
+            NumCtx: ollamaUser.NumCtx);
 
         var logger = _loggerFactory.CreateLogger<OpenAICompatibleLlmClient>();
         return (new OpenAICompatibleLlmClient(http, options, logger), http);
