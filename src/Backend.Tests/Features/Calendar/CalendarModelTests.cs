@@ -35,17 +35,6 @@ public sealed class CalendarModelTests
     }
 
     [Fact]
-    public void CalendarOptions_HasReasonableDefaults()
-    {
-        var opts = new CalendarOptions();
-
-        opts.WorkingHoursStart.Should().Be("09:00");
-        opts.WorkingHoursEnd.Should().Be("18:00");
-        opts.DefaultDurationMinutes.Should().Be(60);
-        opts.SearchHorizonDays.Should().Be(14);
-    }
-
-    [Fact]
     public void CalendarEvent_IsAllDay_DefaultsToFalse()
     {
         var ev = new CalendarEvent(

@@ -20,7 +20,6 @@ using NauAssist.Backend.Features.Settings;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection("Persistence"));
-builder.Services.Configure<CalendarOptions>(builder.Configuration.GetSection("Calendar"));
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
 builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time"));
 

@@ -1,60 +1,91 @@
 using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using NauAssist.Backend.Features.Settings;
 
 namespace NauAssist.Backend.Features.Calendar.Google;
 
 public sealed class GoogleAuthService
 {
-    private readonly CalendarOptions _options;
+    public const string UserId = "nauassist-default";
+    public const string RedirectUri = "http://localhost";
+
+    private readonly IAppSettingsRepository _settings;
     private readonly SqliteDataStore _dataStore;
     private readonly ILogger<GoogleAuthService> _logger;
 
     public GoogleAuthService(
-        IOptions<CalendarOptions> options,
+        IAppSettingsRepository settings,
         SqliteDataStore dataStore,
         ILogger<GoogleAuthService> logger)
     {
-        _options = options.Value;
+        _settings = settings;
         _dataStore = dataStore;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Liefert Credentials. Wenn noch keine im Store: löst interaktiven OAuth-Flow aus
-    /// (öffnet Browser auf der lokalen Maschine).
-    /// </summary>
     public async Task<UserCredential> GetCredentialAsync(CancellationToken ct)
     {
-        var credentialsPath = Path.GetFullPath(_options.GoogleCredentialsPath);
-        if (!File.Exists(credentialsPath))
+        var clientSecrets = await LoadClientSecretsAsync(ct);
+        var flow = BuildFlow(clientSecrets);
+
+        var token = await _dataStore.GetAsync<TokenResponse>(UserId);
+        if (token is null)
         {
-            throw new InvalidOperationException(
-                $"Google-OAuth-Client-Secret nicht gefunden unter '{credentialsPath}'. " +
-                "Bitte Datei aus der Google Cloud Console (OAuth 2.0 Client ID, Type: Desktop) herunterladen und dorthin legen.");
+            throw new NotAuthenticatedException(
+                "Google-Kalender ist nicht verbunden. Bitte in den Settings autorisieren.");
         }
 
-        await using var stream = File.OpenRead(credentialsPath);
-        var clientSecrets = (await GoogleClientSecrets.FromStreamAsync(stream, ct)).Secrets;
-
-        var isContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
-        ICodeReceiver? codeReceiver = isContainer ? new ConsoleCodeReceiver() : null;
-
-        var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-            clientSecrets,
-            new[] { CalendarService.Scope.Calendar },
-            user: "nauassist-default",
-            taskCancellationToken: ct,
-            dataStore: _dataStore,
-            codeReceiver: codeReceiver);
-
+        var credential = new UserCredential(flow, UserId, token);
         if (credential.Token.IsStale)
         {
             _logger.LogInformation("Google-Token ist abgelaufen — refreshe.");
             await credential.RefreshTokenAsync(ct);
         }
-
         return credential;
     }
+
+    public async Task<(string AuthUrl, GoogleAuthorizationCodeFlow Flow)> StartAuthorizationAsync(
+        CancellationToken ct)
+    {
+        var clientSecrets = await LoadClientSecretsAsync(ct);
+        var flow = BuildFlow(clientSecrets);
+        var url = flow.CreateAuthorizationCodeRequest(RedirectUri).Build().AbsoluteUri;
+        return (url, flow);
+    }
+
+    public async Task ExchangeCodeAsync(
+        GoogleAuthorizationCodeFlow flow, string code, CancellationToken ct)
+    {
+        await flow.ExchangeCodeForTokenAsync(UserId, code, RedirectUri, ct);
+    }
+
+    public async Task<bool> IsConnectedAsync()
+    {
+        var token = await _dataStore.GetAsync<TokenResponse>(UserId);
+        return token is not null;
+    }
+
+    public Task DisconnectAsync() => _dataStore.ClearAsync();
+
+    private async Task<ClientSecrets> LoadClientSecretsAsync(CancellationToken ct)
+    {
+        var creds = await _settings.GetGoogleCredentialsAsync(ct);
+        if (creds is null)
+        {
+            throw new NotAuthenticatedException(
+                "Google-OAuth-Credentials nicht konfiguriert. Bitte Client-ID und -Secret in den Settings eintragen.");
+        }
+        return new ClientSecrets { ClientId = creds.ClientId, ClientSecret = creds.ClientSecret };
+    }
+
+    private GoogleAuthorizationCodeFlow BuildFlow(ClientSecrets clientSecrets) =>
+        new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+        {
+            ClientSecrets = clientSecrets,
+            Scopes = new[] { CalendarService.Scope.Calendar },
+            DataStore = _dataStore,
+        });
 }
