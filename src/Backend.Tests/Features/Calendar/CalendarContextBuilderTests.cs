@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Infrastructure.Time;
@@ -20,7 +19,7 @@ public sealed class CalendarContextBuilderTests
     }
 
     private static CalendarContextBuilder BuildBuilder(FakeCalendarProvider provider) =>
-        new(provider, Options.Create(new CalendarOptions { SearchHorizonDays = 14 }), Berlin);
+        new(provider, new FakeSettingsRepo(searchHorizon: 14), Berlin);
 
     [Fact]
     public async Task BuildAsync_NoAllDayEvents_ReturnsEmptyString()

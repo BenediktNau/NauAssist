@@ -172,7 +172,7 @@ public sealed class SendMessageHandlerTests
 
     private static readonly CalendarContextBuilder DefaultCalendarContext = new CalendarContextBuilder(
         new FakeCalendarProvider(),
-        Options.Create(new CalendarOptions { SearchHorizonDays = 14 }),
+        new FakeSettingsRepo(searchHorizon: 14),
         TimeZoneInfo.Utc);
 
     private static AgentRunner BuildRunner(ILlmClient llm) =>

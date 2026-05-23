@@ -1,0 +1,30 @@
+using NauAssist.Backend.Features.Settings;
+
+namespace NauAssist.Backend.Tests.Helpers;
+
+public sealed class FakeSettingsRepo : IAppSettingsRepository
+{
+    private readonly CalendarUserSettings _calendar;
+
+    public FakeSettingsRepo(int searchHorizon = 14)
+    {
+        _calendar = new CalendarUserSettings(
+            "primary", new TimeOnly(9, 0), new TimeOnly(18, 0), 60, searchHorizon);
+    }
+
+    public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
+        Task.FromResult(_calendar);
+    public Task SetCalendarAsync(CalendarUserSettings s, CancellationToken ct) =>
+        Task.CompletedTask;
+
+    public Task<LlmSettings> GetLlmAsync(CancellationToken ct) =>
+        Task.FromResult(new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null));
+    public Task SetLlmAsync(LlmSettings s, CancellationToken ct) => Task.CompletedTask;
+    public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
+        Task.FromResult(new OllamaUserSettings("http://localhost:11434", null, 16384, 0.3));
+    public Task SetOllamaAsync(OllamaUserSettings s, CancellationToken ct) => Task.CompletedTask;
+    public Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct) =>
+        Task.FromResult<GoogleCredentials?>(null);
+    public Task SetGoogleCredentialsAsync(GoogleCredentials c, CancellationToken ct) =>
+        Task.CompletedTask;
+}

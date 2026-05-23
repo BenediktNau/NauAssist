@@ -2,25 +2,25 @@ using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using NauAssist.Backend.Features.Settings;
 
 namespace NauAssist.Backend.Features.Calendar.Google;
 
 public sealed class GoogleCalendarProvider : ICalendarProvider
 {
     private readonly GoogleAuthService _auth;
-    private readonly CalendarOptions _options;
+    private readonly IAppSettingsRepository _settings;
     private readonly TimeZoneInfo _zone;
     private readonly ILogger<GoogleCalendarProvider> _logger;
 
     public GoogleCalendarProvider(
         GoogleAuthService auth,
-        IOptions<CalendarOptions> options,
+        IAppSettingsRepository settings,
         TimeZoneInfo zone,
         ILogger<GoogleCalendarProvider> logger)
     {
         _auth = auth;
-        _options = options.Value;
+        _settings = settings;
         _zone = zone;
         _logger = logger;
     }
@@ -30,8 +30,9 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
         DateTimeOffset to,
         CancellationToken ct)
     {
+        var cal = await _settings.GetCalendarAsync(ct);
         var service = await CreateServiceAsync(ct);
-        var req = service.Events.List(_options.GoogleCalendarId);
+        var req = service.Events.List(cal.CalendarId);
         req.TimeMinDateTimeOffset = from;
         req.TimeMaxDateTimeOffset = to;
         req.SingleEvents = true;
@@ -49,6 +50,7 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
 
     public async Task<string> CreateEventAsync(NewEvent ev, CancellationToken ct)
     {
+        var cal = await _settings.GetCalendarAsync(ct);
         var service = await CreateServiceAsync(ct);
         var googleEvent = new Event
         {
@@ -68,7 +70,7 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
             googleEvent.End   = new EventDateTime { DateTimeDateTimeOffset = ev.End };
         }
 
-        var created = await service.Events.Insert(googleEvent, _options.GoogleCalendarId).ExecuteAsync(ct);
+        var created = await service.Events.Insert(googleEvent, cal.CalendarId).ExecuteAsync(ct);
         _logger.LogInformation(
             "Google-Event {EventId} angelegt für '{Title}' am {Start} (AllDay={AllDay}).",
             created.Id, ev.Title, ev.Start, ev.IsAllDay);

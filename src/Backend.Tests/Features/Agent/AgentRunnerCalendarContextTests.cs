@@ -20,7 +20,7 @@ public sealed class AgentRunnerCalendarContextTests
         var nowLocal = new DateTimeOffset(local, Berlin.GetUtcOffset(local));
         var clock = new ClockContext(() => nowLocal.ToUniversalTime(), Berlin);
         var builder = new CalendarContextBuilder(
-            provider, Options.Create(new CalendarOptions { SearchHorizonDays = 14 }), Berlin);
+            provider, new FakeSettingsRepo(searchHorizon: 14), Berlin);
 
         var llm = new FakeLlmClient();
         llm.QueueResponse(new TextDeltaChunk("Ok."));

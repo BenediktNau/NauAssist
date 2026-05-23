@@ -27,7 +27,7 @@ public sealed class AgentRunnerTimeContextTests
         var calendarContextProvider = new FakeCalendarProvider();
         var calendarContext = new CalendarContextBuilder(
             calendarContextProvider,
-            Options.Create(new CalendarOptions { SearchHorizonDays = 14 }),
+            new FakeSettingsRepo(searchHorizon: 14),
             Berlin);
 
         var runner = new AgentRunner(

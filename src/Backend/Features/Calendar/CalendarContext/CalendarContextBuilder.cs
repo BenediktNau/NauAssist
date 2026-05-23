@@ -1,30 +1,33 @@
 using System.Text;
-using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Time;
+using NauAssist.Backend.Features.Settings;
 
 namespace NauAssist.Backend.Features.Calendar.CalendarContext;
 
 public sealed class CalendarContextBuilder
 {
     private readonly ICalendarProvider _provider;
-    private readonly CalendarOptions _options;
+    private readonly IAppSettingsRepository _settings;
     private readonly TimeZoneInfo _zone;
 
     public CalendarContextBuilder(
         ICalendarProvider provider,
-        IOptions<CalendarOptions> options,
+        IAppSettingsRepository settings,
         TimeZoneInfo zone)
     {
         _provider = provider;
-        _options = options.Value;
+        _settings = settings;
         _zone = zone;
     }
 
     public async Task<string> BuildAsync(TimeSnapshot now, CancellationToken ct)
     {
+        var cal = await _settings.GetCalendarAsync(ct);
+        var horizon = cal.SearchHorizonDays;
+
         var startLocal = now.Today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var from = new DateTimeOffset(startLocal, _zone.GetUtcOffset(startLocal));
-        var to = from.AddDays(_options.SearchHorizonDays);
+        var to = from.AddDays(horizon);
 
         var events = await _provider.GetEventsAsync(from, to, ct);
 
@@ -36,7 +39,7 @@ public sealed class CalendarContextBuilder
         if (allDay.Count == 0) return string.Empty;
 
         var sb = new StringBuilder();
-        sb.AppendLine($"[Längerfristiger Kontext — All-Day-Termine im {_options.SearchHorizonDays}-Tage-Horizont]");
+        sb.AppendLine($"[Längerfristiger Kontext — All-Day-Termine im {horizon}-Tage-Horizont]");
         foreach (var e in allDay)
         {
             sb.AppendLine($"- {FormatRange(e.Start, e.End)}: {e.Title}");

@@ -46,7 +46,7 @@ builder.Services.AddSingleton(sp =>
 // Calendar
 builder.Services.AddSingleton<SqliteDataStore>();
 builder.Services.AddSingleton<GoogleAuthService>();
-builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
+builder.Services.AddScoped<ICalendarProvider, GoogleCalendarProvider>();
 builder.Services.AddScoped(sp =>
 {
     var settings = sp.GetRequiredService<IAppSettingsRepository>();

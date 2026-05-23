@@ -19,7 +19,7 @@ public sealed class AgentRunnerTests
 
     private static readonly CalendarContextBuilder DefaultCalendarContext = new CalendarContextBuilder(
         new FakeCalendarProvider(),
-        Options.Create(new CalendarOptions { SearchHorizonDays = 14 }),
+        new FakeSettingsRepo(searchHorizon: 14),
         TimeZoneInfo.Utc);
 
     [Fact]
