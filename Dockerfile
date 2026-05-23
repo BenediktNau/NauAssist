@@ -43,7 +43,6 @@ USER 10001:10001
 ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     Persistence__DatabasePath=/app/data/nauassist.db \
-    Calendar__GoogleCredentialsPath=/app/data/google-credentials.json \
     Time__Zone=Europe/Berlin
 
 VOLUME ["/app/data"]
