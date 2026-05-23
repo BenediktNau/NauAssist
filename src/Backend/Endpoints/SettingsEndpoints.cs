@@ -111,6 +111,51 @@ public static class SettingsEndpoints
             return Results.Ok(new { ok = true });
         });
 
+        app.MapPost("/api/settings/ollama/test", async (
+            TestOllamaPayload payload,
+            IHttpClientFactory httpFactory,
+            CancellationToken ct) =>
+        {
+            if (!Uri.TryCreate(payload.Host, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != "http" && uri.Scheme != "https"))
+            {
+                return Results.Ok(new TestOllamaResult(false, null, "Host muss absolute http(s)-URL sein."));
+            }
+
+            var http = httpFactory.CreateClient("Ollama");
+            http.Timeout = TimeSpan.FromSeconds(5);
+            var req = new HttpRequestMessage(HttpMethod.Get,
+                new Uri(new Uri(payload.Host.TrimEnd('/') + "/"), "api/tags"));
+            if (!string.IsNullOrWhiteSpace(payload.ApiKey))
+            {
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", payload.ApiKey);
+            }
+
+            try
+            {
+                using var res = await http.SendAsync(req, ct);
+                if (!res.IsSuccessStatusCode)
+                {
+                    return Results.Ok(new TestOllamaResult(false, null, $"HTTP {(int)res.StatusCode}"));
+                }
+
+                using var stream = await res.Content.ReadAsStreamAsync(ct);
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+                var models = doc.RootElement.TryGetProperty("models", out var arr) && arr.ValueKind == JsonValueKind.Array
+                    ? arr.EnumerateArray()
+                         .Select(m => m.TryGetProperty("name", out var n) ? n.GetString() : null)
+                         .Where(n => n is not null).Cast<string>().ToArray()
+                    : Array.Empty<string>();
+
+                return Results.Ok(new TestOllamaResult(true, models, null));
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new TestOllamaResult(false, null, ex.Message));
+            }
+        });
+
         return app;
     }
 
@@ -137,4 +182,7 @@ public static class SettingsEndpoints
         bool HasApiKey,
         int NumCtx,
         double Temperature);
+
+    public sealed record TestOllamaPayload(string Host, string? ApiKey);
+    private sealed record TestOllamaResult(bool Ok, string[]? Models, string? Error);
 }
