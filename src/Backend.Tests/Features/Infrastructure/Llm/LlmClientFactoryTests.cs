@@ -32,14 +32,53 @@ public sealed class LlmClientFactoryTests
         http.DefaultRequestHeaders.Authorization.Parameter.Should().Be("tok-abc");
     }
 
-    private static LlmClientFactory NewFactory(LlmSettings settings, string? ollamaApiKey = null)
+    [Fact]
+    public async Task Create_NoSystemPromptInDb_UsesOptionsDefault()
+    {
+        var factory = NewFactory(
+            new LlmSettings("gemma4:26b", null),
+            optionsSystemPrompt: "from-options");
+
+        var options = await factory.GetOptionsForTestAsync();
+
+        options.SystemPrompt.Should().Be("from-options");
+    }
+
+    [Fact]
+    public async Task Create_SystemPromptInDb_OverridesOptionsDefault()
+    {
+        var factory = NewFactory(
+            new LlmSettings("gemma4:26b", "from-db"),
+            optionsSystemPrompt: "from-options");
+
+        var options = await factory.GetOptionsForTestAsync();
+
+        options.SystemPrompt.Should().Be("from-db");
+    }
+
+    [Fact]
+    public async Task Create_WhitespaceSystemPromptInDb_FallsBackToOptions()
+    {
+        var factory = NewFactory(
+            new LlmSettings("gemma4:26b", "   "),
+            optionsSystemPrompt: "from-options");
+
+        var options = await factory.GetOptionsForTestAsync();
+
+        options.SystemPrompt.Should().Be("from-options");
+    }
+
+    private static LlmClientFactory NewFactory(
+        LlmSettings settings,
+        string? ollamaApiKey = null,
+        string? optionsSystemPrompt = "sys")
     {
         var ollama = Options.Create(new OllamaOptions
         {
             Model = "gemma4:26b",
             InitialTimeoutSeconds = 60,
             TokenTimeoutSeconds = 30,
-            SystemPrompt = "sys",
+            SystemPrompt = optionsSystemPrompt,
         });
 
         var repo = new FakeSettingsRepo(

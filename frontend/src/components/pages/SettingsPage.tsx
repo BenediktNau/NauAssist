@@ -349,6 +349,7 @@ function LlmSection({
 }) {
   const [llmError, setLlmError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [systemPromptDraft, setSystemPromptDraft] = useState(llm.systemPrompt ?? "");
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [hostDraft, setHostDraft] = useState(ollama.host);
@@ -382,12 +383,21 @@ function LlmSection({
     tempDraft !== String(ollama.temperature) ||
     editingOllamaKey;
 
-  const saveLlm = async (ollamaModel: string) => {
+  const systemPromptDirty =
+    (systemPromptDraft.trim() === "" ? null : systemPromptDraft.trim())
+      !== (llm.systemPrompt ?? null);
+
+  const saveLlm = async (patch: { ollamaModel?: string; systemPrompt?: string | null }) => {
     setLlmError(null);
     try {
-      await updateLlmSettings({ ollamaModel });
+      await updateLlmSettings({
+        ollamaModel: patch.ollamaModel ?? llm.ollamaModel,
+        systemPrompt:
+          patch.systemPrompt !== undefined ? patch.systemPrompt : llm.systemPrompt,
+      });
       const fresh = await getLlmSettings();
       setLlm(fresh);
+      setSystemPromptDraft(fresh.systemPrompt ?? "");
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2500);
     } catch (e) {
@@ -446,10 +456,51 @@ function LlmSection({
       >
         <ModelCombobox
           value={llm.ollamaModel}
-          onCommit={(v) => saveLlm(v)}
+          onCommit={(v) => saveLlm({ ollamaModel: v })}
           suggestions={availableModels ?? OLLAMA_MODELS}
           placeholder="z.B. gemma4:26b"
         />
+      </Row>
+
+      <Row
+        label="System-Prompt"
+        hint="Wer Nau ist und wie er sich verhalten soll. Leer = Default aus der Konfig."
+      >
+        <div className="flex w-full flex-col gap-2 lg:max-w-[640px]">
+          <textarea
+            value={systemPromptDraft}
+            onChange={(e) => setSystemPromptDraft(e.target.value)}
+            placeholder={llm.defaultSystemPrompt || "Du bist NauAssist, ein persönlicher Kalender-Agent."}
+            rows={6}
+            className="min-h-[140px] w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm leading-relaxed text-nau-fg"
+          />
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <PrimaryButton
+              onClick={() =>
+                saveLlm({
+                  systemPrompt: systemPromptDraft.trim() === "" ? null : systemPromptDraft,
+                })
+              }
+              disabled={!systemPromptDirty}
+            >
+              PROMPT SPEICHERN ↵
+            </PrimaryButton>
+            <SecondaryButton
+              onClick={() => {
+                setSystemPromptDraft("");
+                saveLlm({ systemPrompt: null });
+              }}
+              disabled={llm.systemPrompt === null}
+            >
+              AUF DEFAULT ZURÜCKSETZEN
+            </SecondaryButton>
+            {llm.systemPrompt === null && (
+              <span className="font-mono text-[10px] tracking-mono-wide text-nau-fg-dim">
+                // NUTZT DEFAULT
+              </span>
+            )}
+          </div>
+        </div>
       </Row>
 
       <Row label="Ollama erweitert" hint="Host, API-Key, Kontext-Größe, Temperatur.">

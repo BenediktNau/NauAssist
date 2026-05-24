@@ -7,6 +7,7 @@ namespace NauAssist.Backend.Features.Settings;
 public sealed class AppSettingsRepository : IAppSettingsRepository
 {
     private const string KeyOllamaModel = "llm.ollama.model";
+    private const string KeyOllamaSystemPrompt = "llm.system_prompt";
     private const string KeyOllamaHost = "ollama.host";
     private const string KeyOllamaApiKey = "ollama.api_key";
     private const string KeyOllamaNumCtx = "ollama.num_ctx";
@@ -29,18 +30,34 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     public async Task<LlmSettings> GetLlmAsync(CancellationToken ct)
     {
         using var conn = _db.OpenConnection();
-        var value = await conn.ExecuteScalarAsync<string?>(new CommandDefinition(
-            "SELECT value FROM app_settings WHERE key = @key;",
-            new { key = KeyOllamaModel },
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2);",
+            new { k1 = KeyOllamaModel, k2 = KeyOllamaSystemPrompt },
             cancellationToken: ct));
 
-        return new LlmSettings(value ?? "gemma4:26b");
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        var model = map.GetValueOrDefault(KeyOllamaModel) ?? "gemma4:26b";
+        var promptRaw = map.GetValueOrDefault(KeyOllamaSystemPrompt);
+        var systemPrompt = string.IsNullOrEmpty(promptRaw) ? null : promptRaw;
+
+        return new LlmSettings(model, systemPrompt);
     }
 
     public async Task SetLlmAsync(LlmSettings settings, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();
-        await UpsertAsync(conn, null, KeyOllamaModel, settings.OllamaModel, ct);
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyOllamaModel, settings.OllamaModel, ct);
+            await UpsertAsync(conn, tx, KeyOllamaSystemPrompt, settings.SystemPrompt ?? "", ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
     }
 
     private static Task UpsertAsync(

@@ -13,7 +13,7 @@ public sealed class UpdateLlmSettingsHandlerTests
         var handler = new UpdateLlmSettingsHandler(repo);
 
         var result = await handler.Handle(
-            new UpdateLlmSettingsRequest(""),
+            new UpdateLlmSettingsRequest("", null),
             CancellationToken.None);
 
         result.Ok.Should().BeFalse();
@@ -27,16 +27,60 @@ public sealed class UpdateLlmSettingsHandlerTests
         var handler = new UpdateLlmSettingsHandler(repo);
 
         var result = await handler.Handle(
-            new UpdateLlmSettingsRequest("mistral:7b"),
+            new UpdateLlmSettingsRequest("mistral:7b", null),
             CancellationToken.None);
 
         result.Ok.Should().BeTrue();
         repo.Current.OllamaModel.Should().Be("mistral:7b");
+        repo.Current.SystemPrompt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_CustomSystemPrompt_IsTrimmedAndStored()
+    {
+        var repo = new InMemorySettingsRepo();
+        var handler = new UpdateLlmSettingsHandler(repo);
+
+        var result = await handler.Handle(
+            new UpdateLlmSettingsRequest("mistral:7b", "   you are nau   "),
+            CancellationToken.None);
+
+        result.Ok.Should().BeTrue();
+        repo.Current.SystemPrompt.Should().Be("you are nau");
+    }
+
+    [Fact]
+    public async Task Handle_EmptySystemPrompt_StoresNullForFallback()
+    {
+        var repo = new InMemorySettingsRepo();
+        repo.Current = new LlmSettings("mistral:7b", "previous");
+        var handler = new UpdateLlmSettingsHandler(repo);
+
+        var result = await handler.Handle(
+            new UpdateLlmSettingsRequest("mistral:7b", "   "),
+            CancellationToken.None);
+
+        result.Ok.Should().BeTrue();
+        repo.Current.SystemPrompt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_TooLongSystemPrompt_ReturnsError()
+    {
+        var repo = new InMemorySettingsRepo();
+        var handler = new UpdateLlmSettingsHandler(repo);
+
+        var result = await handler.Handle(
+            new UpdateLlmSettingsRequest("mistral:7b", new string('x', 4001)),
+            CancellationToken.None);
+
+        result.Ok.Should().BeFalse();
+        result.Error.Should().Contain("systemPrompt");
     }
 
     private sealed class InMemorySettingsRepo : IAppSettingsRepository
     {
-        public LlmSettings Current { get; private set; } = new("gemma4:26b");
+        public LlmSettings Current { get; set; } = new("gemma4:26b", null);
 
         public Task<LlmSettings> GetLlmAsync(CancellationToken ct) => Task.FromResult(Current);
 

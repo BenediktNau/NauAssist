@@ -1,9 +1,12 @@
 export interface LlmSettings {
   ollamaModel: string;
+  systemPrompt: string | null;
+  defaultSystemPrompt: string;
 }
 
 export interface UpdateLlmSettingsPayload {
   ollamaModel: string;
+  systemPrompt: string | null;
 }
 
 export const OLLAMA_MODELS = [

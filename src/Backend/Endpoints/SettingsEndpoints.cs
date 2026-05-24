@@ -20,7 +20,10 @@ public static class SettingsEndpoints
             CancellationToken ct) =>
         {
             var response = await mediator.Send(new GetLlmSettingsRequest(), ct);
-            return Results.Ok(new LlmSettingsDto(response.OllamaModel));
+            return Results.Ok(new LlmSettingsDto(
+                response.OllamaModel,
+                response.SystemPrompt,
+                response.DefaultSystemPrompt));
         });
 
         app.MapPut("/api/settings/llm", async (
@@ -31,7 +34,9 @@ public static class SettingsEndpoints
             ILogger<UpdateLlmSettingsResult> logger,
             CancellationToken ct) =>
         {
-            var request = new UpdateLlmSettingsRequest(payload.OllamaModel ?? "");
+            var request = new UpdateLlmSettingsRequest(
+                payload.OllamaModel ?? "",
+                payload.SystemPrompt);
 
             var result = await mediator.Send(request, ct);
 
@@ -43,6 +48,7 @@ public static class SettingsEndpoints
             var auditArgs = JsonSerializer.Serialize(new
             {
                 ollamaModel = payload.OllamaModel,
+                systemPromptAction = string.IsNullOrWhiteSpace(payload.SystemPrompt) ? "reset" : "set",
             });
 
             await audit.AppendAsync(
@@ -193,9 +199,12 @@ public static class SettingsEndpoints
         return app;
     }
 
-    public sealed record UpdateLlmSettingsPayload(string? OllamaModel);
+    public sealed record UpdateLlmSettingsPayload(string? OllamaModel, string? SystemPrompt);
 
-    private sealed record LlmSettingsDto(string OllamaModel);
+    private sealed record LlmSettingsDto(
+        string OllamaModel,
+        string? SystemPrompt,
+        string DefaultSystemPrompt);
 
     public sealed record UpdateOllamaSettingsPayload(
         string? Host,

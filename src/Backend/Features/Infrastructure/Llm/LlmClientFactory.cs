@@ -32,16 +32,25 @@ public sealed class LlmClientFactory : ILlmClientFactory
 
     public async Task<ILlmClient> CreateAsync(CancellationToken ct)
     {
-        var (client, _) = await CreateInternalAsync(ct);
-        return client;
+        var built = await BuildAsync(ct);
+        return built.Client;
     }
 
     internal async Task<(ILlmClient Client, HttpClient Http)> CreateInternalForTestAsync()
     {
-        return await CreateInternalAsync(CancellationToken.None);
+        var built = await BuildAsync(CancellationToken.None);
+        return (built.Client, built.Http);
     }
 
-    private async Task<(ILlmClient Client, HttpClient Http)> CreateInternalAsync(CancellationToken ct)
+    internal async Task<OpenAICompatibleLlmOptions> GetOptionsForTestAsync()
+    {
+        var built = await BuildAsync(CancellationToken.None);
+        built.Http.Dispose();
+        return built.Options;
+    }
+
+    private async Task<(ILlmClient Client, HttpClient Http, OpenAICompatibleLlmOptions Options)> BuildAsync(
+        CancellationToken ct)
     {
         var s = await _settings.GetLlmAsync(ct);
         var ollamaUser = await _settings.GetOllamaAsync(ct);
@@ -55,15 +64,20 @@ public sealed class LlmClientFactory : ILlmClientFactory
                 new AuthenticationHeaderValue("Bearer", ollamaUser.ApiKey);
         }
 
+        var systemPrompt = string.IsNullOrWhiteSpace(s.SystemPrompt)
+            ? _ollamaDefaults.SystemPrompt
+            : s.SystemPrompt;
+
         var options = new OpenAICompatibleLlmOptions(
             Model: s.OllamaModel,
             InitialTimeoutSeconds: _ollamaDefaults.InitialTimeoutSeconds,
             TokenTimeoutSeconds: _ollamaDefaults.TokenTimeoutSeconds,
-            SystemPrompt: _ollamaDefaults.SystemPrompt,
+            SystemPrompt: systemPrompt,
             Temperature: ollamaUser.Temperature,
             NumCtx: ollamaUser.NumCtx);
 
         var logger = _loggerFactory.CreateLogger<OpenAICompatibleLlmClient>();
-        return (new OpenAICompatibleLlmClient(http, options, logger), http);
+        return (new OpenAICompatibleLlmClient(http, options, logger), http, options);
     }
+
 }
