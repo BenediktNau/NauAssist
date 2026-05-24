@@ -120,6 +120,7 @@ app.MapRulesEndpoints();
 app.MapChatEndpoints();
 app.MapSettingsEndpoints();
 app.MapCalendarAuthEndpoints();
+app.MapCalendarEndpoints();
 
 app.MapFallbackToFile("index.html");
 
