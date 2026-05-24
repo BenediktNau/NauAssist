@@ -51,6 +51,10 @@ export function ChatBubble({ bubble, onPickSlot, pickDisabled }: ChatBubbleProps
   const isUser = bubble.role === "user";
   const stamp = formatStamp(bubble.createdAt);
 
+  if (!isUser && bubble.streaming && bubble.content.length === 0) {
+    return null;
+  }
+
   if (isUser) {
     return (
       <div className="mb-7 flex justify-end">
@@ -82,8 +86,6 @@ export function ChatBubble({ bubble, onPickSlot, pickDisabled }: ChatBubbleProps
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
             {bubble.content}
           </ReactMarkdown>
-        ) : bubble.streaming ? (
-          <span className="opacity-50">…</span>
         ) : null}
         {bubble.incomplete && (
           <div className="mt-2 inline-block rounded-[3px] border border-nau-danger px-2 py-0.5 font-mono text-[11px] tracking-mono-wide text-nau-danger">
