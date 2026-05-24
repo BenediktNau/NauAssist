@@ -1,15 +1,9 @@
 export interface LlmSettings {
-  provider: "ollama" | "gemini";
   ollamaModel: string;
-  geminiModel: string;
-  hasGeminiApiKey: boolean;
 }
 
 export interface UpdateLlmSettingsPayload {
-  provider: "ollama" | "gemini";
   ollamaModel: string;
-  geminiModel: string;
-  geminiApiKey: string | null;
 }
 
 export const OLLAMA_MODELS = [
@@ -18,12 +12,6 @@ export const OLLAMA_MODELS = [
   "qwen3.5:4b",
   "qwen2.5:7b-instruct",
   "llama3.2:3b",
-] as const;
-
-export const GEMINI_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemma-4-31b-it",
 ] as const;
 
 export async function getLlmSettings(): Promise<LlmSettings> {

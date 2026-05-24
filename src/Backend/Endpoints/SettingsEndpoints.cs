@@ -20,11 +20,7 @@ public static class SettingsEndpoints
             CancellationToken ct) =>
         {
             var response = await mediator.Send(new GetLlmSettingsRequest(), ct);
-            return Results.Ok(new LlmSettingsDto(
-                response.Provider,
-                response.OllamaModel,
-                response.GeminiModel,
-                response.HasGeminiApiKey));
+            return Results.Ok(new LlmSettingsDto(response.OllamaModel));
         });
 
         app.MapPut("/api/settings/llm", async (
@@ -35,11 +31,7 @@ public static class SettingsEndpoints
             ILogger<UpdateLlmSettingsResult> logger,
             CancellationToken ct) =>
         {
-            var request = new UpdateLlmSettingsRequest(
-                Provider: payload.Provider ?? "",
-                OllamaModel: payload.OllamaModel ?? "",
-                GeminiModel: payload.GeminiModel ?? "",
-                GeminiApiKey: payload.GeminiApiKey);
+            var request = new UpdateLlmSettingsRequest(payload.OllamaModel ?? "");
 
             var result = await mediator.Send(request, ct);
 
@@ -50,15 +42,7 @@ public static class SettingsEndpoints
 
             var auditArgs = JsonSerializer.Serialize(new
             {
-                provider = payload.Provider,
                 ollamaModel = payload.OllamaModel,
-                geminiModel = payload.GeminiModel,
-                geminiKeyAction = payload.GeminiApiKey switch
-                {
-                    null => "unchanged",
-                    "" => "cleared",
-                    _ => "set",
-                },
             });
 
             await audit.AppendAsync(
@@ -209,17 +193,9 @@ public static class SettingsEndpoints
         return app;
     }
 
-    public sealed record UpdateLlmSettingsPayload(
-        string? Provider,
-        string? OllamaModel,
-        string? GeminiModel,
-        string? GeminiApiKey);
+    public sealed record UpdateLlmSettingsPayload(string? OllamaModel);
 
-    private sealed record LlmSettingsDto(
-        string Provider,
-        string OllamaModel,
-        string GeminiModel,
-        bool HasGeminiApiKey);
+    private sealed record LlmSettingsDto(string OllamaModel);
 
     public sealed record UpdateOllamaSettingsPayload(
         string? Host,

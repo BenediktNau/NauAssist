@@ -14,10 +14,6 @@ public sealed class GetLlmSettingsHandler : IRequestHandler<GetLlmSettingsReques
     public async ValueTask<GetLlmSettingsResponse> Handle(GetLlmSettingsRequest request, CancellationToken ct)
     {
         var s = await _settings.GetLlmAsync(ct);
-        return new GetLlmSettingsResponse(
-            Provider: s.Provider,
-            OllamaModel: s.OllamaModel,
-            GeminiModel: s.GeminiModel,
-            HasGeminiApiKey: !string.IsNullOrEmpty(s.GeminiApiKey));
+        return new GetLlmSettingsResponse(s.OllamaModel);
     }
 }

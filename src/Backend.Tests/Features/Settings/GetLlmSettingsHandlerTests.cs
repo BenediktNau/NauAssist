@@ -16,24 +16,19 @@ public sealed class GetLlmSettingsHandlerTests
 
         var response = await handler.Handle(new GetLlmSettingsRequest(), CancellationToken.None);
 
-        response.Provider.Should().Be("ollama");
         response.OllamaModel.Should().Be("gemma4:26b");
-        response.GeminiModel.Should().Be("gemini-2.5-flash");
-        response.HasGeminiApiKey.Should().BeFalse();
     }
 
     [Fact]
-    public async Task Handle_HasGeminiApiKeyTrue_AfterKeyIsSet()
+    public async Task Handle_ReturnsUpdatedModel()
     {
         using var db = new TempSqliteDb();
         var repo = new AppSettingsRepository(db.AppDb);
-        await repo.SetLlmAsync(
-            new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", "AIza-x"),
-            CancellationToken.None);
+        await repo.SetLlmAsync(new LlmSettings("mistral:7b"), CancellationToken.None);
 
         var handler = new GetLlmSettingsHandler(repo);
         var response = await handler.Handle(new GetLlmSettingsRequest(), CancellationToken.None);
 
-        response.HasGeminiApiKey.Should().BeTrue();
+        response.OllamaModel.Should().Be("mistral:7b");
     }
 }

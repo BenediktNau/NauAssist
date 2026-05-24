@@ -4,8 +4,4 @@ namespace NauAssist.Backend.Features.Settings.GetLlmSettings;
 
 public sealed record GetLlmSettingsRequest : IRequest<GetLlmSettingsResponse>;
 
-public sealed record GetLlmSettingsResponse(
-    string Provider,
-    string OllamaModel,
-    string GeminiModel,
-    bool HasGeminiApiKey);
+public sealed record GetLlmSettingsResponse(string OllamaModel);

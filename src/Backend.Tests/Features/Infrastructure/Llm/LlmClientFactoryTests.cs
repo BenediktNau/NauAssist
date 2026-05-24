@@ -2,7 +2,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Llm;
-using NauAssist.Backend.Features.Infrastructure.Llm.Gemini;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Settings;
 
@@ -11,9 +10,9 @@ namespace NauAssist.Backend.Tests.Features.Infrastructure.Llm;
 public sealed class LlmClientFactoryTests
 {
     [Fact]
-    public async Task Create_OllamaProvider_BuildsClient_WithoutAuth()
+    public async Task Create_BuildsOllamaClient_WithoutAuth()
     {
-        var factory = NewFactory(new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null));
+        var factory = NewFactory(new LlmSettings("gemma4:26b"));
         var (client, http) = await factory.CreateInternalForTestAsync();
 
         client.Should().BeOfType<OpenAICompatibleLlmClient>();
@@ -22,48 +21,15 @@ public sealed class LlmClientFactoryTests
     }
 
     [Fact]
-    public async Task Create_OllamaProvider_WithApiKey_BuildsClient_WithBearer()
+    public async Task Create_WithApiKey_BuildsOllamaClient_WithBearer()
     {
-        var factory = NewFactory(
-            new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null),
-            ollamaApiKey: "tok-abc");
+        var factory = NewFactory(new LlmSettings("gemma4:26b"), ollamaApiKey: "tok-abc");
         var (client, http) = await factory.CreateInternalForTestAsync();
 
         client.Should().BeOfType<OpenAICompatibleLlmClient>();
         http.BaseAddress!.AbsoluteUri.Should().Be("http://localhost:11434/v1/");
         http.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
         http.DefaultRequestHeaders.Authorization.Parameter.Should().Be("tok-abc");
-    }
-
-    [Fact]
-    public async Task Create_GeminiProvider_WithKey_BuildsClient_WithBearer()
-    {
-        var factory = NewFactory(new LlmSettings("gemini", "gemma4:26b", "gemini-2.5-flash", "AIza-xyz"));
-        var (client, http) = await factory.CreateInternalForTestAsync();
-
-        client.Should().BeOfType<OpenAICompatibleLlmClient>();
-        http.BaseAddress!.AbsoluteUri.Should().Be("https://generativelanguage.googleapis.com/v1beta/openai/");
-        http.DefaultRequestHeaders.Authorization!.Scheme.Should().Be("Bearer");
-        http.DefaultRequestHeaders.Authorization.Parameter.Should().Be("AIza-xyz");
-    }
-
-    [Fact]
-    public async Task Create_GeminiProvider_WithoutKey_Throws()
-    {
-        var factory = NewFactory(new LlmSettings("gemini", "gemma4:26b", "gemini-2.5-flash", GeminiApiKey: null));
-
-        var act = async () => await factory.CreateAsync(CancellationToken.None);
-        (await act.Should().ThrowAsync<InvalidOperationException>())
-            .WithMessage("*Gemini*Key*");
-    }
-
-    [Fact]
-    public async Task Create_UnknownProvider_Throws()
-    {
-        var factory = NewFactory(new LlmSettings("anthropic", "gemma4:26b", "gemini-2.5-flash", null));
-
-        var act = async () => await factory.CreateAsync(CancellationToken.None);
-        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     private static LlmClientFactory NewFactory(LlmSettings settings, string? ollamaApiKey = null)
@@ -75,14 +41,6 @@ public sealed class LlmClientFactoryTests
             TokenTimeoutSeconds = 30,
             SystemPrompt = "sys",
         });
-        var gemini = Options.Create(new GeminiOptions
-        {
-            BaseAddress = "https://generativelanguage.googleapis.com/v1beta/openai/",
-            InitialTimeoutSeconds = 60,
-            TokenTimeoutSeconds = 30,
-            SystemPrompt = null,
-            Temperature = 0.3,
-        });
 
         var repo = new FakeSettingsRepo(
             settings,
@@ -90,7 +48,7 @@ public sealed class LlmClientFactoryTests
         var httpFactory = new TestHttpClientFactory();
         var loggerFactory = NullLoggerFactory.Instance;
 
-        return new LlmClientFactory(httpFactory, repo, ollama, gemini, loggerFactory);
+        return new LlmClientFactory(httpFactory, repo, ollama, loggerFactory);
     }
 
     private sealed class FakeSettingsRepo : IAppSettingsRepository

@@ -71,10 +71,10 @@ public sealed class DbInitializerTests
         var rows = conn.Query<(string Key, string Value)>(
             "SELECT key, value FROM app_settings ORDER BY key;").ToList();
 
-        rows.Should().Contain(r => r.Key == "llm.provider" && r.Value == "ollama");
         rows.Should().Contain(r => r.Key == "llm.ollama.model" && r.Value == "gemma4:26b");
-        rows.Should().Contain(r => r.Key == "llm.gemini.model" && r.Value == "gemini-2.5-flash");
-        rows.Should().Contain(r => r.Key == "llm.gemini.api_key" && r.Value == "");
+        rows.Should().NotContain(r => r.Key == "llm.provider");
+        rows.Should().NotContain(r => r.Key == "llm.gemini.model");
+        rows.Should().NotContain(r => r.Key == "llm.gemini.api_key");
     }
 
     [Fact]

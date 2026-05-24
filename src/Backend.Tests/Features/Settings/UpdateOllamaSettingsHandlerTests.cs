@@ -113,7 +113,7 @@ public sealed class UpdateOllamaSettingsHandlerTests
 
         // Unused stubs:
         public Task<LlmSettings> GetLlmAsync(CancellationToken ct) =>
-            Task.FromResult(new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null));
+            Task.FromResult(new LlmSettings("gemma4:26b"));
         public Task SetLlmAsync(LlmSettings s, CancellationToken ct) => Task.CompletedTask;
         public Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct) =>
             Task.FromResult(new CalendarUserSettings("primary", new(9, 0), new(18, 0), 60, 14));

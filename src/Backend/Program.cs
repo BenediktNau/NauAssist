@@ -10,7 +10,6 @@ using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
-using NauAssist.Backend.Features.Infrastructure.Llm.Gemini;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 using NauAssist.Backend.Features.Infrastructure.Time;
@@ -63,9 +62,7 @@ builder.Services.AddScoped<CalendarContextBuilder>();
 
 // LLM
 builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
-builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 builder.Services.AddHttpClient("Ollama");
-builder.Services.AddHttpClient("Gemini");
 builder.Services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
 builder.Services.AddScoped<ILlmClientFactory, LlmClientFactory>();
 builder.Services.AddScoped<ILlmClient>(sp =>

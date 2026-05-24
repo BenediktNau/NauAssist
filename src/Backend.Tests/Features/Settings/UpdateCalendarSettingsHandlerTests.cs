@@ -117,7 +117,7 @@ public sealed class UpdateCalendarSettingsHandlerTests
         }
 
         public Task<LlmSettings> GetLlmAsync(CancellationToken ct) =>
-            Task.FromResult(new LlmSettings("ollama", "gemma4:26b", "gemini-2.5-flash", null));
+            Task.FromResult(new LlmSettings("gemma4:26b"));
         public Task SetLlmAsync(LlmSettings s, CancellationToken ct) => Task.CompletedTask;
         public Task<OllamaUserSettings> GetOllamaAsync(CancellationToken ct) =>
             Task.FromResult(new OllamaUserSettings("http://localhost:11434", null, 16384, 0.3));
