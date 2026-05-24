@@ -54,12 +54,16 @@ export function ChatView({ onNavigate }: ChatViewProps) {
 
   return (
     <div className="flex h-screen flex-col bg-nau-bg text-nau-fg">
-      <Header onOpenSettings={() => onNavigate("settings")} />
+      <Header
+        onOpenSettings={() => onNavigate("settings")}
+        currentTab="chat"
+        onSelectTab={onNavigate}
+      />
 
-      <main className="min-h-0 flex-1 px-6 py-6 lg:px-10 lg:py-8">
+      <main className="min-h-0 flex-1 px-0 py-0 lg:px-10 lg:py-8">
         <div className="mx-auto flex h-full w-full max-w-[1480px] gap-6">
           {/* ── Chat card ───────────────────────────────────── */}
-          <section className="flex min-w-0 flex-1 flex-col rounded-[4px] border border-nau-line bg-nau-bg-alt">
+          <section className="flex min-w-0 flex-1 flex-col bg-nau-bg-alt lg:rounded-[4px] lg:border lg:border-nau-line">
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 lg:px-8">
               {bubbles.length === 0 && (
                 <WelcomeBlock onPickPrompt={(text) => send(text)} />
@@ -122,7 +126,7 @@ function WelcomeBlock({ onPickPrompt }: WelcomeBlockProps) {
         </span>
       </div>
 
-      <h1 className="m-0 mb-5 font-sans text-6xl font-normal leading-[1.05] tracking-tight text-nau-fg">
+      <h1 className="m-0 mb-5 font-sans text-4xl font-normal leading-[1.05] tracking-tight text-nau-fg lg:text-6xl">
         Was steht heute
         <br />
         auf{" "}

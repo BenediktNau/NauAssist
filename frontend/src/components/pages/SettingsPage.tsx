@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import type { AppPage } from "@/App";
 import {
   getLlmSettings,
@@ -8,7 +9,6 @@ import {
   updateOllamaSettings,
   testOllamaConnection,
   OLLAMA_MODELS,
-  GEMINI_MODELS,
   type LlmSettings,
   type OllamaSettings,
 } from "@/api/settings";
@@ -33,10 +33,7 @@ interface RowProps {
 
 function Row({ label, hint, children }: RowProps) {
   return (
-    <div
-      className="grid items-start gap-8 border-b border-nau-line py-4"
-      style={{ gridTemplateColumns: "260px 1fr" }}
-    >
+    <div className="grid grid-cols-1 items-start gap-2 border-b border-nau-line py-4 lg:grid-cols-[260px_1fr] lg:gap-8">
       <div>
         <div
           className="font-sans text-sm font-medium text-nau-fg"
@@ -45,7 +42,7 @@ function Row({ label, hint, children }: RowProps) {
           {label}
         </div>
         {hint && (
-          <div className="max-w-[240px] font-sans text-[13px] leading-relaxed text-nau-fg-dim">
+          <div className="max-w-none font-sans text-[13px] leading-relaxed text-nau-fg-dim lg:max-w-[240px]">
             {hint}
           </div>
         )}
@@ -102,7 +99,7 @@ function TextInput({
       disabled={disabled}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className="max-w-[480px] w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg disabled:opacity-50"
+      className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg disabled:opacity-50 lg:max-w-[480px]"
     />
   );
 }
@@ -115,7 +112,7 @@ function PrimaryButton({ children, onClick, disabled }: {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="cursor-pointer border-none bg-nau-accent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-bg disabled:opacity-40"
+      className="min-h-11 cursor-pointer border-none bg-nau-accent px-4 py-3 font-mono text-[11px] tracking-mono-wide text-nau-bg disabled:opacity-40 lg:min-h-0 lg:py-2.5"
     >
       {children}
     </button>
@@ -130,10 +127,111 @@ function SecondaryButton({ children, onClick, disabled }: {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="cursor-pointer border border-nau-line bg-transparent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-fg disabled:opacity-40"
+      className="min-h-11 cursor-pointer border border-nau-line bg-transparent px-4 py-3 font-mono text-[11px] tracking-mono-wide text-nau-fg disabled:opacity-40 lg:min-h-0 lg:py-2.5"
     >
       {children}
     </button>
+  );
+}
+
+function ModelCombobox({
+  value, onCommit, suggestions, placeholder,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  suggestions: readonly string[];
+  placeholder?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(value);
+  const [lastValue, setLastValue] = useState(value);
+  const [open, setOpen] = useState(false);
+
+  if (value !== lastValue) {
+    setLastValue(value);
+    setDraft(value);
+  }
+
+  const trimmedDraft = draft.trim();
+  const isBrowseMode = trimmedDraft === "" || trimmedDraft === value;
+  const filtered = isBrowseMode
+    ? [...suggestions]
+    : suggestions.filter((s) =>
+        s.toLowerCase().includes(trimmedDraft.toLowerCase()),
+      );
+
+  const commit = (v: string) => {
+    const trimmed = v.trim();
+    if (trimmed === "" || trimmed === value) {
+      setDraft(value);
+      setOpen(false);
+      return;
+    }
+    setDraft(trimmed);
+    setOpen(false);
+    onCommit(trimmed);
+  };
+
+  return (
+    <div className="relative w-full lg:max-w-[480px]">
+      <div className="flex">
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => { setOpen(false); commit(draft); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit(draft);
+              (e.currentTarget as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
+              setDraft(value);
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+          className="min-h-11 flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+        />
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const wasFocused = document.activeElement === inputRef.current;
+            if (wasFocused) {
+              setOpen((o) => !o);
+            } else {
+              inputRef.current?.focus();
+            }
+          }}
+          aria-label="Vorschläge anzeigen"
+          className="min-h-11 cursor-pointer border border-l-0 border-nau-line bg-white/[0.03] px-3 font-mono text-[11px] text-nau-fg-dim"
+        >
+          ▾
+        </button>
+      </div>
+      {open && filtered.length > 0 && (
+        <ul
+          className="absolute left-0 right-0 z-10 mt-1 max-h-60 list-none overflow-auto border border-nau-line bg-nau-bg p-0 shadow-lg"
+        >
+          {filtered.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  commit(s);
+                }}
+                className="block w-full cursor-pointer border-none bg-transparent px-3.5 py-2 text-left font-sans text-sm text-nau-fg hover:bg-white/[0.06]"
+              >
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -152,16 +250,27 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   }, []);
 
   const navItems = [
-    { n: "01", label: "KI-Provider", anchor: "section-llm" },
+    { n: "01", label: "Sprachmodell", anchor: "section-llm" },
     { n: "02", label: "Kalender", anchor: "section-calendar" },
   ];
 
   return (
-    <div
-      className="grid min-h-screen bg-nau-bg text-nau-fg"
-      style={{ gridTemplateColumns: "260px 1fr" }}
-    >
-      <aside className="relative border-r border-nau-line px-6 py-7">
+    <div className="grid min-h-screen grid-cols-1 bg-nau-bg text-nau-fg lg:grid-cols-[260px_1fr]">
+      <div className="flex items-center gap-3 border-b border-nau-line px-4 py-4 lg:hidden">
+        <button
+          type="button"
+          onClick={() => onNavigate("chat")}
+          aria-label="Zurück zum Chat"
+          className="inline-flex h-10 w-10 items-center justify-center text-nau-fg-dim transition-colors hover:text-nau-accent"
+        >
+          <ArrowLeft size={20} strokeWidth={1.5} />
+        </button>
+        <span className="font-mono text-[11px] tracking-mono-xwide text-nau-fg-dim">
+          // EINSTELLUNGEN
+        </span>
+      </div>
+
+      <aside className="relative hidden border-r border-nau-line px-6 py-7 lg:block">
         <button
           type="button"
           onClick={() => onNavigate("chat")}
@@ -194,12 +303,12 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         </nav>
       </aside>
 
-      <main className="max-w-[980px] px-16 pb-20 pt-10">
+      <main className="max-w-[980px] px-4 pb-12 pt-6 lg:px-16 lg:pb-20 lg:pt-10">
         <div className="mb-9">
-          <div className="mb-3 font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
+          <div className="mb-3 hidden font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim lg:block">
             — EINSTELLUNGEN —
           </div>
-          <h1 className="m-0 font-sans text-4xl font-normal leading-[1.05] tracking-tight text-nau-fg">
+          <h1 className="m-0 font-sans text-3xl font-normal leading-[1.05] tracking-tight text-nau-fg lg:text-4xl">
             Provider &amp; Kalender.
           </h1>
         </div>
@@ -220,7 +329,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           <CalendarSection calendar={calendar} setCalendar={setCalendar} />
         )}
 
-        <div className="mt-14 flex items-center justify-end border-t border-nau-line pt-6">
+        <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>
             ZURÜCK ZUM CHAT
           </SecondaryButton>
@@ -238,8 +347,6 @@ function LlmSection({
   ollama: OllamaSettings;
   setOllama: (o: OllamaSettings) => void;
 }) {
-  const [draftKey, setDraftKey] = useState("");
-  const [editingKey, setEditingKey] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -252,6 +359,22 @@ function LlmSection({
   const [ollamaSaving, setOllamaSaving] = useState(false);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    testOllamaConnection(ollama.host, null)
+      .then((r) => {
+        if (cancelled) return;
+        if (r.ok && r.models && r.models.length > 0) {
+          setAvailableModels(r.models);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ollama.host]);
 
   const ollamaDirty =
     hostDraft !== ollama.host ||
@@ -259,26 +382,16 @@ function LlmSection({
     tempDraft !== String(ollama.temperature) ||
     editingOllamaKey;
 
-  const saveLlm = async (
-    patch: Partial<LlmSettings> & { geminiApiKey?: string | null },
-  ) => {
+  const saveLlm = async (ollamaModel: string) => {
     setLlmError(null);
     try {
-      await updateLlmSettings({
-        provider: patch.provider ?? llm.provider,
-        ollamaModel: patch.ollamaModel ?? llm.ollamaModel,
-        geminiModel: patch.geminiModel ?? llm.geminiModel,
-        geminiApiKey: patch.geminiApiKey ?? null,
-      });
+      await updateLlmSettings({ ollamaModel });
       const fresh = await getLlmSettings();
       setLlm(fresh);
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2500);
     } catch (e) {
       setLlmError(String((e as Error).message ?? e));
-    } finally {
-      setEditingKey(false);
-      setDraftKey("");
     }
   };
 
@@ -314,6 +427,9 @@ function LlmSection({
       editingOllamaKey ? apiKeyDraft : null,
     );
     if (r.ok) {
+      if (r.models && r.models.length > 0) {
+        setAvailableModels(r.models);
+      }
       setTestResult(`// ERREICHBAR · ${r.models?.length ?? 0} MODELLE`);
     } else {
       setTestResult(`// FEHLER: ${r.error ?? "unbekannt"}`);
@@ -322,110 +438,18 @@ function LlmSection({
 
   return (
     <div id="section-llm">
-      <SectionHead n={1} label="KI-PROVIDER" title="Wie Nau denkt." />
-
-      <Row label="AI-Provider" hint="Welche AI Nau für seine Antworten nutzt.">
-        <div className="inline-flex border border-nau-line">
-          {(["ollama", "gemini"] as const).map((p, i) => {
-            const active = llm.provider === p;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => saveLlm({ provider: p })}
-                className="cursor-pointer bg-transparent px-4 py-2.5 font-mono text-[11px] uppercase tracking-mono"
-                style={{
-                  background: active ? "#facc15" : "transparent",
-                  color: active ? "#0a0a0a" : "#f5f5f4",
-                  borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.10)" : "none",
-                }}
-              >
-                {p === "ollama" ? "Ollama (lokal)" : "Gemini (Cloud)"}
-              </button>
-            );
-          })}
-        </div>
-      </Row>
+      <SectionHead n={1} label="SPRACHMODELL" title="Wie Nau denkt." />
 
       <Row
         label="Modell"
-        hint={
-          llm.provider === "ollama"
-            ? "Vorschläge — oder eigenes lokal gepulltes Modell eintippen."
-            : "Welches Modell verwendet wird."
-        }
+        hint="Vorschläge — oder eigenes lokal gepulltes Modell eintippen."
       >
-        {llm.provider === "ollama" ? (
-          <>
-            <input
-              list="ollama-models"
-              value={llm.ollamaModel}
-              onChange={(e) => saveLlm({ ollamaModel: e.target.value })}
-              className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-              placeholder="z.B. gemma4:26b"
-            />
-            <datalist id="ollama-models">
-              {OLLAMA_MODELS.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          </>
-        ) : (
-          <select
-            value={llm.geminiModel}
-            onChange={(e) => saveLlm({ geminiModel: e.target.value })}
-            className="max-w-[480px] border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-          >
-            {GEMINI_MODELS.map((m) => (
-              <option key={m} value={m} className="bg-nau-bg text-nau-fg">
-                {m}
-              </option>
-            ))}
-          </select>
-        )}
-      </Row>
-
-      <Row
-        label="Gemini API-Key"
-        hint="Wird sicher lokal gespeichert. Hol dir einen Key bei aistudio.google.com."
-      >
-        {llm.hasGeminiApiKey && !editingKey ? (
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
-              •••••••••• GESPEICHERT
-            </span>
-            <SecondaryButton onClick={() => setEditingKey(true)}>ÄNDERN</SecondaryButton>
-            <SecondaryButton
-              onClick={() => saveLlm({ geminiApiKey: "" })}
-              disabled={llm.provider === "gemini"}
-            >
-              ENTFERNEN
-            </SecondaryButton>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <input
-              type="password"
-              value={draftKey}
-              onChange={(e) => setDraftKey(e.target.value)}
-              placeholder="AIza..."
-              className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-            />
-            <PrimaryButton
-              onClick={() => saveLlm({ geminiApiKey: draftKey })}
-              disabled={draftKey.length === 0}
-            >
-              ÜBERNEHMEN ↵
-            </PrimaryButton>
-            {llm.hasGeminiApiKey && (
-              <SecondaryButton onClick={() => {
-                setEditingKey(false); setDraftKey("");
-              }}>
-                ABBRECHEN
-              </SecondaryButton>
-            )}
-          </div>
-        )}
+        <ModelCombobox
+          value={llm.ollamaModel}
+          onCommit={(v) => saveLlm(v)}
+          suggestions={availableModels ?? OLLAMA_MODELS}
+          placeholder="z.B. gemma4:26b"
+        />
       </Row>
 
       <Row label="Ollama erweitert" hint="Host, API-Key, Kontext-Größe, Temperatur.">
@@ -441,8 +465,8 @@ function LlmSection({
       {showAdvanced && (
         <>
           <Row label="Ollama-Host" hint="Z.B. http://localhost:11434 oder hinter einem Reverse-Proxy.">
-            <div className="flex flex-col gap-2 max-w-[480px]">
-              <div className="flex items-center gap-3">
+            <div className="flex w-full flex-col gap-2 lg:max-w-[480px]">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <TextInput
                   value={hostDraft}
                   onChange={setHostDraft}
@@ -460,14 +484,14 @@ function LlmSection({
 
           <Row label="Ollama API-Key" hint="Optional. Bearer-Token für Reverse-Proxy-Endpoints.">
             {ollama.hasApiKey && !editingOllamaKey ? (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
                   •••••• GESPEICHERT
                 </span>
                 <SecondaryButton onClick={() => setEditingOllamaKey(true)}>ÄNDERN</SecondaryButton>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <input
                   type="password"
                   value={apiKeyDraft}
@@ -476,7 +500,7 @@ function LlmSection({
                     setEditingOllamaKey(true);
                   }}
                   placeholder="optional"
-                  className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+                  className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg lg:max-w-[360px] lg:flex-1"
                 />
                 {ollama.hasApiKey && (
                   <SecondaryButton onClick={() => {
@@ -497,7 +521,7 @@ function LlmSection({
             <TextInput type="number" value={tempDraft} onChange={setTempDraft} />
           </Row>
 
-          <div className="flex items-center gap-3 border-b border-nau-line py-4">
+          <div className="flex flex-col gap-3 border-b border-nau-line py-4 lg:flex-row lg:items-center">
             <PrimaryButton onClick={saveOllama} disabled={!ollamaDirty || ollamaSaving}>
               OLLAMA SPEICHERN ↵
             </PrimaryButton>
@@ -512,7 +536,7 @@ function LlmSection({
 
       {savedFlash && (
         <div className="border-b border-nau-line py-3 font-mono text-[10px] tracking-mono-wide text-nau-accent">
-          // PROVIDER AKTUALISIERT — WIRD AB DEINER NÄCHSTEN NACHRICHT GENUTZT
+          // MODELL AKTUALISIERT — WIRD AB DEINER NÄCHSTEN NACHRICHT GENUTZT
         </div>
       )}
       {llmError && (
@@ -620,7 +644,7 @@ function CalendarSection({
       />
 
       <Row label="Verbindungsstatus" hint="">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center">
           <span
             className="px-2.5 py-1 font-mono text-[10px] tracking-mono-wide"
             style={{
@@ -659,13 +683,13 @@ function CalendarSection({
           <div className="mb-3 max-w-[600px] break-all border border-nau-line bg-nau-bg px-3 py-2 font-mono text-[11px] text-nau-fg">
             {authState.url}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <input
               type="text"
               value={authCode}
               onChange={(e) => setAuthCode(e.target.value)}
               placeholder="code=..."
-              className="max-w-[360px] flex-1 border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
+              className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg lg:max-w-[360px] lg:flex-1"
             />
             <PrimaryButton onClick={completeAuth} disabled={authCode.trim().length === 0}>
               CODE ÜBERMITTELN ↵
@@ -690,7 +714,7 @@ function CalendarSection({
 
       <Row label="Google Client-ID" hint="Aus Google Cloud Console → OAuth-Client (Desktop App).">
         {calendar.hasGoogleCredentials && !editingCreds ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
               GESPEICHERT
             </span>
@@ -725,7 +749,7 @@ function CalendarSection({
       </Row>
 
       <Row label="Arbeitszeiten" hint="Außerhalb dieser Zeiten schlägt Nau nichts vor.">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 lg:gap-3">
           <TextInput value={whStart} onChange={setWhStart} placeholder="09:00" />
           <span className="font-mono text-xs text-nau-fg-dim">→</span>
           <TextInput value={whEnd} onChange={setWhEnd} placeholder="18:00" />
@@ -740,7 +764,7 @@ function CalendarSection({
         <TextInput type="number" value={horizon} onChange={setHorizon} />
       </Row>
 
-      <div className="flex items-center gap-3 py-4">
+      <div className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center">
         <PrimaryButton onClick={save} disabled={!dirty || saving}>
           KALENDER SPEICHERN ↵
         </PrimaryButton>
