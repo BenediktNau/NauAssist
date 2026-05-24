@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Frontend Build ─────────────────────────────────────────────
-FROM node:24-alpine AS frontend-builder
+FROM node:24-slim AS frontend-builder
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
