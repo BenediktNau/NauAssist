@@ -1,44 +1,65 @@
 import { useMemo } from "react";
-import { addDays, format, isToday, startOfDay } from "date-fns";
+import { addDays, differenceInCalendarDays, format, isToday, startOfDay } from "date-fns";
 import { de } from "date-fns/locale";
 import {
-  allDayEventsForDay,
   computeGridRange,
   formatTime,
   layoutDay,
   timedEventsForDay,
+  type AllDayEvent,
   type ParsedEvent,
   type TimedEvent,
 } from "./utils";
+import type { PopoverState } from "./EventPopover";
 
 interface WeekViewProps {
   weekStart: Date;
   events: ParsedEvent[];
   workingHoursStart: string;
   workingHoursEnd: string;
-  highlightedSlot: { start: Date; end: Date } | null;
   rowHeight?: number;
+  onHoverEvent: (state: PopoverState | null) => void;
+  onClickEvent: (state: PopoverState) => void;
 }
 
 const DEFAULT_ROW_HEIGHT = 44;
 const HOUR_LABEL_WIDTH = 48;
+const ALL_DAY_LANE_HEIGHT = 22;
+const ALL_DAY_PAD = 6;
 
 export function WeekView({
   weekStart,
   events,
   workingHoursStart,
   workingHoursEnd,
-  highlightedSlot,
   rowHeight = DEFAULT_ROW_HEIGHT,
+  onHoverEvent,
+  onClickEvent,
 }: WeekViewProps) {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
 
+  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
+
   const timedEvents = useMemo(
     () => events.filter((e): e is TimedEvent => !e.isAllDay),
     [events],
+  );
+
+  const allDayInWeek = useMemo(
+    () =>
+      events.filter(
+        (e): e is AllDayEvent =>
+          e.isAllDay && e.startDate < weekEnd && e.endDate > weekStart,
+      ),
+    [events, weekStart, weekEnd],
+  );
+
+  const allDayLayout = useMemo(
+    () => layoutAllDay(allDayInWeek, weekStart, weekEnd),
+    [allDayInWeek, weekStart, weekEnd],
   );
 
   const range = useMemo(
@@ -55,17 +76,11 @@ export function WeekView({
   const gridHeight = hours.length * rowHeight;
   const minuteToY = (m: number) => ((m - range.startHour * 60) / minutesInGrid) * gridHeight;
 
-  const allDayPerDay = useMemo(
-    () => days.map((d) => allDayEventsForDay(events, d)),
-    [days, events],
-  );
-  const hasAnyAllDay = allDayPerDay.some((arr) => arr.length > 0);
-
   return (
     <div className="rounded-[4px] border border-nau-line bg-nau-bg-alt">
       <div
         className="grid border-b border-nau-line"
-        style={{ gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, 1fr)` }}
+        style={{ gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, minmax(0, 1fr))` }}
       >
         <span />
         {days.map((d) => {
@@ -77,7 +92,7 @@ export function WeekView({
               style={{ color: today ? "#facc15" : "#888885" }}
             >
               <div>{format(d, "EEE", { locale: de }).toUpperCase()}</div>
-              <div className="text-nau-fg" style={{ color: today ? "#facc15" : undefined }}>
+              <div style={{ color: today ? "#facc15" : "#f5f5f4" }}>
                 {format(d, "d.M.")}
               </div>
             </div>
@@ -85,32 +100,68 @@ export function WeekView({
         })}
       </div>
 
-      {hasAnyAllDay && (
+      {allDayLayout.lanes > 0 && (
         <div
-          className="grid border-b border-nau-line"
-          style={{ gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, 1fr)` }}
+          className="relative grid border-b border-nau-line"
+          style={{
+            gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${allDayLayout.lanes}, ${ALL_DAY_LANE_HEIGHT}px)`,
+            paddingTop: ALL_DAY_PAD,
+            paddingBottom: ALL_DAY_PAD,
+          }}
         >
-          <div className="px-2 py-1.5 text-right font-mono text-[9px] tracking-mono text-nau-fg-dim">
+          <div
+            className="self-start px-2 pt-0.5 font-mono text-[9px] tracking-mono text-nau-fg-dim"
+            style={{
+              gridColumn: "1 / 2",
+              gridRow: `1 / span ${allDayLayout.lanes}`,
+            }}
+          >
             ALL-DAY
           </div>
-          {allDayPerDay.map((items, di) => (
-            <div key={di} className="border-l border-nau-line px-1.5 py-1.5">
-              <div className="flex flex-col gap-1">
-                {items.map((e) => (
-                  <div
-                    key={e.id}
-                    className="truncate border-l-2 px-1.5 py-0.5 font-mono text-[10px] text-nau-fg"
-                    style={{
-                      borderLeftColor: "#60a5fa",
-                      background: "rgba(96,165,250,0.08)",
-                    }}
-                    title={e.title}
-                  >
-                    {e.title}
-                  </div>
-                ))}
-              </div>
-            </div>
+
+          {/* day-column dividers so the borders run through the all-day area */}
+          {days.map((_d, di) => (
+            <div
+              key={`div-${di}`}
+              className="border-l border-nau-line"
+              style={{
+                gridColumn: `${di + 2} / span 1`,
+                gridRow: `1 / span ${allDayLayout.lanes}`,
+              }}
+            />
+          ))}
+
+          {allDayLayout.items.map((it) => (
+            <button
+              key={it.event.id}
+              type="button"
+              onMouseEnter={(ev) =>
+                onHoverEvent({
+                  event: it.event,
+                  anchor: ev.currentTarget.getBoundingClientRect(),
+                  pinned: false,
+                })
+              }
+              onMouseLeave={() => onHoverEvent(null)}
+              onClick={(ev) =>
+                onClickEvent({
+                  event: it.event,
+                  anchor: ev.currentTarget.getBoundingClientRect(),
+                  pinned: true,
+                })
+              }
+              className="mx-0.5 cursor-pointer truncate border-none border-l-[2px] px-1.5 py-0 text-left font-mono text-[10px] leading-[20px] text-nau-fg"
+              style={{
+                gridColumn: `${it.colStart} / ${it.colEnd}`,
+                gridRow: it.lane + 1,
+                background: "rgba(96,165,250,0.10)",
+                borderLeftColor: "#60a5fa",
+              }}
+              title={it.event.title}
+            >
+              {it.event.title}
+            </button>
           ))}
         </div>
       )}
@@ -119,7 +170,7 @@ export function WeekView({
         <div
           className="relative grid"
           style={{
-            gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, 1fr)`,
+            gridTemplateColumns: `${HOUR_LABEL_WIDTH}px repeat(7, minmax(0, 1fr))`,
             height: gridHeight,
           }}
         >
@@ -142,8 +193,9 @@ export function WeekView({
               events={events}
               hours={hours}
               minuteToY={minuteToY}
-              highlightedSlot={highlightedSlot}
               rowHeight={rowHeight}
+              onHoverEvent={onHoverEvent}
+              onClickEvent={onClickEvent}
             />
           ))}
         </div>
@@ -157,8 +209,9 @@ interface DayColumnProps {
   events: ParsedEvent[];
   hours: number[];
   minuteToY: (m: number) => number;
-  highlightedSlot: { start: Date; end: Date } | null;
   rowHeight: number;
+  onHoverEvent: (state: PopoverState | null) => void;
+  onClickEvent: (state: PopoverState) => void;
 }
 
 function DayColumn({
@@ -166,21 +219,12 @@ function DayColumn({
   events,
   hours,
   minuteToY,
-  highlightedSlot,
   rowHeight,
+  onHoverEvent,
+  onClickEvent,
 }: DayColumnProps) {
   const timed = timedEventsForDay(events, day);
   const positioned = useMemo(() => layoutDay(timed), [timed]);
-  const startOfThisDay = startOfDay(day);
-
-  const slotInDay = useMemo(() => {
-    if (!highlightedSlot) return null;
-    const slotDay = startOfDay(highlightedSlot.start);
-    if (slotDay.getTime() !== startOfThisDay.getTime()) return null;
-    const startMin = highlightedSlot.start.getHours() * 60 + highlightedSlot.start.getMinutes();
-    const endMin = highlightedSlot.end.getHours() * 60 + highlightedSlot.end.getMinutes();
-    return { startMin, endMin };
-  }, [highlightedSlot, startOfThisDay]);
 
   return (
     <div className="relative border-l border-nau-line">
@@ -192,21 +236,6 @@ function DayColumn({
         />
       ))}
 
-      {slotInDay && (
-        <div
-          className="pointer-events-none absolute left-1 right-1 font-mono text-[9px] tracking-mono text-nau-accent"
-          style={{
-            top: minuteToY(slotInDay.startMin),
-            height: minuteToY(slotInDay.endMin) - minuteToY(slotInDay.startMin),
-            background: "rgba(250,204,21,0.14)",
-            border: "1px solid #facc15",
-            padding: "3px 5px",
-          }}
-        >
-          → VORSCHLAG
-        </div>
-      )}
-
       {positioned.map((p) => {
         const top = minuteToY(p.topMinutes);
         const height = Math.max(
@@ -214,9 +243,25 @@ function DayColumn({
           minuteToY(p.topMinutes + p.durationMinutes) - top - 2,
         );
         return (
-          <div
+          <button
             key={p.event.id}
-            className="absolute overflow-hidden font-mono text-[9px] text-nau-fg"
+            type="button"
+            onMouseEnter={(ev) =>
+              onHoverEvent({
+                event: p.event,
+                anchor: ev.currentTarget.getBoundingClientRect(),
+                pinned: false,
+              })
+            }
+            onMouseLeave={() => onHoverEvent(null)}
+            onClick={(ev) =>
+              onClickEvent({
+                event: p.event,
+                anchor: ev.currentTarget.getBoundingClientRect(),
+                pinned: true,
+              })
+            }
+            className="absolute cursor-pointer overflow-hidden border-none p-0 text-left font-mono text-[9px] text-nau-fg"
             style={{
               top,
               left: `calc(${p.left * 100}% + 3px)`,
@@ -224,10 +269,10 @@ function DayColumn({
               height,
               background: "rgba(255,255,255,0.05)",
               borderLeft: `2px solid ${p.hasConflict ? "#f472b6" : "#f5f5f4"}`,
-              padding: "3px 5px",
               outline: p.hasConflict ? "1px solid rgba(244,114,182,0.6)" : "none",
+              padding: "3px 5px",
             }}
-            title={`${p.event.title}\n${formatTime(p.event.startDate)}–${formatTime(p.event.endDate)}${p.event.location ? "\n@ " + p.event.location : ""}`}
+            title={p.event.title}
           >
             <div className="truncate">{p.event.title}</div>
             <div className="truncate text-[8px] text-nau-fg-dim">
@@ -241,10 +286,76 @@ function DayColumn({
                 ⚠
               </div>
             )}
-          </div>
+          </button>
         );
       })}
-
     </div>
   );
+}
+
+interface AllDayPositioned {
+  event: AllDayEvent;
+  lane: number;
+  /** CSS grid column-start (1-indexed; col 1 = label, col 2 = Mo) */
+  colStart: number;
+  /** CSS grid column-end (exclusive) */
+  colEnd: number;
+}
+
+interface AllDayLayout {
+  lanes: number;
+  items: AllDayPositioned[];
+}
+
+function layoutAllDay(
+  events: AllDayEvent[],
+  weekStart: Date,
+  weekEnd: Date,
+): AllDayLayout {
+  if (events.length === 0) return { lanes: 0, items: [] };
+
+  const sorted = [...events].sort(
+    (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+  );
+  const laneEnds: number[] = [];
+  const items: AllDayPositioned[] = [];
+
+  for (const e of sorted) {
+    const start = e.startDate.getTime();
+    const end = e.endDate.getTime();
+    let lane = laneEnds.findIndex((t) => t <= start);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(end);
+    } else {
+      laneEnds[lane] = end;
+    }
+    const { colStart, colEnd } = spanColumns(e, weekStart, weekEnd);
+    items.push({ event: e, lane, colStart, colEnd });
+  }
+  return { lanes: laneEnds.length, items };
+}
+
+/**
+ * CSS-Grid-Spalten: 1 = ALL-DAY-Label, 2..8 = Mo..So.
+ */
+function spanColumns(
+  event: AllDayEvent,
+  weekStart: Date,
+  weekEnd: Date,
+): { colStart: number; colEnd: number } {
+  const inclusiveEnd = addDays(event.endDate, -1);
+  const startDayIdx =
+    event.startDate < weekStart
+      ? 0
+      : differenceInCalendarDays(startOfDay(event.startDate), weekStart);
+  const endDayIdx =
+    inclusiveEnd >= weekEnd
+      ? 6
+      : differenceInCalendarDays(startOfDay(inclusiveEnd), weekStart);
+
+  return {
+    colStart: Math.max(0, startDayIdx) + 2,
+    colEnd: Math.min(6, endDayIdx) + 3,
+  };
 }

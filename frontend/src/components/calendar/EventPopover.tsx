@@ -1,0 +1,130 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { addDays, differenceInCalendarDays, format } from "date-fns";
+import { de } from "date-fns/locale";
+import type { ParsedEvent } from "./utils";
+
+export interface PopoverState {
+  event: ParsedEvent;
+  anchor: DOMRect;
+  pinned: boolean;
+}
+
+interface EventPopoverProps {
+  state: PopoverState;
+  onClose: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}
+
+const MAX_WIDTH = 320;
+const GAP = 8;
+
+export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: EventPopoverProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const anchor = state.anchor;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left = anchor.right + GAP;
+    if (left + rect.width > vw - 8) {
+      left = anchor.left - rect.width - GAP;
+    }
+    if (left < 8) {
+      left = Math.max(8, anchor.left);
+    }
+
+    let top = anchor.top;
+    if (top + rect.height > vh - 8) {
+      top = Math.max(8, vh - rect.height - 8);
+    }
+    setPosition({ top, left });
+  }, [state.anchor]);
+
+  useEffect(() => {
+    if (!state.pinned) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [state.pinned, onClose]);
+
+  const { event } = state;
+  const dateLine = formatRange(event);
+
+  const content = (
+    <div
+      ref={ref}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className="pointer-events-auto fixed z-[80] border border-nau-line-strong bg-nau-bg p-4 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+      style={{
+        top: position?.top ?? state.anchor.top,
+        left: position?.left ?? state.anchor.right + GAP,
+        maxWidth: MAX_WIDTH,
+        visibility: position ? "visible" : "hidden",
+      }}
+    >
+      <div className="font-sans text-sm font-medium leading-snug text-nau-fg">
+        {event.title}
+      </div>
+      <div className="mt-1 font-mono text-[10px] tracking-mono text-nau-fg-dim">
+        {dateLine}
+      </div>
+      {event.location && (
+        <div className="mt-2 font-sans text-[12px] text-nau-fg-dim">
+          @ {event.location}
+        </div>
+      )}
+      {event.description && (
+        <div className="mt-2 max-h-[180px] overflow-y-auto font-sans text-[12px] leading-relaxed text-nau-fg whitespace-pre-wrap">
+          {event.description}
+        </div>
+      )}
+      {state.pinned && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 cursor-pointer border border-nau-line bg-transparent px-2.5 py-1 font-mono text-[10px] tracking-mono-wide text-nau-fg-dim"
+        >
+          SCHLIESSEN
+        </button>
+      )}
+    </div>
+  );
+
+  return createPortal(content, document.body);
+}
+
+function formatRange(event: ParsedEvent): string {
+  if (event.isAllDay) {
+    const inclusiveEnd = addDays(event.endDate, -1);
+    const days = differenceInCalendarDays(inclusiveEnd, event.startDate) + 1;
+    if (days <= 1) {
+      return `${format(event.startDate, "EEE d. MMM yyyy", { locale: de }).toUpperCase()} · GANZTAG`;
+    }
+    return `${format(event.startDate, "d. MMM", { locale: de })} – ${format(inclusiveEnd, "d. MMM yyyy", { locale: de })} · ${days} TAGE`;
+  }
+  const sameDay =
+    event.startDate.toDateString() === event.endDate.toDateString();
+  if (sameDay) {
+    return `${format(event.startDate, "EEE d. MMM", { locale: de }).toUpperCase()} · ${format(event.startDate, "HH:mm")}–${format(event.endDate, "HH:mm")}`;
+  }
+  return `${format(event.startDate, "d.M. HH:mm")} – ${format(event.endDate, "d.M. HH:mm")}`;
+}

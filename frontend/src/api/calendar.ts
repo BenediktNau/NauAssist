@@ -8,15 +8,6 @@ export interface CalendarEvent {
   isAllDay: boolean;
 }
 
-export type FreeSlotStatus = "passes" | "soft" | "hard";
-
-export interface FreeSlot {
-  start: string;
-  end: string;
-  status: FreeSlotStatus;
-  violatedBy: string | null;
-}
-
 export class NotConnectedError extends Error {
   constructor() {
     super("Google-Kalender ist nicht verbunden.");
@@ -41,23 +32,4 @@ export async function getCalendarRange(
   if (!res.ok) await handleError(res, url);
   const body = (await res.json()) as { events: CalendarEvent[] };
   return body.events;
-}
-
-export async function findFreeSlots(
-  from: Date,
-  to: Date,
-  durationMinutes: number,
-): Promise<FreeSlot[]> {
-  const res = await fetch("/api/calendar/free-slots", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: from.toISOString(),
-      to: to.toISOString(),
-      durationMinutes,
-    }),
-  });
-  if (!res.ok) await handleError(res, "/api/calendar/free-slots");
-  const body = (await res.json()) as { slots: FreeSlot[] };
-  return body.slots;
 }

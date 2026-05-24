@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addMonths,
   addWeeks,
@@ -7,7 +7,6 @@ import {
   endOfWeek,
   endOfYear,
   format,
-  parseISO,
   startOfMonth,
   startOfWeek,
   startOfYear,
@@ -17,14 +16,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { YearView } from "./YearView";
-import { SlotFinder } from "./SlotFinder";
+import { WhatsNext } from "./WhatsNext";
 import { NotConnected } from "./NotConnected";
+import { EventPopover, type PopoverState } from "./EventPopover";
 import { parseEvents } from "./utils";
 import {
   getCalendarRange,
   NotConnectedError,
   type CalendarEvent,
-  type FreeSlot,
 } from "@/api/calendar";
 import { getCalendarSettings, type CalendarSettings } from "@/api/calendar-settings";
 import type { AppPage } from "@/App";
@@ -37,6 +36,8 @@ interface CalendarBoardProps {
   onNavigate: (page: AppPage) => void;
 }
 
+const HOVER_HIDE_DELAY_MS = 180;
+
 export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -45,8 +46,44 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notConnected, setNotConnected] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<FreeSlot | null>(null);
-  const [slotsOpen, setSlotsOpen] = useState(variant === "full");
+
+  const [popover, setPopover] = useState<PopoverState | null>(null);
+  const hideTimer = useRef<number | null>(null);
+
+  const cancelHide = () => {
+    if (hideTimer.current !== null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  };
+
+  const scheduleHide = () => {
+    cancelHide();
+    hideTimer.current = window.setTimeout(() => {
+      setPopover((p) => (p?.pinned ? p : null));
+      hideTimer.current = null;
+    }, HOVER_HIDE_DELAY_MS);
+  };
+
+  const handleHoverEvent = (next: PopoverState | null) => {
+    if (popover?.pinned) return;
+    if (next === null) {
+      scheduleHide();
+    } else {
+      cancelHide();
+      setPopover(next);
+    }
+  };
+
+  const handleClickEvent = (next: PopoverState) => {
+    cancelHide();
+    setPopover(next);
+  };
+
+  const closePopover = () => {
+    cancelHide();
+    setPopover(null);
+  };
 
   const range = useMemo(() => computeRange(view, anchor), [view, anchor]);
 
@@ -92,11 +129,6 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
       return addYears(d, delta);
     });
   };
-
-  const selectedSlotForGrid = useMemo(() => {
-    if (!selectedSlot) return null;
-    return { start: parseISO(selectedSlot.start), end: parseISO(selectedSlot.end) };
-  }, [selectedSlot]);
 
   const compact = variant === "compact";
 
@@ -147,8 +179,9 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
       events={events}
       workingHoursStart={settings?.workingHoursStart ?? "09:00"}
       workingHoursEnd={settings?.workingHoursEnd ?? "18:00"}
-      highlightedSlot={selectedSlotForGrid}
       rowHeight={compact ? 30 : 44}
+      onHoverEvent={handleHoverEvent}
+      onClickEvent={handleClickEvent}
     />
   ) : view === "month" ? (
     <MonthView
@@ -156,6 +189,8 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
       events={events}
       onPickWeek={(ws) => { setAnchor(ws); setView("week"); }}
       minCellHeight={compact ? 80 : 110}
+      onHoverEvent={handleHoverEvent}
+      onClickEvent={handleClickEvent}
     />
   ) : (
     <YearView
@@ -166,46 +201,42 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
     />
   );
 
-  const slotFinderPanel = settings && (
-    <SlotFinder
-      defaultDurationMinutes={settings.defaultDurationMinutes}
-      searchHorizonDays={settings.searchHorizonDays}
-      onPickSlot={setSelectedSlot}
-      selectedSlotKey={selectedSlot ? `${selectedSlot.start}|${selectedSlot.end}` : null}
+  const whatsNext = (
+    <WhatsNext
+      onHoverEvent={handleHoverEvent}
+      onClickEvent={handleClickEvent}
+      reloadKey={rawEvents.length}
     />
   );
 
-  if (compact) {
-    return (
-      <div className="flex flex-col gap-3">
-        {header}
-        {grid}
-        {settings && (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setSlotsOpen((v) => !v)}
-              className="cursor-pointer border border-nau-line bg-transparent px-3 py-2 text-left font-mono text-[10px] tracking-mono-wide text-nau-fg-dim transition-colors hover:text-nau-accent"
-            >
-              {slotsOpen ? "▼ SLOT-EMPFEHLUNGEN" : "▶ SLOT-EMPFEHLUNGEN"}
-            </button>
-            {slotsOpen && slotFinderPanel}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
+  const body = compact ? (
+    <div className="flex flex-col gap-3">
+      {header}
+      {grid}
+      {whatsNext}
+    </div>
+  ) : (
     <div className="flex flex-col gap-4">
       {header}
-      <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">{grid}</div>
-        {settings && (
-          <aside className="min-w-0">{slotFinderPanel}</aside>
-        )}
+        <aside className="min-w-0">{whatsNext}</aside>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {body}
+      {popover && (
+        <EventPopover
+          state={popover}
+          onClose={closePopover}
+          onMouseEnter={cancelHide}
+          onMouseLeave={scheduleHide}
+        />
+      )}
+    </>
   );
 }
 
