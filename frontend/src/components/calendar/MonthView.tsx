@@ -21,11 +21,17 @@ interface MonthViewProps {
   monthAnchor: Date;
   events: ParsedEvent[];
   onPickWeek: (weekStart: Date) => void;
+  minCellHeight?: number;
 }
 
 const MAX_CHIPS = 3;
 
-export function MonthView({ monthAnchor, events, onPickWeek }: MonthViewProps) {
+export function MonthView({
+  monthAnchor,
+  events,
+  onPickWeek,
+  minCellHeight = 110,
+}: MonthViewProps) {
   const cells = useMemo(() => {
     const first = startOfWeek(startOfMonth(monthAnchor), { weekStartsOn: 1 });
     const last = endOfWeek(endOfMonth(monthAnchor), { weekStartsOn: 1 });
@@ -77,8 +83,9 @@ export function MonthView({ monthAnchor, events, onPickWeek }: MonthViewProps) {
               key={day.toISOString()}
               type="button"
               onClick={() => onPickWeek(startOfWeek(day, { weekStartsOn: 1 }))}
-              className="group relative flex min-h-[110px] cursor-pointer flex-col gap-1 border-l border-t border-nau-line bg-transparent px-2 py-2 text-left transition-colors first:border-l-0 hover:bg-white/[0.02]"
+              className="group relative flex cursor-pointer flex-col gap-1 border-l border-t border-nau-line bg-transparent px-2 py-2 text-left transition-colors first:border-l-0 hover:bg-white/[0.02]"
               style={{
+                minHeight: minCellHeight,
                 borderLeftWidth: isWeekStart ? 0 : undefined,
                 opacity: inMonth ? 1 : 0.4,
               }}

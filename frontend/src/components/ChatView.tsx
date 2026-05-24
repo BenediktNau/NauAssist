@@ -6,8 +6,7 @@ import { ClearDivider } from "./ClearDivider";
 import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
 import { Header } from "./nau/Header";
-import { CalendarCard } from "./nau/CalendarCard";
-import { FocusPanel } from "./nau/FocusPanel";
+import { CalendarBoard } from "./calendar/CalendarBoard";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
 import type { AppPage } from "@/App";
 
@@ -94,10 +93,9 @@ export function ChatView({ onNavigate }: ChatViewProps) {
             </div>
           </section>
 
-          {/* ── Calendar card column ─────────────────────────── */}
-          <aside className="hidden w-[460px] shrink-0 flex-col gap-5 overflow-y-auto lg:flex">
-            <CalendarCard onTitleClick={() => onNavigate("calendar")} />
-            <FocusPanel />
+          {/* ── Calendar column ─────────────────────────── */}
+          <aside className="hidden w-[560px] shrink-0 flex-col gap-5 overflow-y-auto pr-1 lg:flex xl:w-[620px]">
+            <CalendarBoard variant="compact" onNavigate={onNavigate} />
           </aside>
         </div>
       </main>

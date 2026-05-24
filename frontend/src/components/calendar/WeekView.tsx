@@ -17,9 +17,10 @@ interface WeekViewProps {
   workingHoursStart: string;
   workingHoursEnd: string;
   highlightedSlot: { start: Date; end: Date } | null;
+  rowHeight?: number;
 }
 
-const ROW_HEIGHT = 44;
+const DEFAULT_ROW_HEIGHT = 44;
 const HOUR_LABEL_WIDTH = 48;
 
 export function WeekView({
@@ -28,6 +29,7 @@ export function WeekView({
   workingHoursStart,
   workingHoursEnd,
   highlightedSlot,
+  rowHeight = DEFAULT_ROW_HEIGHT,
 }: WeekViewProps) {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -50,7 +52,7 @@ export function WeekView({
   );
 
   const minutesInGrid = (range.endHour - range.startHour) * 60;
-  const gridHeight = hours.length * ROW_HEIGHT;
+  const gridHeight = hours.length * rowHeight;
   const minuteToY = (m: number) => ((m - range.startHour * 60) / minutesInGrid) * gridHeight;
 
   const allDayPerDay = useMemo(
@@ -126,7 +128,7 @@ export function WeekView({
               <div
                 key={h}
                 className="absolute right-2 -translate-y-1/2 font-mono text-[9px] text-nau-fg-dim"
-                style={{ top: i * ROW_HEIGHT }}
+                style={{ top: i * rowHeight }}
               >
                 {String(h).padStart(2, "0")}:00
               </div>
@@ -141,6 +143,7 @@ export function WeekView({
               hours={hours}
               minuteToY={minuteToY}
               highlightedSlot={highlightedSlot}
+              rowHeight={rowHeight}
             />
           ))}
         </div>
@@ -155,6 +158,7 @@ interface DayColumnProps {
   hours: number[];
   minuteToY: (m: number) => number;
   highlightedSlot: { start: Date; end: Date } | null;
+  rowHeight: number;
 }
 
 function DayColumn({
@@ -163,6 +167,7 @@ function DayColumn({
   hours,
   minuteToY,
   highlightedSlot,
+  rowHeight,
 }: DayColumnProps) {
   const timed = timedEventsForDay(events, day);
   const positioned = useMemo(() => layoutDay(timed), [timed]);
@@ -183,7 +188,7 @@ function DayColumn({
         <div
           key={i}
           className="border-b border-dashed"
-          style={{ height: ROW_HEIGHT, borderColor: "rgba(255,255,255,0.04)" }}
+          style={{ height: rowHeight, borderColor: "rgba(255,255,255,0.04)" }}
         />
       ))}
 

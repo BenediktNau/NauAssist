@@ -18,9 +18,15 @@ interface YearViewProps {
   yearAnchor: Date;
   events: ParsedEvent[];
   onPickMonth: (monthAnchor: Date) => void;
+  columns?: number;
 }
 
-export function YearView({ yearAnchor, events, onPickMonth }: YearViewProps) {
+export function YearView({
+  yearAnchor,
+  events,
+  onPickMonth,
+  columns = 4,
+}: YearViewProps) {
   const months = useMemo(() => {
     const yStart = startOfYear(yearAnchor);
     return Array.from({ length: 12 }, (_, i) => addMonths(yStart, i));
@@ -38,7 +44,7 @@ export function YearView({ yearAnchor, events, onPickMonth }: YearViewProps) {
   }, [events]);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2">
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {months.map((m) => (
         <button
           key={m.toISOString()}
