@@ -1,5 +1,13 @@
 import { useMemo } from "react";
-import { addDays, differenceInCalendarDays, format, isToday, startOfDay } from "date-fns";
+import {
+  addDays,
+  differenceInCalendarDays,
+  differenceInMinutes,
+  format,
+  isSameDay,
+  isToday,
+  startOfDay,
+} from "date-fns";
 import { de } from "date-fns/locale";
 import {
   computeGridRange,
@@ -11,6 +19,13 @@ import {
   type TimedEvent,
 } from "./utils";
 import type { PopoverState } from "./EventPopover";
+import type { SlotInfo } from "@/api/types";
+
+export interface ParsedProposal {
+  slot: SlotInfo;
+  startDate: Date;
+  endDate: Date;
+}
 
 interface WeekViewProps {
   weekStart: Date;
@@ -20,6 +35,8 @@ interface WeekViewProps {
   rowHeight?: number;
   onHoverEvent: (state: PopoverState | null) => void;
   onClickEvent: (state: PopoverState) => void;
+  proposals?: ParsedProposal[];
+  onPickProposal?: (slot: SlotInfo) => void;
 }
 
 const DEFAULT_ROW_HEIGHT = 44;
@@ -35,6 +52,8 @@ export function WeekView({
   rowHeight = DEFAULT_ROW_HEIGHT,
   onHoverEvent,
   onClickEvent,
+  proposals,
+  onPickProposal,
 }: WeekViewProps) {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -62,9 +81,27 @@ export function WeekView({
     [allDayInWeek, weekStart, weekEnd],
   );
 
+  // Proposals werden in die Grid-Range einbezogen, damit der Sichtbereich sie umfasst
+  // auch wenn sie außerhalb der Working-Hours liegen.
+  const eventsForRange = useMemo(() => {
+    if (!proposals || proposals.length === 0) return timedEvents;
+    const synthetic: TimedEvent[] = proposals.map((p, i) => ({
+      id: `__proposal_${i}`,
+      title: "",
+      start: p.slot.start,
+      end: p.slot.end,
+      description: null,
+      location: null,
+      isAllDay: false,
+      startDate: p.startDate,
+      endDate: p.endDate,
+    }));
+    return [...timedEvents, ...synthetic];
+  }, [timedEvents, proposals]);
+
   const range = useMemo(
-    () => computeGridRange(workingHoursStart, workingHoursEnd, timedEvents),
-    [workingHoursStart, workingHoursEnd, timedEvents],
+    () => computeGridRange(workingHoursStart, workingHoursEnd, eventsForRange),
+    [workingHoursStart, workingHoursEnd, eventsForRange],
   );
 
   const hours = useMemo(
@@ -196,6 +233,8 @@ export function WeekView({
               rowHeight={rowHeight}
               onHoverEvent={onHoverEvent}
               onClickEvent={onClickEvent}
+              proposals={proposals}
+              onPickProposal={onPickProposal}
             />
           ))}
         </div>
@@ -212,6 +251,8 @@ interface DayColumnProps {
   rowHeight: number;
   onHoverEvent: (state: PopoverState | null) => void;
   onClickEvent: (state: PopoverState) => void;
+  proposals?: ParsedProposal[];
+  onPickProposal?: (slot: SlotInfo) => void;
 }
 
 function DayColumn({
@@ -222,9 +263,15 @@ function DayColumn({
   rowHeight,
   onHoverEvent,
   onClickEvent,
+  proposals,
+  onPickProposal,
 }: DayColumnProps) {
   const timed = timedEventsForDay(events, day);
   const positioned = useMemo(() => layoutDay(timed), [timed]);
+  const proposalsForDay = useMemo(
+    () => (proposals ?? []).filter((p) => isSameDay(p.startDate, day)),
+    [proposals, day],
+  );
 
   return (
     <div className="relative border-l border-nau-line">
@@ -286,6 +333,43 @@ function DayColumn({
                 ⚠
               </div>
             )}
+          </button>
+        );
+      })}
+
+      {proposalsForDay.map((p, i) => {
+        const dayStart = startOfDay(p.startDate);
+        const topMin = differenceInMinutes(p.startDate, dayStart);
+        const durationMin = Math.max(15, differenceInMinutes(p.endDate, p.startDate));
+        const top = minuteToY(topMin);
+        const height = Math.max(20, minuteToY(topMin + durationMin) - top - 2);
+        const label = p.slot.note ?? "VORSCHLAG";
+        const titleText = `Vorschlag · ${formatTime(p.startDate)}–${formatTime(p.endDate)}${
+          p.slot.note ? ` · ${p.slot.note}` : ""
+        }${onPickProposal ? "\n(Klicken zum Annehmen)" : ""}`;
+        return (
+          <button
+            key={`proposal-${i}`}
+            type="button"
+            onClick={() => onPickProposal?.(p.slot)}
+            disabled={!onPickProposal}
+            className="absolute z-10 cursor-pointer overflow-hidden border-2 border-dashed p-0 text-left font-mono text-[9px] disabled:cursor-default"
+            style={{
+              top,
+              left: "3px",
+              right: "3px",
+              height,
+              background: "rgba(250,204,21,0.10)",
+              borderColor: "#facc15",
+              color: "#facc15",
+              padding: "2px 5px",
+            }}
+            title={titleText}
+          >
+            <div className="truncate font-bold tracking-mono">▸ {label}</div>
+            <div className="truncate text-[8px] opacity-80">
+              {formatTime(p.startDate)}–{formatTime(p.endDate)}
+            </div>
           </button>
         );
       })}

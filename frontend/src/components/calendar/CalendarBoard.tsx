@@ -7,6 +7,7 @@ import {
   endOfWeek,
   endOfYear,
   format,
+  parseISO,
   startOfMonth,
   startOfWeek,
   startOfYear,
@@ -14,7 +15,7 @@ import {
 import { de } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MonthView } from "./MonthView";
-import { WeekView } from "./WeekView";
+import { WeekView, type ParsedProposal } from "./WeekView";
 import { YearView } from "./YearView";
 import { WhatsNext } from "./WhatsNext";
 import { NotConnected } from "./NotConnected";
@@ -27,6 +28,8 @@ import {
 } from "@/api/calendar";
 import { getCalendarSettings, type CalendarSettings } from "@/api/calendar-settings";
 import type { AppPage } from "@/App";
+import type { ActiveProposals } from "@/hooks/useChat";
+import type { SlotInfo } from "@/api/types";
 
 export type CalendarBoardVariant = "full" | "compact";
 type ViewMode = "week" | "month" | "year";
@@ -34,11 +37,20 @@ type ViewMode = "week" | "month" | "year";
 interface CalendarBoardProps {
   variant: CalendarBoardVariant;
   onNavigate: (page: AppPage) => void;
+  /** Aktive Vorschläge aus dem Chat — werden im WeekView als Ghost-Events angezeigt. */
+  proposals?: ActiveProposals | null;
+  /** Klick auf einen Vorschlags-Ghost akzeptiert den Slot. */
+  onPickProposal?: (slot: SlotInfo) => void;
 }
 
 const HOVER_HIDE_DELAY_MS = 180;
 
-export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
+export function CalendarBoard({
+  variant,
+  onNavigate,
+  proposals,
+  onPickProposal,
+}: CalendarBoardProps) {
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [settings, setSettings] = useState<CalendarSettings | null>(null);
@@ -122,6 +134,36 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
   const titleLabel = useMemo(() => formatTitle(view, anchor), [view, anchor]);
   const subtitle = useMemo(() => formatSubtitle(view, range), [view, range]);
 
+  const parsedProposals = useMemo<ParsedProposal[]>(() => {
+    if (!proposals) return [];
+    return proposals.slots
+      .map((s) => {
+        const start = parseISO(s.start);
+        const end = parseISO(s.end);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+          return null;
+        }
+        return { slot: s, startDate: start, endDate: end };
+      })
+      .filter((p): p is ParsedProposal => p !== null);
+  }, [proposals]);
+
+  // Auto-Jump: bei neuen Proposals (messageId-Wechsel) Anchor auf ersten Slot setzen
+  // und in die Woche-Ansicht wechseln, damit der Nutzer sie sofort einschätzen kann.
+  const lastProposalsIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = proposals?.messageId ?? null;
+    if (id === null) {
+      lastProposalsIdRef.current = null;
+      return;
+    }
+    if (id === lastProposalsIdRef.current) return;
+    lastProposalsIdRef.current = id;
+    if (parsedProposals.length === 0) return;
+    setAnchor(parsedProposals[0].startDate);
+    setView("week");
+  }, [proposals?.messageId, parsedProposals]);
+
   const navigate = (delta: number) => {
     setAnchor((d) => {
       if (view === "week") return addWeeks(d, delta);
@@ -182,6 +224,8 @@ export function CalendarBoard({ variant, onNavigate }: CalendarBoardProps) {
       rowHeight={compact ? 30 : 44}
       onHoverEvent={handleHoverEvent}
       onClickEvent={handleClickEvent}
+      proposals={parsedProposals}
+      onPickProposal={onPickProposal}
     />
   ) : view === "month" ? (
     <MonthView

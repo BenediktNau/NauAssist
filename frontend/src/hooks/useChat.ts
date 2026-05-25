@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearSession, getHistory } from "@/api/client";
 import { sendMessage } from "@/api/chatStream";
 import type { ClearMarkerDto, MessageDto, SlotInfo } from "@/api/types";
@@ -37,11 +37,18 @@ export interface ToolStatus {
   ok?: boolean;
 }
 
+export interface ActiveProposals {
+  /** ID der Assistant-Bubble, deren Proposals das sind — wechselt nur bei neuen Vorschlägen. */
+  messageId: number;
+  slots: SlotInfo[];
+}
+
 export interface ChatState {
   bubbles: ChatBubble[];
   toolStatus: ToolStatus | null;
   error: string | null;
   sending: boolean;
+  activeProposals: ActiveProposals | null;
 }
 
 const TEMP_ID_OFFSET = -1; // temporäre IDs sind negativ, dann gibt es keine Kollision mit DB-IDs
@@ -269,5 +276,17 @@ export function useChat(): ChatState & {
     [sending, reloadHistory],
   );
 
-  return { bubbles, toolStatus, error, sending, send };
+  const activeProposals = useMemo<ActiveProposals | null>(() => {
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      if (b.kind === "clear-marker") return null;
+      if (!isMessageBubble(b)) continue;
+      if (b.role === "assistant" && b.proposals && b.proposals.length > 0) {
+        return { messageId: b.id, slots: b.proposals };
+      }
+    }
+    return null;
+  }, [bubbles]);
+
+  return { bubbles, toolStatus, error, sending, send, activeProposals };
 }

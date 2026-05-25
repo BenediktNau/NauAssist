@@ -25,7 +25,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onNavigate }: ChatViewProps) {
-  const { bubbles, toolStatus, error, sending, send } = useChat();
+  const { bubbles, toolStatus, error, sending, send, activeProposals } = useChat();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -95,7 +95,12 @@ export function ChatView({ onNavigate }: ChatViewProps) {
 
           {/* ── Calendar column ─────────────────────────── */}
           <aside className="hidden w-[560px] shrink-0 flex-col gap-5 overflow-y-auto pr-1 lg:flex xl:w-[620px]">
-            <CalendarBoard variant="compact" onNavigate={onNavigate} />
+            <CalendarBoard
+              variant="compact"
+              onNavigate={onNavigate}
+              proposals={activeProposals}
+              onPickProposal={onPickSlot}
+            />
           </aside>
         </div>
       </main>
