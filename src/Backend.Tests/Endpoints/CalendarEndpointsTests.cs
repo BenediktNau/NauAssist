@@ -174,6 +174,85 @@ public sealed class CalendarEndpointsTests : IDisposable
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    [Fact]
+    public async Task DeleteEvent_RemovesEvent()
+    {
+        _fakeCal.Seed(new CalendarEvent("ev-1", "Standup",
+            new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 9, 30, 0, TimeSpan.Zero),
+            null, null, false));
+
+        using var client = Build().CreateClient();
+        using var resp = await client.DeleteAsync("/api/calendar/events/ev-1");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        _fakeCal.Deletions.Should().ContainSingle()
+            .Which.Scope.Should().Be(EventScope.Instance);
+    }
+
+    [Fact]
+    public async Task DeleteEvent_ScopeSeries_Forwards()
+    {
+        _fakeCal.Seed(new CalendarEvent("ev-1", "Standup",
+            new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 9, 30, 0, TimeSpan.Zero),
+            null, null, false, SeriesId: "master"));
+
+        using var client = Build().CreateClient();
+        using var resp = await client.DeleteAsync("/api/calendar/events/ev-1?scope=series");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        _fakeCal.Deletions.Should().ContainSingle()
+            .Which.Scope.Should().Be(EventScope.Series);
+    }
+
+    [Fact]
+    public async Task DeleteEvent_BadScope_Returns400()
+    {
+        using var client = Build().CreateClient();
+        using var resp = await client.DeleteAsync("/api/calendar/events/ev-1?scope=alle");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PatchEvent_UpdatesFields()
+    {
+        _fakeCal.Seed(new CalendarEvent("ev-1", "Alt",
+            new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 9, 30, 0, TimeSpan.Zero),
+            null, null, false));
+
+        using var client = Build().CreateClient();
+        using var resp = await client.PatchAsJsonAsync("/api/calendar/events/ev-1", new
+        {
+            title = "Neu",
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        _fakeCal.Updates.Should().ContainSingle()
+            .Which.Update.Title.Should().Be("Neu");
+    }
+
+    [Fact]
+    public async Task PatchEvent_EndBeforeStart_Returns400()
+    {
+        _fakeCal.Seed(new CalendarEvent("ev-1", "X",
+            new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 9, 30, 0, TimeSpan.Zero),
+            null, null, false));
+
+        var start = new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero);
+        using var client = Build().CreateClient();
+        using var resp = await client.PatchAsJsonAsync("/api/calendar/events/ev-1", new
+        {
+            start,
+            end = start.AddMinutes(-30),
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     public void Dispose() => _factory.Dispose();
 
     private sealed record RangeDto(IReadOnlyList<EventDto> Events);

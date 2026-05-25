@@ -5,10 +5,16 @@ interface MessageInputProps {
   disabled: boolean;
 }
 
-// Quick-Buttons für Slash-Commands, die als deterministische Frontend-Aktionen
-// (No-AI) ausgeführt werden. /clear bleibt sichtbar im Footer-Hinweis.
-// /verschieben, /loeschen, /woche, /frei folgen in PR 3 als eigene Modals.
-const SLASH_HINTS = ["/termin", "/regeln"];
+// Quick-Buttons für deterministische No-AI-Slash-Commands. Jeder Eintrag
+// öffnet ein Modal im useChat-Dispatcher. /clear bleibt nur per Eingabe.
+const SLASH_HINTS = [
+  "/termin",
+  "/verschieben",
+  "/loeschen",
+  "/woche",
+  "/frei",
+  "/regeln",
+];
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [value, setValue] = useState("");

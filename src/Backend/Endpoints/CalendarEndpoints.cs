@@ -1,9 +1,11 @@
 using Mediator;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CreateEvent;
+using NauAssist.Backend.Features.Calendar.DeleteEvent;
 using NauAssist.Backend.Features.Calendar.GetCalendarRange;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Calendar.LookupFreeSlots;
+using NauAssist.Backend.Features.Calendar.UpdateEvent;
 using NauAssist.Backend.Features.Rules;
 
 namespace NauAssist.Backend.Endpoints;
@@ -64,6 +66,73 @@ public static class CalendarEndpoints
                 return Results.Created(
                     $"/api/calendar/events/{response.EventId}",
                     new { id = response.EventId });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (NotAuthenticatedException ex)
+            {
+                return Results.Json(
+                    new { error = ex.Message, code = "not_connected" },
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+        app.MapDelete("/api/calendar/events/{eventId}", async (
+            string eventId,
+            string? scope,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            var parsedScope = ParseScope(scope);
+            if (parsedScope is null)
+            {
+                return Results.BadRequest(new { error = "scope muss 'instance' oder 'series' sein." });
+            }
+
+            try
+            {
+                await mediator.Send(new DeleteEventRequest(eventId, parsedScope.Value), ct);
+                return Results.NoContent();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (NotAuthenticatedException ex)
+            {
+                return Results.Json(
+                    new { error = ex.Message, code = "not_connected" },
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+        app.MapPatch("/api/calendar/events/{eventId}", async (
+            string eventId,
+            string? scope,
+            UpdateEventPayload payload,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            var parsedScope = ParseScope(scope);
+            if (parsedScope is null)
+            {
+                return Results.BadRequest(new { error = "scope muss 'instance' oder 'series' sein." });
+            }
+
+            try
+            {
+                var update = new EventUpdate(
+                    Title: payload.Title,
+                    Start: payload.Start,
+                    End: payload.End,
+                    Description: payload.Description,
+                    Location: payload.Location,
+                    IsAllDay: payload.IsAllDay);
+
+                await mediator.Send(new UpdateEventRequest(eventId, update, parsedScope.Value), ct);
+                return Results.NoContent();
             }
             catch (ArgumentException ex)
             {
@@ -148,6 +217,24 @@ public static class CalendarEndpoints
         string? Description,
         string? Location,
         bool IsAllDay = false);
+
+    public sealed record UpdateEventPayload(
+        string? Title,
+        DateTimeOffset? Start,
+        DateTimeOffset? End,
+        string? Description,
+        string? Location,
+        bool? IsAllDay);
+
+    /// <summary>
+    /// scope: null/leer/"instance" → Instance, "series" → Series, alles andere → null.
+    /// </summary>
+    private static EventScope? ParseScope(string? raw) => raw?.ToLowerInvariant() switch
+    {
+        null or "" or "instance" => EventScope.Instance,
+        "series" => EventScope.Series,
+        _ => null,
+    };
 
     private sealed record CalendarRangeDto(IReadOnlyList<CalendarEventDto> Events);
 

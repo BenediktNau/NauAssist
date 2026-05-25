@@ -7,8 +7,12 @@ import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
 import { Header } from "./nau/Header";
 import { CalendarBoard } from "./calendar/CalendarBoard";
+import { DeleteEventsModal } from "./DeleteEventsModal";
+import { FreeSlotsModal } from "./FreeSlotsModal";
+import { MoveEventsModal } from "./MoveEventsModal";
 import { NewEventModal } from "./NewEventModal";
 import { RulesModal } from "./RulesModal";
+import { WeekViewModal } from "./WeekViewModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
 import type { AppPage } from "@/App";
 
@@ -38,6 +42,14 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     closeRulesModal,
     newEventModalOpen,
     closeNewEventModal,
+    weekViewModalOpen,
+    closeWeekViewModal,
+    freeSlotsModalOpen,
+    closeFreeSlotsModal,
+    deleteEventsModalOpen,
+    closeDeleteEventsModal,
+    moveEventsModalOpen,
+    closeMoveEventsModal,
     calendarReloadKey,
     bumpCalendarReload,
   } = useChat();
@@ -126,6 +138,23 @@ export function ChatView({ onNavigate }: ChatViewProps) {
         open={newEventModalOpen}
         onClose={closeNewEventModal}
         onCreated={bumpCalendarReload}
+      />
+      <WeekViewModal
+        open={weekViewModalOpen}
+        onClose={closeWeekViewModal}
+        onNavigate={onNavigate}
+        reloadKey={calendarReloadKey}
+      />
+      <FreeSlotsModal open={freeSlotsModalOpen} onClose={closeFreeSlotsModal} />
+      <DeleteEventsModal
+        open={deleteEventsModalOpen}
+        onClose={closeDeleteEventsModal}
+        onMutated={bumpCalendarReload}
+      />
+      <MoveEventsModal
+        open={moveEventsModalOpen}
+        onClose={closeMoveEventsModal}
+        onMutated={bumpCalendarReload}
       />
     </div>
   );

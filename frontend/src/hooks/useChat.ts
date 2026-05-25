@@ -51,6 +51,10 @@ export interface ChatState {
   activeProposals: ActiveProposals | null;
   rulesModalOpen: boolean;
   newEventModalOpen: boolean;
+  weekViewModalOpen: boolean;
+  freeSlotsModalOpen: boolean;
+  deleteEventsModalOpen: boolean;
+  moveEventsModalOpen: boolean;
   /** Bei jedem erfolgreichen Calendar-Mutation hochgezählt; Konsumenten triggern damit Reloads. */
   calendarReloadKey: number;
 }
@@ -118,6 +122,10 @@ export function useChat(): ChatState & {
   send: (text: string) => void;
   closeRulesModal: () => void;
   closeNewEventModal: () => void;
+  closeWeekViewModal: () => void;
+  closeFreeSlotsModal: () => void;
+  closeDeleteEventsModal: () => void;
+  closeMoveEventsModal: () => void;
   bumpCalendarReload: () => void;
 } {
   const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
@@ -126,6 +134,10 @@ export function useChat(): ChatState & {
   const [sending, setSending] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
+  const [weekViewModalOpen, setWeekViewModalOpen] = useState(false);
+  const [freeSlotsModalOpen, setFreeSlotsModalOpen] = useState(false);
+  const [deleteEventsModalOpen, setDeleteEventsModalOpen] = useState(false);
+  const [moveEventsModalOpen, setMoveEventsModalOpen] = useState(false);
   const [calendarReloadKey, setCalendarReloadKey] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -176,6 +188,26 @@ export function useChat(): ChatState & {
 
       if (trimmed === "/termin") {
         setNewEventModalOpen(true);
+        return;
+      }
+
+      if (trimmed === "/woche") {
+        setWeekViewModalOpen(true);
+        return;
+      }
+
+      if (trimmed === "/frei") {
+        setFreeSlotsModalOpen(true);
+        return;
+      }
+
+      if (trimmed === "/loeschen") {
+        setDeleteEventsModalOpen(true);
+        return;
+      }
+
+      if (trimmed === "/verschieben") {
+        setMoveEventsModalOpen(true);
         return;
       }
 
@@ -310,6 +342,10 @@ export function useChat(): ChatState & {
 
   const closeRulesModal = useCallback(() => setRulesModalOpen(false), []);
   const closeNewEventModal = useCallback(() => setNewEventModalOpen(false), []);
+  const closeWeekViewModal = useCallback(() => setWeekViewModalOpen(false), []);
+  const closeFreeSlotsModal = useCallback(() => setFreeSlotsModalOpen(false), []);
+  const closeDeleteEventsModal = useCallback(() => setDeleteEventsModalOpen(false), []);
+  const closeMoveEventsModal = useCallback(() => setMoveEventsModalOpen(false), []);
   const bumpCalendarReload = useCallback(() => setCalendarReloadKey((k) => k + 1), []);
 
   return {
@@ -323,6 +359,14 @@ export function useChat(): ChatState & {
     closeRulesModal,
     newEventModalOpen,
     closeNewEventModal,
+    weekViewModalOpen,
+    closeWeekViewModal,
+    freeSlotsModalOpen,
+    closeFreeSlotsModal,
+    deleteEventsModalOpen,
+    closeDeleteEventsModal,
+    moveEventsModalOpen,
+    closeMoveEventsModal,
     calendarReloadKey,
     bumpCalendarReload,
   };
