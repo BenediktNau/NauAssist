@@ -5,7 +5,14 @@ interface MessageInputProps {
   disabled: boolean;
 }
 
-const SLASH_HINTS = ["/termin", "/verschieben", "/woche", "/frei"];
+const SLASH_HINTS = [
+  "/termin",
+  "/verschieben",
+  "/loeschen",
+  "/woche",
+  "/frei",
+  "/regel",
+];
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [value, setValue] = useState("");
