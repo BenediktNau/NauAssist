@@ -49,6 +49,7 @@ export interface ChatState {
   error: string | null;
   sending: boolean;
   activeProposals: ActiveProposals | null;
+  rulesModalOpen: boolean;
 }
 
 const TEMP_ID_OFFSET = -1; // temporäre IDs sind negativ, dann gibt es keine Kollision mit DB-IDs
@@ -112,11 +113,13 @@ function mapHistory(msgs: MessageDto[], markers: ClearMarkerDto[]): ChatBubble[]
 
 export function useChat(): ChatState & {
   send: (text: string) => void;
+  closeRulesModal: () => void;
 } {
   const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
   const [toolStatus, setToolStatus] = useState<ToolStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -156,6 +159,11 @@ export function useChat(): ChatState & {
             setError(e instanceof Error ? e.message : "Clear fehlgeschlagen");
           })
           .finally(() => setSending(false));
+        return;
+      }
+
+      if (trimmed === "/regeln") {
+        setRulesModalOpen(true);
         return;
       }
 
@@ -288,5 +296,16 @@ export function useChat(): ChatState & {
     return null;
   }, [bubbles]);
 
-  return { bubbles, toolStatus, error, sending, send, activeProposals };
+  const closeRulesModal = useCallback(() => setRulesModalOpen(false), []);
+
+  return {
+    bubbles,
+    toolStatus,
+    error,
+    sending,
+    send,
+    activeProposals,
+    rulesModalOpen,
+    closeRulesModal,
+  };
 }

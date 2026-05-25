@@ -5,14 +5,11 @@ interface MessageInputProps {
   disabled: boolean;
 }
 
-const SLASH_HINTS = [
-  "/termin",
-  "/verschieben",
-  "/loeschen",
-  "/woche",
-  "/frei",
-  "/regel",
-];
+// Quick-Buttons für Slash-Commands, die als deterministische Frontend-Aktionen
+// (No-AI) ausgeführt werden. /clear bleibt sichtbar im Footer-Hinweis.
+// /termin, /verschieben, /loeschen, /woche, /frei folgen in späteren PRs als
+// eigene Modals.
+const SLASH_HINTS = ["/regeln"];
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [value, setValue] = useState("");
@@ -40,7 +37,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           <button
             type="button"
             key={cmd}
-            onClick={() => setValue((v) => (v ? v : `${cmd} `))}
+            onClick={() => onSend(cmd)}
             disabled={disabled}
             className="cursor-pointer border border-nau-line px-2.5 py-1 font-mono text-[10px] tracking-mono text-nau-fg-dim transition-colors hover:border-nau-accent hover:text-nau-accent disabled:cursor-not-allowed disabled:opacity-50"
           >

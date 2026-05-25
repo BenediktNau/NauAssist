@@ -7,6 +7,7 @@ import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
 import { Header } from "./nau/Header";
 import { CalendarBoard } from "./calendar/CalendarBoard";
+import { RulesModal } from "./RulesModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
 import type { AppPage } from "@/App";
 
@@ -25,7 +26,16 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onNavigate }: ChatViewProps) {
-  const { bubbles, toolStatus, error, sending, send, activeProposals } = useChat();
+  const {
+    bubbles,
+    toolStatus,
+    error,
+    sending,
+    send,
+    activeProposals,
+    rulesModalOpen,
+    closeRulesModal,
+  } = useChat();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -104,6 +114,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
           </aside>
         </div>
       </main>
+
+      <RulesModal open={rulesModalOpen} onClose={closeRulesModal} />
     </div>
   );
 }
