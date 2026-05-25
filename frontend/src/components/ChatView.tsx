@@ -7,6 +7,7 @@ import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
 import { Header } from "./nau/Header";
 import { CalendarBoard } from "./calendar/CalendarBoard";
+import { NewEventModal } from "./NewEventModal";
 import { RulesModal } from "./RulesModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
 import type { AppPage } from "@/App";
@@ -35,6 +36,10 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     activeProposals,
     rulesModalOpen,
     closeRulesModal,
+    newEventModalOpen,
+    closeNewEventModal,
+    calendarReloadKey,
+    bumpCalendarReload,
   } = useChat();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -110,12 +115,18 @@ export function ChatView({ onNavigate }: ChatViewProps) {
               onNavigate={onNavigate}
               proposals={activeProposals}
               onPickProposal={onPickSlot}
+              reloadKey={calendarReloadKey}
             />
           </aside>
         </div>
       </main>
 
       <RulesModal open={rulesModalOpen} onClose={closeRulesModal} />
+      <NewEventModal
+        open={newEventModalOpen}
+        onClose={closeNewEventModal}
+        onCreated={bumpCalendarReload}
+      />
     </div>
   );
 }

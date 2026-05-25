@@ -50,6 +50,9 @@ export interface ChatState {
   sending: boolean;
   activeProposals: ActiveProposals | null;
   rulesModalOpen: boolean;
+  newEventModalOpen: boolean;
+  /** Bei jedem erfolgreichen Calendar-Mutation hochgezählt; Konsumenten triggern damit Reloads. */
+  calendarReloadKey: number;
 }
 
 const TEMP_ID_OFFSET = -1; // temporäre IDs sind negativ, dann gibt es keine Kollision mit DB-IDs
@@ -114,12 +117,16 @@ function mapHistory(msgs: MessageDto[], markers: ClearMarkerDto[]): ChatBubble[]
 export function useChat(): ChatState & {
   send: (text: string) => void;
   closeRulesModal: () => void;
+  closeNewEventModal: () => void;
+  bumpCalendarReload: () => void;
 } {
   const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
   const [toolStatus, setToolStatus] = useState<ToolStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
+  const [newEventModalOpen, setNewEventModalOpen] = useState(false);
+  const [calendarReloadKey, setCalendarReloadKey] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -164,6 +171,11 @@ export function useChat(): ChatState & {
 
       if (trimmed === "/regeln") {
         setRulesModalOpen(true);
+        return;
+      }
+
+      if (trimmed === "/termin") {
+        setNewEventModalOpen(true);
         return;
       }
 
@@ -297,6 +309,8 @@ export function useChat(): ChatState & {
   }, [bubbles]);
 
   const closeRulesModal = useCallback(() => setRulesModalOpen(false), []);
+  const closeNewEventModal = useCallback(() => setNewEventModalOpen(false), []);
+  const bumpCalendarReload = useCallback(() => setCalendarReloadKey((k) => k + 1), []);
 
   return {
     bubbles,
@@ -307,5 +321,9 @@ export function useChat(): ChatState & {
     activeProposals,
     rulesModalOpen,
     closeRulesModal,
+    newEventModalOpen,
+    closeNewEventModal,
+    calendarReloadKey,
+    bumpCalendarReload,
   };
 }

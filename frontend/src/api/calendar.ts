@@ -35,3 +35,29 @@ export async function getCalendarRange(
   const body = (await res.json()) as { events: CalendarEvent[] };
   return body.events;
 }
+
+export interface CreateEventInput {
+  title: string;
+  start: Date;
+  end: Date;
+  description?: string | null;
+  location?: string | null;
+  isAllDay: boolean;
+}
+
+export async function createEvent(input: CreateEventInput): Promise<{ id: string }> {
+  const res = await fetch("/api/calendar/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: input.title,
+      start: input.start.toISOString(),
+      end: input.end.toISOString(),
+      description: input.description ?? null,
+      location: input.location ?? null,
+      isAllDay: input.isAllDay,
+    }),
+  });
+  if (!res.ok) await handleError(res, "/api/calendar/events");
+  return (await res.json()) as { id: string };
+}

@@ -1,5 +1,6 @@
 using Mediator;
 using NauAssist.Backend.Features.Calendar;
+using NauAssist.Backend.Features.Calendar.CreateEvent;
 using NauAssist.Backend.Features.Calendar.GetCalendarRange;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Calendar.LookupFreeSlots;
@@ -35,6 +36,38 @@ public static class CalendarEndpoints
                 var response = await mediator.Send(new GetCalendarRangeRequest(from, to), ct);
                 var dtos = response.Events.Select(MapEvent).ToArray();
                 return Results.Ok(new CalendarRangeDto(dtos));
+            }
+            catch (NotAuthenticatedException ex)
+            {
+                return Results.Json(
+                    new { error = ex.Message, code = "not_connected" },
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
+        app.MapPost("/api/calendar/events", async (
+            CreateEventPayload payload,
+            IMediator mediator,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var response = await mediator.Send(
+                    new CreateEventRequest(
+                        Title: payload.Title,
+                        Start: payload.Start,
+                        End: payload.End,
+                        Description: payload.Description,
+                        Location: payload.Location,
+                        IsAllDay: payload.IsAllDay),
+                    ct);
+                return Results.Created(
+                    $"/api/calendar/events/{response.EventId}",
+                    new { id = response.EventId });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
             }
             catch (NotAuthenticatedException ex)
             {
@@ -107,6 +140,14 @@ public static class CalendarEndpoints
         DateTimeOffset From,
         DateTimeOffset To,
         int DurationMinutes);
+
+    public sealed record CreateEventPayload(
+        string Title,
+        DateTimeOffset Start,
+        DateTimeOffset End,
+        string? Description,
+        string? Location,
+        bool IsAllDay = false);
 
     private sealed record CalendarRangeDto(IReadOnlyList<CalendarEventDto> Events);
 

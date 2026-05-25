@@ -41,6 +41,8 @@ interface CalendarBoardProps {
   proposals?: ActiveProposals | null;
   /** Klick auf einen Vorschlags-Ghost akzeptiert den Slot. */
   onPickProposal?: (slot: SlotInfo) => void;
+  /** Bei Änderung wird der Event-Fetch erneut ausgelöst (z.B. nach Mutation). */
+  reloadKey?: number;
 }
 
 const HOVER_HIDE_DELAY_MS = 180;
@@ -50,6 +52,7 @@ export function CalendarBoard({
   onNavigate,
   proposals,
   onPickProposal,
+  reloadKey,
 }: CalendarBoardProps) {
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -128,7 +131,7 @@ export function CalendarBoard({
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [settings, range.from, range.to]);
+  }, [settings, range.from, range.to, reloadKey]);
 
   const events = useMemo(() => parseEvents(rawEvents), [rawEvents]);
   const titleLabel = useMemo(() => formatTitle(view, anchor), [view, anchor]);

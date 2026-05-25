@@ -104,12 +104,84 @@ public sealed class CalendarEndpointsTests : IDisposable
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task PostEvent_CreatesEventAndReturns201()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        using var client = Build().CreateClient();
+        using var resp = await client.PostAsJsonAsync("/api/calendar/events", new
+        {
+            title = "Standup",
+            start,
+            end = start.AddMinutes(30),
+            description = (string?)null,
+            location = (string?)null,
+            isAllDay = false,
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await resp.Content.ReadFromJsonAsync<CreatedEventDto>();
+        body!.Id.Should().StartWith("fake-");
+        _fakeCal.CreatedEvents.Should().ContainSingle()
+            .Which.Title.Should().Be("Standup");
+    }
+
+    [Fact]
+    public async Task PostEvent_EmptyTitle_Returns400()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        using var client = Build().CreateClient();
+        using var resp = await client.PostAsJsonAsync("/api/calendar/events", new
+        {
+            title = "   ",
+            start,
+            end = start.AddMinutes(30),
+            isAllDay = false,
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PostEvent_EndBeforeStart_Returns400()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        using var client = Build().CreateClient();
+        using var resp = await client.PostAsJsonAsync("/api/calendar/events", new
+        {
+            title = "Kaputt",
+            start,
+            end = start.AddMinutes(-30),
+            isAllDay = false,
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PostEvent_NotConnected_Returns409()
+    {
+        var start = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        using var client = BuildNotConnected().CreateClient();
+        using var resp = await client.PostAsJsonAsync("/api/calendar/events", new
+        {
+            title = "Standup",
+            start,
+            end = start.AddMinutes(30),
+            isAllDay = false,
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     public void Dispose() => _factory.Dispose();
 
     private sealed record RangeDto(IReadOnlyList<EventDto> Events);
     private sealed record EventDto(
         string Id, string Title, DateTimeOffset Start, DateTimeOffset End,
         string? Description, string? Location, bool IsAllDay, bool IsSeriesInstance);
+
+    private sealed record CreatedEventDto(string Id);
 
     private sealed record SlotsDto(IReadOnlyList<SlotDto> Slots);
     private sealed record SlotDto(

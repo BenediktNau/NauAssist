@@ -7,9 +7,8 @@ interface MessageInputProps {
 
 // Quick-Buttons für Slash-Commands, die als deterministische Frontend-Aktionen
 // (No-AI) ausgeführt werden. /clear bleibt sichtbar im Footer-Hinweis.
-// /termin, /verschieben, /loeschen, /woche, /frei folgen in späteren PRs als
-// eigene Modals.
-const SLASH_HINTS = ["/regeln"];
+// /verschieben, /loeschen, /woche, /frei folgen in PR 3 als eigene Modals.
+const SLASH_HINTS = ["/termin", "/regeln"];
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [value, setValue] = useState("");
