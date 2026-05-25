@@ -48,15 +48,18 @@ public sealed class AgentRunnerTimeContextTests
         llm.CapturedCalls.Should().HaveCount(1);
         var msgs = llm.CapturedCalls[0].Messages;
 
-        // Erste Message ist die Zeit-Kontext-System-Message, dann folgt die History.
+        // Zuerst die fixen Agent-Spielregeln, dann der Zeit-Kontext, dann die History.
         msgs[0].Role.Should().Be("system");
-        msgs[0].Content.Should().Contain("[Zeit-Kontext");
-        msgs[0].Content.Should().Contain("2026-05-20");
-        msgs[0].Content.Should().Contain("Mittwoch");
-        msgs[0].Content.Should().Contain("Nächste Woche:  2026-05-25 (Mo) bis 2026-05-31 (So)");
-        msgs[0].Content.Should().Contain("Nächstes WE:    2026-05-30 (Sa) bis 2026-05-31 (So)");
+        msgs[0].Content.Should().Contain("[Agent-Spielregeln");
 
-        msgs[1].Role.Should().Be("user");
-        msgs[1].Content.Should().Be("Was steht nächste Woche an?");
+        msgs[1].Role.Should().Be("system");
+        msgs[1].Content.Should().Contain("[Zeit-Kontext");
+        msgs[1].Content.Should().Contain("2026-05-20");
+        msgs[1].Content.Should().Contain("Mittwoch");
+        msgs[1].Content.Should().Contain("Nächste Woche:  2026-05-25 (Mo) bis 2026-05-31 (So)");
+        msgs[1].Content.Should().Contain("Nächstes WE:    2026-05-30 (Sa) bis 2026-05-31 (So)");
+
+        msgs[2].Role.Should().Be("user");
+        msgs[2].Content.Should().Be("Was steht nächste Woche an?");
     }
 }

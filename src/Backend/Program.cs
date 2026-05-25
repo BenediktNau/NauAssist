@@ -74,6 +74,8 @@ builder.Services.AddScoped<ILlmClient>(sp =>
 // Agent-Tools (alle Scoped, weil sie IMediator brauchen)
 builder.Services.AddScoped<ITool, LookupFreeSlotsTool>();
 builder.Services.AddScoped<ITool, CreateEventTool>();
+builder.Services.AddScoped<ITool, DeleteEventTool>();
+builder.Services.AddScoped<ITool, UpdateEventTool>();
 builder.Services.AddScoped<ITool, GetCalendarRangeTool>();
 builder.Services.AddScoped<ITool, ListRulesTool>();
 builder.Services.AddScoped<ITool, AddRuleTool>();

@@ -46,8 +46,10 @@ public sealed class AgentRunnerCalendarContextTests
 
         var msgs = llm.CapturedCalls[0].Messages;
         msgs[0].Role.Should().Be("system");
-        msgs[0].Content.Should().Contain("[Zeit-Kontext");
-        msgs[1].Role.Should().Be("user");
+        msgs[0].Content.Should().Contain("[Agent-Spielregeln");
+        msgs[1].Role.Should().Be("system");
+        msgs[1].Content.Should().Contain("[Zeit-Kontext");
+        msgs[2].Role.Should().Be("user");
     }
 
     [Fact]
@@ -67,10 +69,12 @@ public sealed class AgentRunnerCalendarContextTests
 
         var msgs = llm.CapturedCalls[0].Messages;
         msgs[0].Role.Should().Be("system");
-        msgs[0].Content.Should().Contain("[Zeit-Kontext");
+        msgs[0].Content.Should().Contain("[Agent-Spielregeln");
         msgs[1].Role.Should().Be("system");
-        msgs[1].Content.Should().Contain("Schulung Köln");
-        msgs[1].Content.Should().Contain("Mi 27.5.–Fr 29.5.");
-        msgs[2].Role.Should().Be("user");
+        msgs[1].Content.Should().Contain("[Zeit-Kontext");
+        msgs[2].Role.Should().Be("system");
+        msgs[2].Content.Should().Contain("Schulung Köln");
+        msgs[2].Content.Should().Contain("Mi 27.5.–Fr 29.5.");
+        msgs[3].Role.Should().Be("user");
     }
 }

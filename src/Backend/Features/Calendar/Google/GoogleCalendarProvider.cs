@@ -77,6 +77,97 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
         return created.Id;
     }
 
+    public async Task DeleteEventAsync(string eventId, CancellationToken ct)
+    {
+        var cal = await _settings.GetCalendarAsync(ct);
+        var service = await CreateServiceAsync(ct);
+        await service.Events.Delete(cal.CalendarId, eventId).ExecuteAsync(ct);
+        _logger.LogInformation("Google-Event {EventId} gelöscht.", eventId);
+    }
+
+    public async Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct)
+    {
+        var cal = await _settings.GetCalendarAsync(ct);
+        var service = await CreateServiceAsync(ct);
+
+        var existing = await service.Events.Get(cal.CalendarId, eventId).ExecuteAsync(ct);
+
+        if (update.Title is not null)
+        {
+            existing.Summary = update.Title;
+        }
+        if (update.Description is not null)
+        {
+            existing.Description = update.Description;
+        }
+        if (update.Location is not null)
+        {
+            existing.Location = update.Location;
+        }
+
+        // is_all_day kann den Modus umschalten; deshalb erst bestimmen, in welchem
+        // Modus die neuen Start/End-Werte zu schreiben sind.
+        var existingIsAllDay = !string.IsNullOrEmpty(existing.Start?.Date);
+        var targetIsAllDay = update.IsAllDay ?? existingIsAllDay;
+
+        if (update.Start is not null || update.End is not null || update.IsAllDay is not null)
+        {
+            existing.Start ??= new EventDateTime();
+            existing.End ??= new EventDateTime();
+
+            if (targetIsAllDay)
+            {
+                if (update.Start is { } s)
+                {
+                    existing.Start = new EventDateTime { Date = s.ToString("yyyy-MM-dd") };
+                }
+                else if (update.IsAllDay == true && !existingIsAllDay && existing.Start.DateTimeDateTimeOffset is { } sDt)
+                {
+                    existing.Start = new EventDateTime { Date = sDt.ToString("yyyy-MM-dd") };
+                }
+                if (update.End is { } e)
+                {
+                    existing.End = new EventDateTime { Date = e.ToString("yyyy-MM-dd") };
+                }
+                else if (update.IsAllDay == true && !existingIsAllDay && existing.End.DateTimeDateTimeOffset is { } eDt)
+                {
+                    existing.End = new EventDateTime { Date = eDt.ToString("yyyy-MM-dd") };
+                }
+            }
+            else
+            {
+                if (update.Start is { } s)
+                {
+                    existing.Start = new EventDateTime { DateTimeDateTimeOffset = s };
+                }
+                else if (update.IsAllDay == false && existingIsAllDay && !string.IsNullOrEmpty(existing.Start.Date))
+                {
+                    // Date → DateTime: Mitternacht in lokaler Zeitzone
+                    var d = System.Globalization.CultureInfo.InvariantCulture;
+                    var dateOnly = DateOnly.ParseExact(existing.Start.Date, "yyyy-MM-dd", d);
+                    var local = dateOnly.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+                    existing.Start = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(local, _zone.GetUtcOffset(local)) };
+                }
+                if (update.End is { } e)
+                {
+                    existing.End = new EventDateTime { DateTimeDateTimeOffset = e };
+                }
+                else if (update.IsAllDay == false && existingIsAllDay && !string.IsNullOrEmpty(existing.End.Date))
+                {
+                    var d = System.Globalization.CultureInfo.InvariantCulture;
+                    var dateOnly = DateOnly.ParseExact(existing.End.Date, "yyyy-MM-dd", d);
+                    var local = dateOnly.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+                    existing.End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(local, _zone.GetUtcOffset(local)) };
+                }
+            }
+        }
+
+        await service.Events.Update(existing, cal.CalendarId, eventId).ExecuteAsync(ct);
+        _logger.LogInformation(
+            "Google-Event {EventId} aktualisiert (AllDay={AllDay}).",
+            eventId, targetIsAllDay);
+    }
+
     private async Task<CalendarService> CreateServiceAsync(CancellationToken ct)
     {
         var credential = await _auth.GetCredentialAsync(ct);

@@ -123,5 +123,11 @@ public sealed class CalendarEndpointsTests : IDisposable
 
         public Task<string> CreateEventAsync(NewEvent ev, CancellationToken ct) =>
             throw new NotAuthenticatedException("Nicht verbunden.");
+
+        public Task DeleteEventAsync(string eventId, CancellationToken ct) =>
+            throw new NotAuthenticatedException("Nicht verbunden.");
+
+        public Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct) =>
+            throw new NotAuthenticatedException("Nicht verbunden.");
     }
 }

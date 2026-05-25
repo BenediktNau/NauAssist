@@ -163,8 +163,9 @@ public sealed class SendMessageHandlerTests
 
         fakeLlm.CapturedCalls.Should().ContainSingle();
         var sent = fakeLlm.CapturedCalls[0].Messages;
-        // First message is the prepended time-context system message; skip it.
-        sent.Skip(1).Select(m => m.Content).Should().Equal("alt-frage", "alt-antwort", "neue-frage");
+        // System-Messages (Agent-Spielregeln, Zeit-Kontext, ggf. Kalender) überspringen.
+        sent.Where(m => m.Role != "system").Select(m => m.Content)
+            .Should().Equal("alt-frage", "alt-antwort", "neue-frage");
     }
 
     private static readonly ClockContext DefaultClock = new ClockContext(

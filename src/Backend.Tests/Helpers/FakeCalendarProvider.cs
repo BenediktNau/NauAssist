@@ -51,4 +51,41 @@ public sealed class FakeCalendarProvider : ICalendarProvider
             return Task.FromResult(id);
         }
     }
+
+    public Task DeleteEventAsync(string eventId, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            var idx = _events.FindIndex(e => e.Id == eventId);
+            if (idx < 0)
+            {
+                throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+            }
+            _events.RemoveAt(idx);
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            var idx = _events.FindIndex(e => e.Id == eventId);
+            if (idx < 0)
+            {
+                throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+            }
+            var cur = _events[idx];
+            _events[idx] = cur with
+            {
+                Title = update.Title ?? cur.Title,
+                Start = update.Start ?? cur.Start,
+                End = update.End ?? cur.End,
+                Description = update.Description ?? cur.Description,
+                Location = update.Location ?? cur.Location,
+                IsAllDay = update.IsAllDay ?? cur.IsAllDay,
+            };
+            return Task.CompletedTask;
+        }
+    }
 }

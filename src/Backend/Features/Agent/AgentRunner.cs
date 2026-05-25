@@ -40,7 +40,11 @@ public sealed class AgentRunner
     {
         var toolDefs = _tools.Values.Select(t => t.ToDefinition()).ToList();
         var snapshot = _clockContext.Build();
-        var conversation = new List<LlmMessage> { new LlmMessage("system", BuildTimeContextBlock(snapshot)) };
+        var conversation = new List<LlmMessage>
+        {
+            new LlmMessage("system", AgentOperatingRules.Text),
+            new LlmMessage("system", BuildTimeContextBlock(snapshot)),
+        };
 
         var calendarBlock = await _calendarContext.BuildAsync(snapshot, ct);
         if (!string.IsNullOrWhiteSpace(calendarBlock))
