@@ -91,12 +91,23 @@ export default {
           "0%, 49%": { opacity: "1" },
           "50%, 100%": { opacity: "0" },
         },
+        "nau-mech-open": {
+          "0%": { transform: "scaleX(0) scaleY(0)" },
+          "30%": { transform: "scaleX(1) scaleY(0.04)" },
+          "100%": { transform: "scaleX(1) scaleY(1)" },
+        },
+        "nau-mech-fade": {
+          "0%, 55%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "nau-pulse": "nau-pulse 1.2s ease-in-out infinite",
         "nau-blink": "nau-blink 0.8s steps(1) infinite",
+        "nau-mech-open": "nau-mech-open 320ms cubic-bezier(0.85, 0, 0.15, 1) both",
+        "nau-mech-fade": "nau-mech-fade 320ms linear both",
       },
     },
   },
