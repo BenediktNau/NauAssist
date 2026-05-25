@@ -133,6 +133,9 @@ function WhatsNextItem({ event, onHoverEvent, onClickEvent }: WhatsNextItemProps
       </span>
       <div className="min-w-0">
         <div className="truncate font-sans text-[13px] text-nau-fg">
+          {event.isSeriesInstance && (
+            <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+          )}
           {event.title}
         </div>
         {event.location && (

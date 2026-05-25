@@ -51,16 +51,16 @@ public sealed class UpdateEventHandler : IRequestHandler<UpdateEventRequest, Upd
             throw new ArgumentException("Title darf nicht leer sein.", nameof(request));
         }
 
-        await _calendar.UpdateEventAsync(request.EventId, request.Update, cancellationToken);
+        await _calendar.UpdateEventAsync(request.EventId, request.Update, request.Scope, cancellationToken);
 
         await TryWriteAuditAsync(
             toolName: "update_event",
             argsJson: JsonSerializer.Serialize(request, JsonOptions),
-            resultJson: JsonSerializer.Serialize(new { id = request.EventId, updated = true }, JsonOptions),
+            resultJson: JsonSerializer.Serialize(new { id = request.EventId, scope = request.Scope.ToString(), updated = true }, JsonOptions),
             providerEventId: request.EventId,
             cancellationToken);
 
-        return new UpdateEventResponse(request.EventId);
+        return new UpdateEventResponse(request.EventId, request.Scope);
     }
 
     private async Task TryWriteAuditAsync(

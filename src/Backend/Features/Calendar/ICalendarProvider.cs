@@ -18,12 +18,16 @@ public interface ICalendarProvider
 
     /// <summary>
     /// Löscht einen Termin anhand der Provider-Event-ID.
+    /// Bei <paramref name="scope"/>=<see cref="EventScope.Series"/> wird die ganze
+    /// Serie gelöscht (sofern <paramref name="eventId"/> eine Serien-Instanz ist).
     /// </summary>
-    Task DeleteEventAsync(string eventId, CancellationToken ct);
+    Task DeleteEventAsync(string eventId, EventScope scope, CancellationToken ct);
 
     /// <summary>
     /// Aktualisiert einzelne Felder eines bestehenden Termins. Nicht gesetzte
     /// Felder in <paramref name="update"/> bleiben unverändert.
+    /// Bei <paramref name="scope"/>=<see cref="EventScope.Series"/> wird das
+    /// Master-Event der Serie aktualisiert.
     /// </summary>
-    Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct);
+    Task UpdateEventAsync(string eventId, EventUpdate update, EventScope scope, CancellationToken ct);
 }

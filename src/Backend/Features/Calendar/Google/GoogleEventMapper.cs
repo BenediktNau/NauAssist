@@ -9,6 +9,10 @@ internal static class GoogleEventMapper
     {
         if (e.Start is null || e.End is null) return null;
 
+        // RecurringEventId ist gesetzt, wenn das Event eine konkrete Instanz einer
+        // Serie ist (SingleEvents=true expandiert die Serie in Einzel-Instanzen).
+        var seriesId = string.IsNullOrEmpty(e.RecurringEventId) ? null : e.RecurringEventId;
+
         if (e.Start.DateTimeDateTimeOffset is { } startDt && e.End.DateTimeDateTimeOffset is { } endDt)
         {
             return new CalendarEvent(
@@ -18,7 +22,8 @@ internal static class GoogleEventMapper
                 End: endDt,
                 Description: e.Description,
                 Location: e.Location,
-                IsAllDay: false);
+                IsAllDay: false,
+                SeriesId: seriesId);
         }
 
         if (!string.IsNullOrEmpty(e.Start.Date) && !string.IsNullOrEmpty(e.End.Date))
@@ -32,7 +37,8 @@ internal static class GoogleEventMapper
                 End: ToLocalMidnight(endDate, zone),
                 Description: e.Description,
                 Location: e.Location,
-                IsAllDay: true);
+                IsAllDay: true,
+                SeriesId: seriesId);
         }
 
         return null;

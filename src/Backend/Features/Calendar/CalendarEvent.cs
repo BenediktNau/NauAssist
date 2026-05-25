@@ -7,4 +7,12 @@ public sealed record CalendarEvent(
     DateTimeOffset End,
     string? Description,
     string? Location,
-    bool IsAllDay = false);
+    bool IsAllDay = false,
+    string? SeriesId = null)
+{
+    /// <summary>
+    /// True, wenn dieses Event eine Instanz einer wiederkehrenden Serie ist.
+    /// SeriesId trägt dann die Master-Event-ID des Providers.
+    /// </summary>
+    public bool IsSeriesInstance => SeriesId is not null;
+}

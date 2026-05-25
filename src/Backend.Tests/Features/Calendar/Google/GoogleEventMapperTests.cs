@@ -109,6 +109,42 @@ public sealed class GoogleEventMapperTests
     }
 
     [Fact]
+    public void Map_RecurringEventId_PopulatesSeriesId()
+    {
+        var e = new Event
+        {
+            Id = "master_20260601T080000Z",
+            Summary = "Standup",
+            RecurringEventId = "master",
+            Start = new EventDateTime { DateTimeDateTimeOffset = DateTimeOffset.Parse("2026-06-01T10:00:00+02:00") },
+            End   = new EventDateTime { DateTimeDateTimeOffset = DateTimeOffset.Parse("2026-06-01T10:30:00+02:00") },
+        };
+
+        var result = GoogleEventMapper.Map(e, Berlin);
+
+        result.Should().NotBeNull();
+        result!.IsSeriesInstance.Should().BeTrue();
+        result.SeriesId.Should().Be("master");
+    }
+
+    [Fact]
+    public void Map_NoRecurringEventId_SeriesIdNull()
+    {
+        var e = new Event
+        {
+            Id = "single",
+            Summary = "Einzeltermin",
+            Start = new EventDateTime { DateTimeDateTimeOffset = DateTimeOffset.Parse("2026-06-01T10:00:00+02:00") },
+            End   = new EventDateTime { DateTimeDateTimeOffset = DateTimeOffset.Parse("2026-06-01T10:30:00+02:00") },
+        };
+
+        var result = GoogleEventMapper.Map(e, Berlin);
+
+        result!.SeriesId.Should().BeNull();
+        result.IsSeriesInstance.Should().BeFalse();
+    }
+
+    [Fact]
     public void Map_BothFieldsMissing_ReturnsNull()
     {
         var e = new Event { Id = "e-leer", Start = new EventDateTime(), End = new EventDateTime() };

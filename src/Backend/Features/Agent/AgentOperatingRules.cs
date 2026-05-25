@@ -18,6 +18,7 @@ internal static class AgentOperatingRules
         "- Regel-Eingaben (Arbeitszeiten, Pausen, Sperren): rufe add_rule mit strukturierten Args. Zum Entfernen: delete_rule.\n" +
         "- Termin löschen oder verschieben/ändern: erst per get_calendar_range die passende event_id ermitteln, beim User explizit bestätigen lassen, dann delete_event bzw. update_event aufrufen. Niemals ohne Bestätigung löschen oder verschieben.\n" +
         "- update_event nimmt nur die zu ändernden Felder; nicht gesetzte Felder bleiben unverändert. Für ein reines Verschieben reichen start (+ ggf. end).\n" +
+        "- Serien-Instanzen: get_calendar_range liefert pro Termin is_series_instance und series_id. Ist is_series_instance=true, frage den User vor delete_event/update_event explizit, ob nur diese Instanz (scope='instance') oder die gesamte Serie (scope='series') gemeint ist, und gib den scope im Tool-Call mit. Default (scope weglassen) wirkt nur auf die einzelne Instanz. 'scope=series' ändert/löscht den Master und damit alle Instanzen — auch vergangene; weise darauf hin, wenn der User das möglicherweise nicht will. 'Ab jetzt für die Zukunft verschieben/abschaffen' wird nicht direkt unterstützt; in dem Fall beim User rückfragen und ggf. die Serie löschen und eine neue ab Datum X anlegen.\n" +
         "\n" +
         "Datums-/Zeitformat:\n" +
         "- Aktuelle Zeit, Wochentag und die Daten für 'heute', 'morgen', 'diese/nächste Woche' und 'dieses/nächstes Wochenende' stehen im Zeit-Kontext-Block. " +

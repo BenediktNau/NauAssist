@@ -13,7 +13,9 @@ public sealed class UpdateEventTool : ITool
         "Ändert einen bestehenden Termin (z. B. verschieben, umbenennen, neuer Ort) " +
         "nach Bestätigung durch den User. Alle Felder außer event_id sind optional; " +
         "nicht gesetzte Felder bleiben unverändert. Bei All-Day-Einträgen analog " +
-        "create_event: start/end im Format yyyy-MM-dd, end exklusiv.";
+        "create_event: start/end im Format yyyy-MM-dd, end exklusiv. Bei Serien-" +
+        "Instanzen (is_series_instance=true) den scope mitgeben: 'instance' (nur " +
+        "diese Instanz) oder 'series' (Master, wirkt auf alle Instanzen). Default: instance.";
 
     public JsonElement ParameterSchema { get; } = JsonDocument.Parse("""
         {
@@ -25,7 +27,8 @@ public sealed class UpdateEventTool : ITool
             "end":         { "type": ["string", "null"] },
             "description": { "type": ["string", "null"] },
             "location":    { "type": ["string", "null"] },
-            "is_all_day":  { "type": ["boolean", "null"] }
+            "is_all_day":  { "type": ["boolean", "null"] },
+            "scope":       { "type": "string", "enum": ["instance", "series"], "description": "Bei Serien: 'instance' oder 'series'. Default: instance." }
           },
           "required": ["event_id"]
         }
@@ -71,8 +74,29 @@ public sealed class UpdateEventTool : ITool
             Location: args.TryGetProperty("location", out var locEl) && locEl.ValueKind == JsonValueKind.String ? locEl.GetString() : null,
             IsAllDay: isAllDay);
 
-        var response = await _mediator.Send(new UpdateEventRequest(eventId, update), ct);
-        return JsonSerializer.SerializeToElement(new { event_id = response.EventId, status = "updated" });
+        var scope = ParseScope(args);
+        var response = await _mediator.Send(new UpdateEventRequest(eventId, update, scope), ct);
+        return JsonSerializer.SerializeToElement(new
+        {
+            event_id = response.EventId,
+            scope = response.Scope.ToString().ToLowerInvariant(),
+            status = "updated",
+        });
+    }
+
+    private static EventScope ParseScope(JsonElement args)
+    {
+        if (args.TryGetProperty("scope", out var el) && el.ValueKind == JsonValueKind.String)
+        {
+            return el.GetString()?.ToLowerInvariant() switch
+            {
+                "series" => EventScope.Series,
+                "instance" => EventScope.Instance,
+                null or "" => EventScope.Instance,
+                var other => throw new ArgumentException($"Unbekannter scope '{other}'. Erlaubt: instance, series."),
+            };
+        }
+        return EventScope.Instance;
     }
 
     private DateTimeOffset ParseDateOnly(string raw)

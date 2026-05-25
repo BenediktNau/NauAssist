@@ -77,20 +77,25 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
         return created.Id;
     }
 
-    public async Task DeleteEventAsync(string eventId, CancellationToken ct)
+    public async Task DeleteEventAsync(string eventId, EventScope scope, CancellationToken ct)
     {
         var cal = await _settings.GetCalendarAsync(ct);
         var service = await CreateServiceAsync(ct);
-        await service.Events.Delete(cal.CalendarId, eventId).ExecuteAsync(ct);
-        _logger.LogInformation("Google-Event {EventId} gelöscht.", eventId);
+
+        var targetId = await ResolveTargetIdAsync(service, cal.CalendarId, eventId, scope, ct);
+        await service.Events.Delete(cal.CalendarId, targetId).ExecuteAsync(ct);
+        _logger.LogInformation(
+            "Google-Event {EventId} gelöscht (scope={Scope}, target={TargetId}).",
+            eventId, scope, targetId);
     }
 
-    public async Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct)
+    public async Task UpdateEventAsync(string eventId, EventUpdate update, EventScope scope, CancellationToken ct)
     {
         var cal = await _settings.GetCalendarAsync(ct);
         var service = await CreateServiceAsync(ct);
 
-        var existing = await service.Events.Get(cal.CalendarId, eventId).ExecuteAsync(ct);
+        var targetId = await ResolveTargetIdAsync(service, cal.CalendarId, eventId, scope, ct);
+        var existing = await service.Events.Get(cal.CalendarId, targetId).ExecuteAsync(ct);
 
         if (update.Title is not null)
         {
@@ -162,10 +167,32 @@ public sealed class GoogleCalendarProvider : ICalendarProvider
             }
         }
 
-        await service.Events.Update(existing, cal.CalendarId, eventId).ExecuteAsync(ct);
+        await service.Events.Update(existing, cal.CalendarId, targetId).ExecuteAsync(ct);
         _logger.LogInformation(
-            "Google-Event {EventId} aktualisiert (AllDay={AllDay}).",
-            eventId, targetIsAllDay);
+            "Google-Event {EventId} aktualisiert (scope={Scope}, target={TargetId}, AllDay={AllDay}).",
+            eventId, scope, targetId, targetIsAllDay);
+    }
+
+    /// <summary>
+    /// Liefert die effektiv zu modifizierende Event-ID. Bei <c>Series</c> wird
+    /// die Master-ID über <c>recurringEventId</c> der Instanz aufgelöst; ist das
+    /// Event keine Serien-Instanz, bleibt die ID unverändert (Series-Scope ist
+    /// dann ein No-Op-Hinweis und behandelt das Event als Einzeltermin).
+    /// </summary>
+    private static async Task<string> ResolveTargetIdAsync(
+        CalendarService service,
+        string calendarId,
+        string eventId,
+        EventScope scope,
+        CancellationToken ct)
+    {
+        if (scope != EventScope.Series)
+        {
+            return eventId;
+        }
+
+        var instance = await service.Events.Get(calendarId, eventId).ExecuteAsync(ct);
+        return string.IsNullOrEmpty(instance.RecurringEventId) ? eventId : instance.RecurringEventId;
     }
 
     private async Task<CalendarService> CreateServiceAsync(CancellationToken ct)

@@ -88,7 +88,8 @@ public static class CalendarEndpoints
         End: ev.End,
         Description: ev.Description,
         Location: ev.Location,
-        IsAllDay: ev.IsAllDay);
+        IsAllDay: ev.IsAllDay,
+        IsSeriesInstance: ev.IsSeriesInstance);
 
     private static FreeSlotDto MapAnnotation(SlotAnnotation a) => new(
         Start: a.Slot.Start,
@@ -116,7 +117,8 @@ public static class CalendarEndpoints
         DateTimeOffset End,
         string? Description,
         string? Location,
-        bool IsAllDay);
+        bool IsAllDay,
+        bool IsSeriesInstance);
 
     private sealed record FreeSlotsDto(IReadOnlyList<FreeSlotDto> Slots);
 

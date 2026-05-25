@@ -109,7 +109,7 @@ public sealed class CalendarEndpointsTests : IDisposable
     private sealed record RangeDto(IReadOnlyList<EventDto> Events);
     private sealed record EventDto(
         string Id, string Title, DateTimeOffset Start, DateTimeOffset End,
-        string? Description, string? Location, bool IsAllDay);
+        string? Description, string? Location, bool IsAllDay, bool IsSeriesInstance);
 
     private sealed record SlotsDto(IReadOnlyList<SlotDto> Slots);
     private sealed record SlotDto(
@@ -124,10 +124,10 @@ public sealed class CalendarEndpointsTests : IDisposable
         public Task<string> CreateEventAsync(NewEvent ev, CancellationToken ct) =>
             throw new NotAuthenticatedException("Nicht verbunden.");
 
-        public Task DeleteEventAsync(string eventId, CancellationToken ct) =>
+        public Task DeleteEventAsync(string eventId, EventScope scope, CancellationToken ct) =>
             throw new NotAuthenticatedException("Nicht verbunden.");
 
-        public Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct) =>
+        public Task UpdateEventAsync(string eventId, EventUpdate update, EventScope scope, CancellationToken ct) =>
             throw new NotAuthenticatedException("Nicht verbunden.");
     }
 }

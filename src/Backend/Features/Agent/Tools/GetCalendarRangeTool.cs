@@ -44,6 +44,8 @@ public sealed class GetCalendarRangeTool : ITool
                 description = e.Description,
                 location = e.Location,
                 is_all_day = e.IsAllDay,
+                is_series_instance = e.IsSeriesInstance,
+                series_id = e.SeriesId,
             }),
         };
         return JsonSerializer.SerializeToElement(resultObj);

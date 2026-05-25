@@ -93,6 +93,7 @@ export function WeekView({
       description: null,
       location: null,
       isAllDay: false,
+      isSeriesInstance: false,
       startDate: p.startDate,
       endDate: p.endDate,
     }));
@@ -195,8 +196,11 @@ export function WeekView({
                 background: "rgba(96,165,250,0.10)",
                 borderLeftColor: "#60a5fa",
               }}
-              title={it.event.title}
+              title={it.event.isSeriesInstance ? `${it.event.title} (Serie)` : it.event.title}
             >
+              {it.event.isSeriesInstance && (
+                <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+              )}
               {it.event.title}
             </button>
           ))}
@@ -319,9 +323,14 @@ function DayColumn({
               outline: p.hasConflict ? "1px solid rgba(244,114,182,0.6)" : "none",
               padding: "3px 5px",
             }}
-            title={p.event.title}
+            title={p.event.isSeriesInstance ? `${p.event.title} (Serie)` : p.event.title}
           >
-            <div className="truncate">{p.event.title}</div>
+            <div className="truncate">
+              {p.event.isSeriesInstance && (
+                <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+              )}
+              {p.event.title}
+            </div>
             <div className="truncate text-[8px] text-nau-fg-dim">
               {formatTime(p.event.startDate)}–{formatTime(p.event.endDate)}
             </div>

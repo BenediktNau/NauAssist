@@ -6,6 +6,8 @@ export interface CalendarEvent {
   description: string | null;
   location: string | null;
   isAllDay: boolean;
+  /** Instanz einer wiederkehrenden Serie (Google: recurringEventId gesetzt). */
+  isSeriesInstance: boolean;
 }
 
 export class NotConnectedError extends Error {

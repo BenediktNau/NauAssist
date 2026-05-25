@@ -156,8 +156,11 @@ function Chip({ event, onHoverEvent, onClickEvent }: ChipProps) {
           ? "rgba(96,165,250,0.08)"
           : "rgba(255,255,255,0.05)",
       }}
-      title={event.title}
+      title={event.isSeriesInstance ? `${event.title} (Serie)` : event.title}
     >
+      {event.isSeriesInstance && (
+        <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+      )}
       {label}
     </button>
   );

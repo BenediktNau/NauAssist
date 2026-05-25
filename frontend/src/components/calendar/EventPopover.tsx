@@ -89,11 +89,19 @@ export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: Eve
     >
       <div className="animate-nau-mech-fade">
         <div className="font-sans text-sm font-medium leading-snug text-nau-fg">
+          {event.isSeriesInstance && (
+            <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+          )}
           {event.title}
         </div>
         <div className="mt-1 font-mono text-[10px] tracking-mono text-nau-fg-dim">
           {dateLine}
         </div>
+        {event.isSeriesInstance && (
+          <div className="mt-1 font-mono text-[9px] tracking-mono text-nau-fg-dim">
+            ↻ TEIL EINER SERIE
+          </div>
+        )}
         {event.location && (
           <div className="mt-2 font-sans text-[12px] text-nau-fg-dim">
             @ {event.location}

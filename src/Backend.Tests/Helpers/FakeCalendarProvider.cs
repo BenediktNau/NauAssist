@@ -52,28 +52,57 @@ public sealed class FakeCalendarProvider : ICalendarProvider
         }
     }
 
-    public Task DeleteEventAsync(string eventId, CancellationToken ct)
+    public IReadOnlyList<(string EventId, EventScope Scope)> Deletions
+    {
+        get { lock (_lock) { return _deletions.ToList(); } }
+    }
+
+    public IReadOnlyList<(string EventId, EventUpdate Update, EventScope Scope)> Updates
+    {
+        get { lock (_lock) { return _updates.ToList(); } }
+    }
+
+    private readonly List<(string EventId, EventScope Scope)> _deletions = new();
+    private readonly List<(string EventId, EventUpdate Update, EventScope Scope)> _updates = new();
+
+    public Task DeleteEventAsync(string eventId, EventScope scope, CancellationToken ct)
     {
         lock (_lock)
         {
-            var idx = _events.FindIndex(e => e.Id == eventId);
-            if (idx < 0)
+            var targetId = ResolveTargetId(eventId, scope);
+            // Bei Series-Scope alle Events mit derselben SeriesId entfernen (+ Master, falls vorhanden).
+            if (scope == EventScope.Series)
             {
-                throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+                _events.RemoveAll(e => e.Id == targetId || e.SeriesId == targetId);
             }
-            _events.RemoveAt(idx);
+            else
+            {
+                var idx = _events.FindIndex(e => e.Id == eventId);
+                if (idx < 0)
+                {
+                    throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+                }
+                _events.RemoveAt(idx);
+            }
+            _deletions.Add((eventId, scope));
             return Task.CompletedTask;
         }
     }
 
-    public Task UpdateEventAsync(string eventId, EventUpdate update, CancellationToken ct)
+    public Task UpdateEventAsync(string eventId, EventUpdate update, EventScope scope, CancellationToken ct)
     {
         lock (_lock)
         {
-            var idx = _events.FindIndex(e => e.Id == eventId);
+            var targetId = ResolveTargetId(eventId, scope);
+            var idx = _events.FindIndex(e => e.Id == targetId);
             if (idx < 0)
             {
-                throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+                // Bei Series ohne separates Master-Event reicht die Instanz als Ziel.
+                idx = _events.FindIndex(e => e.Id == eventId);
+                if (idx < 0)
+                {
+                    throw new KeyNotFoundException($"Event '{eventId}' nicht gefunden.");
+                }
             }
             var cur = _events[idx];
             _events[idx] = cur with
@@ -85,7 +114,15 @@ public sealed class FakeCalendarProvider : ICalendarProvider
                 Location = update.Location ?? cur.Location,
                 IsAllDay = update.IsAllDay ?? cur.IsAllDay,
             };
+            _updates.Add((eventId, update, scope));
             return Task.CompletedTask;
         }
+    }
+
+    private string ResolveTargetId(string eventId, EventScope scope)
+    {
+        if (scope != EventScope.Series) return eventId;
+        var instance = _events.FirstOrDefault(e => e.Id == eventId);
+        return instance?.SeriesId ?? eventId;
     }
 }

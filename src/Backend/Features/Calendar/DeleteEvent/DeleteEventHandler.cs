@@ -2,6 +2,7 @@ using System.Text.Json;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using NauAssist.Backend.Features.Infrastructure.Audit;
+using NauAssist.Backend.Features.Calendar;
 
 namespace NauAssist.Backend.Features.Calendar.DeleteEvent;
 
@@ -36,16 +37,16 @@ public sealed class DeleteEventHandler : IRequestHandler<DeleteEventRequest, Del
             throw new ArgumentException("EventId darf nicht leer sein.", nameof(request));
         }
 
-        await _calendar.DeleteEventAsync(request.EventId, cancellationToken);
+        await _calendar.DeleteEventAsync(request.EventId, request.Scope, cancellationToken);
 
         await TryWriteAuditAsync(
             toolName: "delete_event",
             argsJson: JsonSerializer.Serialize(request, JsonOptions),
-            resultJson: JsonSerializer.Serialize(new { id = request.EventId, deleted = true }, JsonOptions),
+            resultJson: JsonSerializer.Serialize(new { id = request.EventId, scope = request.Scope.ToString(), deleted = true }, JsonOptions),
             providerEventId: request.EventId,
             cancellationToken);
 
-        return new DeleteEventResponse(request.EventId);
+        return new DeleteEventResponse(request.EventId, request.Scope);
     }
 
     private async Task TryWriteAuditAsync(
