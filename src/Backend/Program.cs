@@ -5,6 +5,8 @@ using NauAssist.Backend.Endpoints;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.AutonomousAgent;
+using NauAssist.Backend.Features.AutonomousAgent.Sources;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
@@ -98,6 +100,11 @@ builder.Services.AddScoped<AuditLogRepository>();
 
 // Autonomer Agent — Scheduler als Singleton (manueller Trigger + BackgroundService teilen Instanz)
 builder.Services.AddScoped<SuggestionRepository>();
+builder.Services.AddScoped<SourceAccountRepository>();
+builder.Services.AddScoped<SourceCursorRepository>();
+builder.Services.AddHttpClient("Matrix");
+builder.Services.AddScoped<MatrixClient>();
+builder.Services.AddScoped<ISourceObserver, MatrixObserver>();
 builder.Services.AddSingleton<AutonomousAgentScheduler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentScheduler>());
 
@@ -131,6 +138,7 @@ app.MapSettingsEndpoints();
 app.MapCalendarAuthEndpoints();
 app.MapCalendarEndpoints();
 app.MapSuggestionsEndpoints();
+app.MapSourceAccountsEndpoints();
 
 app.MapFallbackToFile("index.html");
 

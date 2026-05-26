@@ -20,6 +20,7 @@ import {
   disconnectGoogle,
   type CalendarSettings,
 } from "@/api/calendar-settings";
+import { MatrixSection } from "@/components/settings/MatrixSection";
 
 interface SettingsPageProps {
   onNavigate: (page: AppPage) => void;
@@ -252,6 +253,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const navItems = [
     { n: "01", label: "Sprachmodell", anchor: "section-llm" },
     { n: "02", label: "Kalender", anchor: "section-calendar" },
+    { n: "03", label: "Matrix", anchor: "section-matrix" },
   ];
 
   return (
@@ -328,6 +330,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         {calendar && (
           <CalendarSection calendar={calendar} setCalendar={setCalendar} />
         )}
+
+        <MatrixSection anchor="section-matrix" />
 
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>

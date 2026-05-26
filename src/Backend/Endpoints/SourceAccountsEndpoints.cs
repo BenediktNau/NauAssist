@@ -1,0 +1,208 @@
+using System.Text.Json;
+using NauAssist.Backend.Features.AutonomousAgent.Sources;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
+
+namespace NauAssist.Backend.Endpoints;
+
+public static class SourceAccountsEndpoints
+{
+    public static IEndpointRouteBuilder MapSourceAccountsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/source-accounts");
+
+        group.MapGet("/", async (string? kind, SourceAccountRepository repo, CancellationToken ct) =>
+        {
+            var items = await repo.ListAsync(kind, ct);
+            return Results.Ok(items.Select(ToDto));
+        });
+
+        group.MapGet("/{id:long}", async (long id, SourceAccountRepository repo, CancellationToken ct) =>
+        {
+            var a = await repo.GetAsync(id, ct);
+            return a is null ? Results.NotFound() : Results.Ok(ToDto(a));
+        });
+
+        group.MapPost("/", async (
+            CreateAccountPayload body,
+            SourceAccountRepository repo,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Kind) || string.IsNullOrWhiteSpace(body.DisplayName))
+            {
+                return Results.BadRequest(new { error = "kind_and_display_name_required" });
+            }
+
+            try
+            {
+                // Kind-spezifische Validierung
+                if (body.Kind == MatrixObserver.SourceKey)
+                {
+                    _ = MatrixCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+
+            var credentialsJson = JsonSerializer.Serialize(body.Credentials);
+            var allowlist = body.Allowlist ?? Array.Empty<string>();
+            var created = await repo.AddAsync(body.Kind, body.DisplayName, credentialsJson, allowlist, clock(), ct);
+            return Results.Created($"/api/source-accounts/{created.Id}", ToDto(created));
+        });
+
+        group.MapPatch("/{id:long}", async (
+            long id,
+            UpdateAccountPayload body,
+            SourceAccountRepository repo,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            var existing = await repo.GetAsync(id, ct);
+            if (existing is null) return Results.NotFound();
+
+            string? credentialsJson = body.Credentials is null
+                ? null
+                : JsonSerializer.Serialize(body.Credentials);
+
+            await repo.UpdateAsync(
+                id,
+                body.DisplayName,
+                credentialsJson,
+                body.Allowlist,
+                body.Enabled,
+                clock(),
+                ct);
+
+            var updated = await repo.GetAsync(id, ct);
+            return updated is null ? Results.NotFound() : Results.Ok(ToDto(updated));
+        });
+
+        group.MapDelete("/{id:long}", async (long id, SourceAccountRepository repo, CancellationToken ct) =>
+        {
+            var ok = await repo.DeleteAsync(id, ct);
+            return ok ? Results.NoContent() : Results.NotFound();
+        });
+
+        // Matrix-Hilfs-Endpoint: Räume listen anhand inline-übergebener Credentials.
+        // Wird genutzt, wenn der User gerade dabei ist einen neuen Account anzulegen.
+        group.MapPost("/matrix/list-rooms", async (
+            ListMatrixRoomsPayload body,
+            MatrixClient client,
+            CancellationToken ct) => await ListMatrixRoomsAsync(
+                () => Task.FromResult(JsonSerializer.Serialize(body.Credentials)),
+                client,
+                ct));
+
+        // Räume neu laden für einen bereits gespeicherten Account.
+        group.MapGet("/{id:long}/matrix/rooms", async (
+            long id,
+            SourceAccountRepository repo,
+            MatrixClient client,
+            CancellationToken ct) =>
+        {
+            var account = await repo.GetAsync(id, ct);
+            if (account is null) return Results.NotFound();
+            if (account.Kind != MatrixObserver.SourceKey)
+            {
+                return Results.BadRequest(new { error = "account_not_matrix" });
+            }
+            return await ListMatrixRoomsAsync(() => Task.FromResult(account.CredentialsJson), client, ct);
+        });
+
+        return app;
+    }
+
+    private static async Task<IResult> ListMatrixRoomsAsync(
+        Func<Task<string>> credentialsJsonProvider,
+        MatrixClient client,
+        CancellationToken ct)
+    {
+        try
+        {
+            var credentialsJson = await credentialsJsonProvider();
+            var creds = MatrixCredentials.Parse(credentialsJson);
+            var roomIds = await client.ListJoinedRoomsAsync(creds, ct);
+
+            var rooms = new List<MatrixRoomDto>();
+            foreach (var roomId in roomIds)
+            {
+                var name = await client.GetRoomNameAsync(creds, roomId, ct);
+                rooms.Add(new MatrixRoomDto(roomId, name));
+            }
+            return Results.Ok(rooms);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.BadRequest(new { error = "matrix_request_failed", detail = ex.Message });
+        }
+    }
+
+    private static SourceAccountDto ToDto(SourceAccount a)
+    {
+        var credentialsRedacted = RedactCredentials(a.Kind, a.CredentialsJson);
+        return new SourceAccountDto(
+            a.Id,
+            a.Kind,
+            a.DisplayName,
+            credentialsRedacted,
+            a.Allowlist,
+            a.Enabled,
+            a.CreatedAt,
+            a.UpdatedAt);
+    }
+
+    private static Dictionary<string, string?> RedactCredentials(string kind, string credentialsJson)
+    {
+        // Für Sichtbarkeit im UI ohne Geheimnisse: nur unkritische Felder durchlassen.
+        var result = new Dictionary<string, string?>();
+        try
+        {
+            using var doc = JsonDocument.Parse(credentialsJson);
+            if (kind == MatrixObserver.SourceKey)
+            {
+                if (doc.RootElement.TryGetProperty("homeserverUrl", out var hs))
+                    result["homeserverUrl"] = hs.GetString();
+                if (doc.RootElement.TryGetProperty("userId", out var uid))
+                    result["userId"] = uid.GetString();
+                result["accessToken"] = "***";
+            }
+        }
+        catch (JsonException)
+        {
+            // Defekte Credentials → leeres Mapping. UI zeigt Account trotzdem an.
+        }
+        return result;
+    }
+
+    private sealed record CreateAccountPayload(
+        string Kind,
+        string DisplayName,
+        Dictionary<string, object> Credentials,
+        IReadOnlyList<string>? Allowlist);
+
+    private sealed record UpdateAccountPayload(
+        string? DisplayName,
+        Dictionary<string, object>? Credentials,
+        IReadOnlyList<string>? Allowlist,
+        bool? Enabled);
+
+    private sealed record ListMatrixRoomsPayload(Dictionary<string, object> Credentials);
+
+    private sealed record SourceAccountDto(
+        long Id,
+        string Kind,
+        string DisplayName,
+        Dictionary<string, string?> Credentials,
+        IReadOnlyList<string> Allowlist,
+        bool Enabled,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt);
+
+    private sealed record MatrixRoomDto(string RoomId, string? DisplayName);
+}
