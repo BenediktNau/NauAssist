@@ -1,6 +1,6 @@
 import { Settings } from "lucide-react";
 
-type HeaderTab = "chat" | "calendar";
+type HeaderTab = "chat" | "calendar" | "recommendations";
 
 interface HeaderProps {
   onOpenSettings?: () => void;
@@ -53,6 +53,11 @@ export function Header({
             label="KALENDER"
             active={currentTab === "calendar"}
             onClick={() => onSelectTab("calendar")}
+          />
+          <TabButton
+            label="EMPFEHLUNGEN"
+            active={currentTab === "recommendations"}
+            onClick={() => onSelectTab("recommendations")}
           />
         </nav>
       )}

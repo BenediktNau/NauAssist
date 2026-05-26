@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using NauAssist.Backend.Endpoints;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
+using NauAssist.Backend.Features.AutonomousAgent;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
@@ -20,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection("Persistence"));
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
+builder.Services.Configure<AutonomousAgentOptions>(builder.Configuration.GetSection("AutonomousAgent"));
 builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time"));
 
 builder.Services.AddSingleton<AppDb>();
@@ -94,6 +96,11 @@ builder.Services.AddScoped<ChatContextCutoff>(sp => new ChatContextCutoff(
     sp.GetRequiredService<TimeZoneInfo>()));
 builder.Services.AddScoped<AuditLogRepository>();
 
+// Autonomer Agent — Scheduler als Singleton (manueller Trigger + BackgroundService teilen Instanz)
+builder.Services.AddScoped<SuggestionRepository>();
+builder.Services.AddSingleton<AutonomousAgentScheduler>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentScheduler>());
+
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
@@ -123,6 +130,7 @@ app.MapChatEndpoints();
 app.MapSettingsEndpoints();
 app.MapCalendarAuthEndpoints();
 app.MapCalendarEndpoints();
+app.MapSuggestionsEndpoints();
 
 app.MapFallbackToFile("index.html");
 
