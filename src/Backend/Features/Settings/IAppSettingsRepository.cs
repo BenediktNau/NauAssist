@@ -22,4 +22,10 @@ public interface IAppSettingsRepository
 
     /// <summary>Speichert den Persona-Memory-Text. Wird hart auf 400 Zeichen gekürzt.</summary>
     Task SetUserPersonaAsync(string text, CancellationToken ct);
+
+    /// <summary>Liefert VAPID-Keys + Subject. Public/Private können leer sein, wenn noch nichts generiert wurde.</summary>
+    Task<VapidSettings> GetVapidAsync(CancellationToken ct);
+
+    /// <summary>Speichert VAPID-Public/Private/Subject — atomar.</summary>
+    Task SetVapidAsync(VapidSettings vapid, CancellationToken ct);
 }

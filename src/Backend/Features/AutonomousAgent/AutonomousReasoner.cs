@@ -1,6 +1,7 @@
 using Mediator;
 using Microsoft.Extensions.Logging;
 using NauAssist.Backend.Features.AutonomousAgent.Classification;
+using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.Calendar.LookupFreeSlots;
 using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
@@ -24,6 +25,7 @@ public sealed class AutonomousReasoner
     private readonly IMediator _mediator;
     private readonly SuggestionRepository _suggestions;
     private readonly IAppSettingsRepository _settings;
+    private readonly WebPushSender _pushSender;
     private readonly ClockContext _clockContext;
     private readonly TimeZoneInfo _zone;
     private readonly Func<DateTimeOffset> _clock;
@@ -34,6 +36,7 @@ public sealed class AutonomousReasoner
         IMediator mediator,
         SuggestionRepository suggestions,
         IAppSettingsRepository settings,
+        WebPushSender pushSender,
         ClockContext clockContext,
         TimeZoneInfo zone,
         Func<DateTimeOffset> clock,
@@ -43,6 +46,7 @@ public sealed class AutonomousReasoner
         _mediator = mediator;
         _suggestions = suggestions;
         _settings = settings;
+        _pushSender = pushSender;
         _clockContext = clockContext;
         _zone = zone;
         _clock = clock;
@@ -183,7 +187,32 @@ public sealed class AutonomousReasoner
             ct: ct);
         _logger.LogInformation("Neue Suggestion {Id} aus {Source}/{Ref}: \"{Topic}\".",
             created.Id, signal.Source, signal.SourceRef, cls.Topic);
+
+        // Push nur bei *neuer* Suggestion — Thread-Updates pingen nicht erneut.
+        await TryPushAsync(created, ct);
         return true;
+    }
+
+    private async Task TryPushAsync(Suggestion s, CancellationToken ct)
+    {
+        try
+        {
+            var title = string.IsNullOrEmpty(s.Requester)
+                ? "Neue Termin-Anfrage"
+                : $"Termin-Anfrage von {s.Requester}";
+            var body = s.Topic ?? TruncateQuote(s.QuotedText ?? "");
+            await _pushSender.BroadcastAsync(
+                new PushNotificationPayload(
+                    Title: title,
+                    Body: body,
+                    Url: $"/?suggestion={s.Id}",
+                    Tag: $"suggestion-{s.Id}"),
+                ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Push-Broadcast für Suggestion {Id} fehlgeschlagen.", s.Id);
+        }
     }
 
     /// <summary>Wählt bis zu N Slots, jeweils einen pro Tag, zuerst die "Passes", dann "SoftViolation" falls nicht genug.</summary>

@@ -21,6 +21,9 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyGoogleClientSecret = "calendar.google.client_secret";
     private const string KeyUserPersona        = "agent.user_persona";
     public const int UserPersonaMaxLength      = 400;
+    private const string KeyVapidPublic        = "push.vapid_public_key";
+    private const string KeyVapidPrivate       = "push.vapid_private_key";
+    private const string KeyVapidSubject       = "push.vapid_subject";
 
     private readonly AppDb _db;
 
@@ -229,5 +232,37 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
 
         using var conn = _db.OpenConnection();
         await UpsertAsync(conn, null, KeyUserPersona, trimmed, ct);
+    }
+
+    public async Task<VapidSettings> GetVapidAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2, @k3);",
+            new { k1 = KeyVapidPublic, k2 = KeyVapidPrivate, k3 = KeyVapidSubject },
+            cancellationToken: ct));
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        return new VapidSettings(
+            PublicKey: map.GetValueOrDefault(KeyVapidPublic, ""),
+            PrivateKey: map.GetValueOrDefault(KeyVapidPrivate, ""),
+            Subject: map.GetValueOrDefault(KeyVapidSubject, "mailto:agent@nauassist.local"));
+    }
+
+    public async Task SetVapidAsync(VapidSettings vapid, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyVapidPublic, vapid.PublicKey, ct);
+            await UpsertAsync(conn, tx, KeyVapidPrivate, vapid.PrivateKey, ct);
+            await UpsertAsync(conn, tx, KeyVapidSubject, vapid.Subject, ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
     }
 }

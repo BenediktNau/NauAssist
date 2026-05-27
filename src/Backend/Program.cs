@@ -6,6 +6,7 @@ using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.AutonomousAgent;
 using NauAssist.Backend.Features.AutonomousAgent.Classification;
+using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
 using NauAssist.Backend.Features.Calendar;
@@ -108,6 +109,9 @@ builder.Services.AddScoped<MatrixClient>();
 builder.Services.AddScoped<ISourceObserver, MatrixObserver>();
 builder.Services.AddScoped<IntentClassifier>();
 builder.Services.AddScoped<AutonomousReasoner>();
+builder.Services.AddScoped<PushSubscriptionRepository>();
+builder.Services.AddScoped<WebPushSender>();
+builder.Services.AddScoped<VapidBootstrapper>();
 builder.Services.AddSingleton<AutonomousAgentScheduler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentScheduler>());
 
@@ -123,6 +127,9 @@ using (var scope = app.Services.CreateScope())
 {
     var initializer = scope.ServiceProvider.GetRequiredService<DbInitializer>();
     initializer.Initialize();
+
+    var vapid = scope.ServiceProvider.GetRequiredService<VapidBootstrapper>();
+    await vapid.EnsureKeysAsync(CancellationToken.None);
 }
 
 // Sub-Command "auth"
@@ -142,6 +149,7 @@ app.MapCalendarAuthEndpoints();
 app.MapCalendarEndpoints();
 app.MapSuggestionsEndpoints();
 app.MapSourceAccountsEndpoints();
+app.MapPushEndpoints();
 
 app.MapFallbackToFile("index.html");
 

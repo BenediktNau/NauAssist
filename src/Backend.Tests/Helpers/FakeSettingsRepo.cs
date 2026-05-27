@@ -29,4 +29,7 @@ public sealed class FakeSettingsRepo : IAppSettingsRepository
         Task.CompletedTask;
     public Task<string> GetUserPersonaAsync(CancellationToken ct) => Task.FromResult(string.Empty);
     public Task SetUserPersonaAsync(string text, CancellationToken ct) => Task.CompletedTask;
+    public Task<VapidSettings> GetVapidAsync(CancellationToken ct) =>
+        Task.FromResult(new VapidSettings("", "", "mailto:test@example.org"));
+    public Task SetVapidAsync(VapidSettings v, CancellationToken ct) => Task.CompletedTask;
 }
