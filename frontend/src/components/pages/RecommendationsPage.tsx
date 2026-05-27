@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/nau/Header";
 import type { AppPage } from "@/App";
 import {
@@ -6,6 +6,8 @@ import {
   listSuggestions,
   pickSuggestionSlot,
   pollSuggestionsNow,
+  sendSuggestion,
+  updateSuggestionDraft,
   type SuggestionDto,
   type SuggestionStatus,
 } from "@/api/suggestions";
@@ -65,11 +67,14 @@ export function RecommendationsPage({ onNavigate }: RecommendationsPageProps) {
     }
   };
 
+  const replaceItem = (updated: SuggestionDto) =>
+    setItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+
   const onPick = async (id: number, slotIndex: number) => {
     setError(null);
     try {
       const updated = await pickSuggestionSlot(id, slotIndex);
-      setItems((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      replaceItem(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -80,6 +85,26 @@ export function RecommendationsPage({ onNavigate }: RecommendationsPageProps) {
     try {
       await dismissSuggestion(id);
       await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onSaveDraft = async (id: number, text: string) => {
+    setError(null);
+    try {
+      const updated = await updateSuggestionDraft(id, text);
+      replaceItem(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onSend = async (id: number, text: string) => {
+    setError(null);
+    try {
+      const updated = await sendSuggestion(id, text);
+      replaceItem(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -161,7 +186,14 @@ export function RecommendationsPage({ onNavigate }: RecommendationsPageProps) {
         ) : (
           <ul className="flex flex-col gap-3">
             {items.map((s) => (
-              <SuggestionCard key={s.id} suggestion={s} onPick={onPick} onDismiss={onDismiss} />
+              <SuggestionCard
+                key={s.id}
+                suggestion={s}
+                onPick={onPick}
+                onDismiss={onDismiss}
+                onSaveDraft={onSaveDraft}
+                onSend={onSend}
+              />
             ))}
           </ul>
         )}
@@ -174,10 +206,69 @@ interface SuggestionCardProps {
   suggestion: SuggestionDto;
   onPick: (id: number, slotIndex: number) => void;
   onDismiss: (id: number) => void;
+  onSaveDraft: (id: number, text: string) => Promise<void> | void;
+  onSend: (id: number, text: string) => Promise<void> | void;
 }
 
-function SuggestionCard({ suggestion, onPick, onDismiss }: SuggestionCardProps) {
+function SuggestionCard({ suggestion, onPick, onDismiss, onSaveDraft, onSend }: SuggestionCardProps) {
   const isPending = suggestion.status === "pending";
+  const hasPick = suggestion.pickedSlot !== null && suggestion.pickedSlot !== undefined;
+
+  const [draft, setDraft] = useState(suggestion.draftReply);
+  const [serverDraft, setServerDraft] = useState(suggestion.draftReply);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Backend hat den Draft aktualisiert (z.B. nach Slot-Pick) — übernehmen,
+    // aber nur wenn der User nicht gerade selbst editiert.
+    if (serverDraft !== suggestion.draftReply && draft === serverDraft) {
+      setDraft(suggestion.draftReply);
+    }
+    setServerDraft(suggestion.draftReply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestion.draftReply]);
+
+  const scheduleSave = (text: string) => {
+    setDraft(text);
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = window.setTimeout(async () => {
+      if (text === serverDraft) return;
+      setSaving(true);
+      try {
+        await onSaveDraft(suggestion.id, text);
+      } finally {
+        setSaving(false);
+      }
+    }, 600);
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(draft);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard kann ohne https blockt sein — fallback ohne UI-Hint
+    }
+  };
+
+  const send = async () => {
+    const sourceLabel = suggestion.source === "matrix" ? "Matrix" : suggestion.source;
+    const requester = suggestion.requester ? ` an ${suggestion.requester}` : "";
+    if (!confirm(`Antwort jetzt via ${sourceLabel}${requester} senden?`)) return;
+    setSending(true);
+    try {
+      await onSend(suggestion.id, draft);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <li className="border border-nau-line bg-white/[0.02] p-4 lg:p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -192,7 +283,12 @@ function SuggestionCard({ suggestion, onPick, onDismiss }: SuggestionCardProps) 
         <span className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
           {formatRelative(suggestion.createdAt)}
         </span>
-        <span className="ml-auto font-mono text-[10px] tracking-mono-wide text-nau-fg-dim">
+        <span
+          className={
+            "ml-auto font-mono text-[10px] tracking-mono-wide " +
+            (suggestion.status === "responded" ? "text-nau-accent" : "text-nau-fg-dim")
+          }
+        >
           {suggestion.status.toUpperCase()}
         </span>
       </div>
@@ -229,17 +325,53 @@ function SuggestionCard({ suggestion, onPick, onDismiss }: SuggestionCardProps) 
         </div>
       )}
 
-      {isPending && (
-        <div className="mt-4 flex gap-2">
+      {(hasPick || draft) && (
+        <div className="mt-4">
+          <div className="mb-1 flex items-center gap-3 font-mono text-[11px] tracking-mono text-nau-fg-dim">
+            <span>// ANTWORT-ENTWURF</span>
+            {saving && <span className="text-nau-accent">SPEICHERE …</span>}
+          </div>
+          <textarea
+            value={draft}
+            onChange={(e) => scheduleSave(e.target.value)}
+            disabled={!isPending}
+            rows={3}
+            className="w-full resize-y border border-nau-line bg-white/[0.03] px-3.5 py-2.5 font-sans text-sm leading-relaxed text-nau-fg disabled:opacity-60"
+          />
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(hasPick || draft) && (
+          <button
+            type="button"
+            onClick={copy}
+            disabled={!draft}
+            className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-40"
+          >
+            {copied ? "KOPIERT ✓" : "KOPIEREN"}
+          </button>
+        )}
+        {isPending && hasPick && (
+          <button
+            type="button"
+            onClick={send}
+            disabled={sending || !draft}
+            className="min-h-10 cursor-pointer border-none bg-nau-accent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-bg disabled:opacity-40"
+          >
+            {sending ? "SENDE …" : `IN ${suggestion.source.toUpperCase()} SENDEN`}
+          </button>
+        )}
+        {isPending && (
           <button
             type="button"
             onClick={() => onDismiss(suggestion.id)}
-            className="border border-nau-line px-3 py-1.5 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:border-nau-danger hover:text-nau-danger"
+            className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:border-nau-danger hover:text-nau-danger"
           >
             VERWERFEN
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </li>
   );
 }

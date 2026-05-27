@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging;
 using NauAssist.Backend.Features.AutonomousAgent;
+using NauAssist.Backend.Features.AutonomousAgent.Classification;
+using NauAssist.Backend.Features.AutonomousAgent.Sources;
 
 namespace NauAssist.Backend.Endpoints;
 
@@ -41,7 +44,9 @@ public static class SuggestionsEndpoints
             long id,
             PickPayload body,
             SuggestionRepository repo,
+            DraftReplyGenerator draftGen,
             Func<DateTimeOffset> clock,
+            ILogger<DraftReplyGenerator> draftLog,
             CancellationToken ct) =>
         {
             var s = await repo.GetAsync(id, ct);
@@ -55,8 +60,103 @@ public static class SuggestionsEndpoints
                 return Results.BadRequest(new { error = "slot_index_out_of_range" });
             }
 
-            var ok = await repo.PickAsync(id, body.SlotIndex, clock(), ct);
+            var now = clock();
+            var ok = await repo.PickAsync(id, body.SlotIndex, now, ct);
             if (!ok) return Results.Conflict(new { error = "pick_failed" });
+
+            // On-Demand: Draft anhand des gewählten Slots verfeinern.
+            try
+            {
+                var refined = await draftGen.RefineAsync(
+                    quotedText: s.QuotedText,
+                    topic: s.Topic,
+                    requester: s.Requester,
+                    pickedSlot: s.Slots[body.SlotIndex],
+                    locale: "de-DE",
+                    ct);
+                if (!string.IsNullOrWhiteSpace(refined))
+                {
+                    await repo.UpdateDraftAsync(id, refined, now, ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                draftLog.LogWarning(ex, "Draft-Verfeinerung nach Pick fehlgeschlagen für Suggestion {Id}.", id);
+            }
+
+            var updated = await repo.GetAsync(id, ct);
+            return updated is null ? Results.NotFound() : Results.Ok(ToDto(updated));
+        });
+
+        group.MapPatch("/{id:long}/draft", async (
+            long id,
+            DraftPayload body,
+            SuggestionRepository repo,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            var s = await repo.GetAsync(id, ct);
+            if (s is null) return Results.NotFound();
+            if (s.Status != SuggestionStatus.Pending)
+            {
+                return Results.BadRequest(new { error = "suggestion_not_pending" });
+            }
+
+            await repo.UpdateDraftAsync(id, body.Text ?? string.Empty, clock(), ct);
+            var updated = await repo.GetAsync(id, ct);
+            return updated is null ? Results.NotFound() : Results.Ok(ToDto(updated));
+        });
+
+        group.MapPost("/{id:long}/send", async (
+            long id,
+            SendPayload body,
+            SuggestionRepository repo,
+            SourceAccountRepository accounts,
+            IEnumerable<ISourceSender> senders,
+            Func<DateTimeOffset> clock,
+            ILogger<SuggestionsEndpointsTag> log,
+            CancellationToken ct) =>
+        {
+            var s = await repo.GetAsync(id, ct);
+            if (s is null) return Results.NotFound();
+            if (s.Status != SuggestionStatus.Pending)
+            {
+                return Results.BadRequest(new { error = "suggestion_not_pending" });
+            }
+
+            var text = (body.Text ?? s.DraftReply ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(text))
+            {
+                return Results.BadRequest(new { error = "empty_draft" });
+            }
+
+            var sender = senders.FirstOrDefault(x => x.Source == s.Source);
+            if (sender is null)
+            {
+                return Results.BadRequest(new { error = "no_sender_for_source", source = s.Source });
+            }
+
+            var candidates = await accounts.ListEnabledAsync(s.Source, ct);
+            var account = candidates.FirstOrDefault(a => a.Allowlist.Contains(s.SourceRef));
+            if (account is null)
+            {
+                return Results.BadRequest(new { error = "no_matching_account", source = s.Source });
+            }
+
+            try
+            {
+                await sender.SendAsync(account, s.SourceRef, text, ct);
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Direkt-Send für Suggestion {Id} fehlgeschlagen.", id);
+                return Results.BadRequest(new { error = "send_failed", detail = ex.Message });
+            }
+
+            var now = clock();
+            // Speichere finalen Draft-Text + setze auf 'responded'.
+            await repo.UpdateDraftAsync(id, text, now, ct);
+            await repo.SetStatusAsync(id, SuggestionStatus.Responded, now, ct);
 
             var updated = await repo.GetAsync(id, ct);
             return updated is null ? Results.NotFound() : Results.Ok(ToDto(updated));
@@ -102,6 +202,11 @@ public static class SuggestionsEndpoints
         s.RespondedAt);
 
     private sealed record PickPayload(int SlotIndex);
+    private sealed record DraftPayload(string? Text);
+    private sealed record SendPayload(string? Text);
+
+    /// <summary>Logger-Kategorie für Send-Endpoint — eigener Typ, damit der Logger-Name lesbar bleibt.</summary>
+    private sealed class SuggestionsEndpointsTag;
 
     private sealed record SuggestionDto(
         long Id,

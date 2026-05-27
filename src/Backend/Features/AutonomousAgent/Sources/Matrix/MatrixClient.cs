@@ -58,6 +58,30 @@ public sealed class MatrixClient
         return dto?.Name;
     }
 
+    public async Task SendTextMessageAsync(
+        MatrixCredentials creds,
+        string roomId,
+        string body,
+        CancellationToken ct)
+    {
+        var encodedRoom = Uri.EscapeDataString(roomId);
+        var txnId = Guid.NewGuid().ToString("N");
+        var url = $"{creds.NormalizedHomeserver()}/_matrix/client/v3/rooms/{encodedRoom}/send/m.room.message/{txnId}";
+
+        var content = JsonSerializer.Serialize(new
+        {
+            msgtype = "m.text",
+            body,
+        });
+
+        using var req = BuildRequest(HttpMethod.Put, url, creds);
+        req.Content = new StringContent(content, System.Text.Encoding.UTF8, "application/json");
+
+        using var client = _http.CreateClient("Matrix");
+        using var res = await client.SendAsync(req, ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     public async Task<MatrixSyncResult> SyncAsync(
         MatrixCredentials creds,
         string? since,

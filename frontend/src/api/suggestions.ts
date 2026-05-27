@@ -63,6 +63,37 @@ export async function dismissSuggestion(id: number): Promise<void> {
   }
 }
 
+export async function updateSuggestionDraft(
+  id: number,
+  text: string,
+): Promise<SuggestionDto> {
+  const res = await fetch(`/api/suggestions/${id}/draft`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    throw new Error(`Draft-Update fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as SuggestionDto;
+}
+
+export async function sendSuggestion(
+  id: number,
+  text: string,
+): Promise<SuggestionDto> {
+  const res = await fetch(`/api/suggestions/${id}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `Senden fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as SuggestionDto;
+}
+
 export async function pollSuggestionsNow(): Promise<PollResult> {
   const res = await fetch("/api/suggestions/poll-now", { method: "POST" });
   if (!res.ok) {
