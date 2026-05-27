@@ -14,4 +14,5 @@ public sealed record Suggestion(
     int? PickedSlot,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? RespondedAt);
+    DateTimeOffset? RespondedAt,
+    IReadOnlyDictionary<string, string>? ReplyMetadata = null);

@@ -167,6 +167,7 @@ public sealed class AutonomousReasoner
                 quotedText: TruncateQuote(signal.Text),
                 slots: slots,
                 draftReply: draft,
+                replyMetadata: signal.Metadata,
                 now: now2,
                 ct: ct);
             _logger.LogInformation("Suggestion {Id} im Thread {Source}/{Ref} aktualisiert.",
@@ -183,6 +184,7 @@ public sealed class AutonomousReasoner
             quotedText: TruncateQuote(signal.Text),
             slots: slots,
             draftReply: draft,
+            replyMetadata: signal.Metadata,
             now: now2,
             ct: ct);
         _logger.LogInformation("Neue Suggestion {Id} aus {Source}/{Ref}: \"{Topic}\".",

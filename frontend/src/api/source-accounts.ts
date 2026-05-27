@@ -101,3 +101,59 @@ export async function listMatrixRoomsForAccount(id: number): Promise<MatrixRoomD
   }
   return (await res.json()) as MatrixRoomDto[];
 }
+
+// --- IMAP ---
+
+export interface ImapCredentialsInput {
+  imapHost: string;
+  imapPort: number;
+  imapSsl: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpStartTls: boolean;
+  username: string;
+  password: string;
+  fromAddress?: string;
+  fromName?: string;
+}
+
+export async function listImapFolders(
+  credentials: ImapCredentialsInput,
+): Promise<string[]> {
+  const res = await fetch("/api/source-accounts/imap/list-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credentials }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `IMAP-Anfrage fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as string[];
+}
+
+export async function listImapFoldersForAccount(id: number): Promise<string[]> {
+  const res = await fetch(`/api/source-accounts/${id}/imap/folders`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `IMAP-Anfrage fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as string[];
+}
+
+export async function createImapAccount(
+  displayName: string,
+  credentials: ImapCredentialsInput,
+  allowlist: string[],
+): Promise<SourceAccountDto> {
+  const res = await fetch("/api/source-accounts/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "imap", displayName, credentials, allowlist }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Account-Anlage fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as SourceAccountDto;
+}

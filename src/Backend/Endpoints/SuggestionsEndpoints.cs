@@ -145,7 +145,7 @@ public static class SuggestionsEndpoints
 
             try
             {
-                await sender.SendAsync(account, s.SourceRef, text, ct);
+                await sender.SendAsync(account, s.SourceRef, text, s.ReplyMetadata, ct);
             }
             catch (Exception ex)
             {

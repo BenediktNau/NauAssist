@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.Imap;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
 
 namespace NauAssist.Backend.Endpoints;
@@ -39,6 +40,10 @@ public static class SourceAccountsEndpoints
                 if (body.Kind == MatrixObserver.SourceKey)
                 {
                     _ = MatrixCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
+                }
+                else if (body.Kind == ImapObserver.SourceKey)
+                {
+                    _ = ImapCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
                 }
             }
             catch (ArgumentException ex)
@@ -111,7 +116,54 @@ public static class SourceAccountsEndpoints
             return await ListMatrixRoomsAsync(() => Task.FromResult(account.CredentialsJson), client, ct);
         });
 
+        // IMAP-Folder listen (inline Credentials beim Anlegen).
+        group.MapPost("/imap/list-folders", async (
+            ListImapFoldersPayload body,
+            ImapClient client,
+            CancellationToken ct) => await ListImapFoldersAsync(
+                () => Task.FromResult(JsonSerializer.Serialize(body.Credentials)),
+                client,
+                ct));
+
+        // IMAP-Folder neu laden für einen bereits gespeicherten Account.
+        group.MapGet("/{id:long}/imap/folders", async (
+            long id,
+            SourceAccountRepository repo,
+            ImapClient client,
+            CancellationToken ct) =>
+        {
+            var account = await repo.GetAsync(id, ct);
+            if (account is null) return Results.NotFound();
+            if (account.Kind != ImapObserver.SourceKey)
+            {
+                return Results.BadRequest(new { error = "account_not_imap" });
+            }
+            return await ListImapFoldersAsync(() => Task.FromResult(account.CredentialsJson), client, ct);
+        });
+
         return app;
+    }
+
+    private static async Task<IResult> ListImapFoldersAsync(
+        Func<Task<string>> credentialsJsonProvider,
+        ImapClient client,
+        CancellationToken ct)
+    {
+        try
+        {
+            var credentialsJson = await credentialsJsonProvider();
+            var creds = ImapCredentials.Parse(credentialsJson);
+            var folders = await client.ListFoldersAsync(creds, ct);
+            return Results.Ok(folders);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { error = "imap_request_failed", detail = ex.Message });
+        }
     }
 
     private static async Task<IResult> ListMatrixRoomsAsync(
@@ -172,6 +224,16 @@ public static class SourceAccountsEndpoints
                     result["userId"] = uid.GetString();
                 result["accessToken"] = "***";
             }
+            else if (kind == ImapObserver.SourceKey)
+            {
+                if (doc.RootElement.TryGetProperty("imapHost", out var ih))
+                    result["imapHost"] = ih.GetString();
+                if (doc.RootElement.TryGetProperty("smtpHost", out var sh))
+                    result["smtpHost"] = sh.GetString();
+                if (doc.RootElement.TryGetProperty("username", out var un))
+                    result["username"] = un.GetString();
+                result["password"] = "***";
+            }
         }
         catch (JsonException)
         {
@@ -193,6 +255,7 @@ public static class SourceAccountsEndpoints
         bool? Enabled);
 
     private sealed record ListMatrixRoomsPayload(Dictionary<string, object> Credentials);
+    private sealed record ListImapFoldersPayload(Dictionary<string, object> Credentials);
 
     private sealed record SourceAccountDto(
         long Id,

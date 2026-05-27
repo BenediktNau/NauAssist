@@ -9,4 +9,5 @@ public sealed record RawSignal(
     string SourceRef,
     string? Sender,
     string Text,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    IReadOnlyDictionary<string, string>? Metadata = null);

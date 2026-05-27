@@ -14,6 +14,10 @@ import {
 
 interface RecommendationsPageProps {
   onNavigate: (page: AppPage) => void;
+  /** Wenn gesetzt, scrollt die Seite nach Laden zu dieser Suggestion-ID (Deep-Link). */
+  focusSuggestionId?: number | null;
+  /** Wird gerufen, sobald gescrollt wurde — Parent kann den Focus zurücksetzen. */
+  onFocusHandled?: () => void;
 }
 
 const STATUS_TABS: { key: SuggestionStatus | "all"; label: string }[] = [
@@ -23,13 +27,25 @@ const STATUS_TABS: { key: SuggestionStatus | "all"; label: string }[] = [
   { key: "all", label: "ALLE" },
 ];
 
-export function RecommendationsPage({ onNavigate }: RecommendationsPageProps) {
+export function RecommendationsPage({
+  onNavigate,
+  focusSuggestionId,
+  onFocusHandled,
+}: RecommendationsPageProps) {
   const [items, setItems] = useState<SuggestionDto[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("pending");
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollMessage, setPollMessage] = useState<string | null>(null);
+  // Wenn ein Deep-Link-Ziel auch in "responded"/"dismissed" liegt, müssen wir den
+  // Status-Filter ggf. lockern, damit der Eintrag in der Liste ist.
+  useEffect(() => {
+    if (focusSuggestionId && filter === "pending") {
+      const inList = items.some((s) => s.id === focusSuggestionId);
+      if (!inList && items.length > 0) setFilter("all");
+    }
+  }, [focusSuggestionId, items, filter]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -193,6 +209,8 @@ export function RecommendationsPage({ onNavigate }: RecommendationsPageProps) {
                 onDismiss={onDismiss}
                 onSaveDraft={onSaveDraft}
                 onSend={onSend}
+                focused={focusSuggestionId === s.id}
+                onFocusHandled={onFocusHandled}
               />
             ))}
           </ul>
@@ -208,9 +226,19 @@ interface SuggestionCardProps {
   onDismiss: (id: number) => void;
   onSaveDraft: (id: number, text: string) => Promise<void> | void;
   onSend: (id: number, text: string) => Promise<void> | void;
+  focused?: boolean;
+  onFocusHandled?: () => void;
 }
 
-function SuggestionCard({ suggestion, onPick, onDismiss, onSaveDraft, onSend }: SuggestionCardProps) {
+function SuggestionCard({
+  suggestion,
+  onPick,
+  onDismiss,
+  onSaveDraft,
+  onSend,
+  focused,
+  onFocusHandled,
+}: SuggestionCardProps) {
   const isPending = suggestion.status === "pending";
   const hasPick = suggestion.pickedSlot !== null && suggestion.pickedSlot !== undefined;
 
@@ -220,6 +248,14 @@ function SuggestionCard({ suggestion, onPick, onDismiss, onSaveDraft, onSend }: 
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  const liRef = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (focused && liRef.current) {
+      liRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      onFocusHandled?.();
+    }
+  }, [focused, onFocusHandled]);
 
   useEffect(() => {
     // Backend hat den Draft aktualisiert (z.B. nach Slot-Pick) — übernehmen,
@@ -270,7 +306,13 @@ function SuggestionCard({ suggestion, onPick, onDismiss, onSaveDraft, onSend }: 
   };
 
   return (
-    <li className="border border-nau-line bg-white/[0.02] p-4 lg:p-5">
+    <li
+      ref={liRef}
+      className={
+        "border bg-white/[0.02] p-4 lg:p-5 transition-colors " +
+        (focused ? "border-nau-accent" : "border-nau-line")
+      }
+    >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-[11px] tracking-mono-wide text-nau-accent">
           {suggestion.source.toUpperCase()}

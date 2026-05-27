@@ -20,6 +20,7 @@ import {
   disconnectGoogle,
   type CalendarSettings,
 } from "@/api/calendar-settings";
+import { ImapSection } from "@/components/settings/ImapSection";
 import { MatrixSection } from "@/components/settings/MatrixSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
@@ -258,6 +259,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "03", label: "Matrix", anchor: "section-matrix" },
     { n: "04", label: "Persona", anchor: "section-persona" },
     { n: "05", label: "Push", anchor: "section-push" },
+    { n: "06", label: "E-Mail", anchor: "section-imap" },
   ];
 
   return (
@@ -340,6 +342,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         <PersonaSection anchor="section-persona" />
 
         <PushSection anchor="section-push" />
+
+        <ImapSection anchor="section-imap" />
 
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>

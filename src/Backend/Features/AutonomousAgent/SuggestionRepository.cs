@@ -27,19 +27,21 @@ public sealed class SuggestionRepository
         string? quotedText,
         IReadOnlyList<SuggestionSlot> slots,
         string draftReply,
+        IReadOnlyDictionary<string, string>? replyMetadata,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var slotsJson = JsonSerializer.Serialize(slots, JsonOpts);
+        var metaJson = replyMetadata is null ? null : JsonSerializer.Serialize(replyMetadata, JsonOpts);
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(new CommandDefinition(
             """
             INSERT INTO suggestions(
                 source, source_ref, intent, topic, requester, quoted_text,
-                slots_json, draft_reply, status, created_at, updated_at)
+                slots_json, draft_reply, reply_metadata_json, status, created_at, updated_at)
             VALUES(
                 @source, @sourceRef, @intent, @topic, @requester, @quotedText,
-                @slotsJson, @draftReply, 'pending', @now, @now);
+                @slotsJson, @draftReply, @metaJson, 'pending', @now, @now);
             SELECT last_insert_rowid();
             """,
             new
@@ -52,6 +54,7 @@ public sealed class SuggestionRepository
                 quotedText,
                 slotsJson,
                 draftReply,
+                metaJson,
                 now = now.ToString("O"),
             },
             cancellationToken: ct));
@@ -70,7 +73,8 @@ public sealed class SuggestionRepository
             PickedSlot: null,
             CreatedAt: now,
             UpdatedAt: now,
-            RespondedAt: null);
+            RespondedAt: null,
+            ReplyMetadata: replyMetadata);
     }
 
     public async Task<Suggestion?> GetAsync(long id, CancellationToken ct)
@@ -148,10 +152,12 @@ public sealed class SuggestionRepository
         string? quotedText,
         IReadOnlyList<SuggestionSlot> slots,
         string draftReply,
+        IReadOnlyDictionary<string, string>? replyMetadata,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var slotsJson = JsonSerializer.Serialize(slots, JsonOpts);
+        var metaJson = replyMetadata is null ? null : JsonSerializer.Serialize(replyMetadata, JsonOpts);
         using var conn = _db.OpenConnection();
         var affected = await conn.ExecuteAsync(new CommandDefinition(
             """
@@ -161,11 +167,12 @@ public sealed class SuggestionRepository
                 quoted_text = @quotedText,
                 slots_json = @slotsJson,
                 draft_reply = @draftReply,
+                reply_metadata_json = COALESCE(@metaJson, reply_metadata_json),
                 picked_slot = NULL,
                 updated_at = @now
             WHERE id = @id AND status = 'pending';
             """,
-            new { id, topic, requester, quotedText, slotsJson, draftReply, now = now.ToString("O") },
+            new { id, topic, requester, quotedText, slotsJson, draftReply, metaJson, now = now.ToString("O") },
             cancellationToken: ct));
         return affected > 0;
     }
@@ -232,6 +239,12 @@ public sealed class SuggestionRepository
             : JsonSerializer.Deserialize<SuggestionSlot[]>(r.slots_json, JsonOpts)
               ?? Array.Empty<SuggestionSlot>();
 
+        IReadOnlyDictionary<string, string>? meta = null;
+        if (!string.IsNullOrEmpty(r.reply_metadata_json))
+        {
+            meta = JsonSerializer.Deserialize<Dictionary<string, string>>(r.reply_metadata_json, JsonOpts);
+        }
+
         return new Suggestion(
             Id: r.id,
             Source: r.source,
@@ -248,7 +261,8 @@ public sealed class SuggestionRepository
             UpdatedAt: DateTimeOffset.Parse(r.updated_at),
             RespondedAt: string.IsNullOrEmpty(r.responded_at)
                 ? null
-                : DateTimeOffset.Parse(r.responded_at));
+                : DateTimeOffset.Parse(r.responded_at),
+            ReplyMetadata: meta);
     }
 
     private sealed record SuggestionRow(
@@ -261,6 +275,7 @@ public sealed class SuggestionRepository
         string? quoted_text,
         string slots_json,
         string draft_reply,
+        string? reply_metadata_json,
         string status,
         long? picked_slot,
         string created_at,
