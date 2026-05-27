@@ -88,3 +88,19 @@ export async function testOllamaConnection(
   });
   return res.json();
 }
+
+export interface PersonaDto {
+  text: string;
+  maxLength: number;
+}
+
+export async function getPersona(): Promise<PersonaDto> {
+  const res = await fetch("/api/settings/persona");
+  if (!res.ok) throw new Error(`GET /api/settings/persona failed: ${res.status}`);
+  return res.json();
+}
+
+export async function resetPersona(): Promise<void> {
+  const res = await fetch("/api/settings/persona", { method: "DELETE" });
+  if (!res.ok) throw new Error(`DELETE /api/settings/persona failed: ${res.status}`);
+}

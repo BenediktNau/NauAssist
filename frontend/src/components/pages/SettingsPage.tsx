@@ -21,6 +21,7 @@ import {
   type CalendarSettings,
 } from "@/api/calendar-settings";
 import { MatrixSection } from "@/components/settings/MatrixSection";
+import { PersonaSection } from "@/components/settings/PersonaSection";
 
 interface SettingsPageProps {
   onNavigate: (page: AppPage) => void;
@@ -254,6 +255,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "01", label: "Sprachmodell", anchor: "section-llm" },
     { n: "02", label: "Kalender", anchor: "section-calendar" },
     { n: "03", label: "Matrix", anchor: "section-matrix" },
+    { n: "04", label: "Persona", anchor: "section-persona" },
   ];
 
   return (
@@ -332,6 +334,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         )}
 
         <MatrixSection anchor="section-matrix" />
+
+        <PersonaSection anchor="section-persona" />
 
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>

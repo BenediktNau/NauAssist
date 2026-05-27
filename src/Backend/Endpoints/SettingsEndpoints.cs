@@ -2,6 +2,7 @@ using System.Text.Json;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using NauAssist.Backend.Features.Infrastructure.Audit;
+using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.Settings.GetCalendarSettings;
 using NauAssist.Backend.Features.Settings.GetLlmSettings;
 using NauAssist.Backend.Features.Settings.GetOllamaSettings;
@@ -196,8 +197,31 @@ public static class SettingsEndpoints
             return Results.Ok(new { ok = true });
         });
 
+        app.MapGet("/api/settings/persona", async (
+            IAppSettingsRepository repo,
+            CancellationToken ct) =>
+        {
+            var text = await repo.GetUserPersonaAsync(ct);
+            return Results.Ok(new PersonaDto(text, AppSettingsRepository.UserPersonaMaxLength));
+        });
+
+        app.MapDelete("/api/settings/persona", async (
+            IAppSettingsRepository repo,
+            AuditLogRepository audit,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            await repo.SetUserPersonaAsync(string.Empty, ct);
+            await audit.AppendAsync(
+                new AuditEntry(0, null, "settings.persona.reset", "{}", "{\"ok\":true}", null, clock()),
+                ct);
+            return Results.NoContent();
+        });
+
         return app;
     }
+
+    private sealed record PersonaDto(string Text, int MaxLength);
 
     public sealed record UpdateLlmSettingsPayload(string? OllamaModel, string? SystemPrompt);
 

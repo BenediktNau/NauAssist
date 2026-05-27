@@ -183,7 +183,8 @@ public sealed class SendMessageHandlerTests
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             logger: NullLogger<AgentRunner>.Instance,
             clockContext: DefaultClock,
-            calendarContext: DefaultCalendarContext);
+            calendarContext: DefaultCalendarContext,
+            settings: new FakeSettingsRepo());
 
     private static SendMessageHandler BuildHandler(
         MessageRepository messages,

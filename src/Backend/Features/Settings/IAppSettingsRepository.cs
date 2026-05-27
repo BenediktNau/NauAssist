@@ -16,4 +16,10 @@ public interface IAppSettingsRepository
 
     /// <summary>Speichert Credentials und löscht in derselben Transaktion alle google_oauth-Einträge.</summary>
     Task SetGoogleCredentialsAsync(GoogleCredentials credentials, CancellationToken ct);
+
+    /// <summary>Lese den Persona-Memory-Text (max 400 Zeichen). Leer wenn nichts gesetzt.</summary>
+    Task<string> GetUserPersonaAsync(CancellationToken ct);
+
+    /// <summary>Speichert den Persona-Memory-Text. Wird hart auf 400 Zeichen gekürzt.</summary>
+    Task SetUserPersonaAsync(string text, CancellationToken ct);
 }

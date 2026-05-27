@@ -22,6 +22,8 @@ public sealed class AgentRunnerTests
         new FakeSettingsRepo(searchHorizon: 14),
         TimeZoneInfo.Utc);
 
+    private static readonly FakeSettingsRepo DefaultSettings = new FakeSettingsRepo();
+
     [Fact]
     public async Task Run_PureTextResponse_YieldsTokensAndDone()
     {
@@ -35,7 +37,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions()),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -63,7 +66,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions()),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -99,7 +103,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions()),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -132,7 +137,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions()),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -164,7 +170,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(
@@ -188,7 +195,8 @@ public sealed class AgentRunnerTests
             Options.Create(new AgentOptions()),
             NullLogger<AgentRunner>.Instance,
             DefaultClock,
-            DefaultCalendarContext);
+            DefaultCalendarContext,
+            DefaultSettings);
 
         var events = new List<AgentStreamEvent>();
         await foreach (var ev in runner.HandleAsync(

@@ -5,6 +5,7 @@ using NauAssist.Backend.Endpoints;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.AutonomousAgent;
+using NauAssist.Backend.Features.AutonomousAgent.Classification;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
 using NauAssist.Backend.Features.Calendar;
@@ -105,6 +106,8 @@ builder.Services.AddScoped<SourceCursorRepository>();
 builder.Services.AddHttpClient("Matrix");
 builder.Services.AddScoped<MatrixClient>();
 builder.Services.AddScoped<ISourceObserver, MatrixObserver>();
+builder.Services.AddScoped<IntentClassifier>();
+builder.Services.AddScoped<AutonomousReasoner>();
 builder.Services.AddSingleton<AutonomousAgentScheduler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentScheduler>());
 

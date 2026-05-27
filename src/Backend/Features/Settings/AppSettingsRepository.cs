@@ -19,6 +19,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeySearchHorizon   = "calendar.search_horizon_days";
     private const string KeyGoogleClientId     = "calendar.google.client_id";
     private const string KeyGoogleClientSecret = "calendar.google.client_secret";
+    private const string KeyUserPersona        = "agent.user_persona";
+    public const int UserPersonaMaxLength      = 400;
 
     private readonly AppDb _db;
 
@@ -205,5 +207,27 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             tx.Rollback();
             throw;
         }
+    }
+
+    public async Task<string> GetUserPersonaAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var raw = await conn.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT value FROM app_settings WHERE key = @key;",
+            new { key = KeyUserPersona },
+            cancellationToken: ct));
+        return raw ?? string.Empty;
+    }
+
+    public async Task SetUserPersonaAsync(string text, CancellationToken ct)
+    {
+        var trimmed = text ?? string.Empty;
+        if (trimmed.Length > UserPersonaMaxLength)
+        {
+            trimmed = trimmed[..UserPersonaMaxLength];
+        }
+
+        using var conn = _db.OpenConnection();
+        await UpsertAsync(conn, null, KeyUserPersona, trimmed, ct);
     }
 }

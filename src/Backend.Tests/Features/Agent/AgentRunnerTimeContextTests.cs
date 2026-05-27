@@ -36,7 +36,8 @@ public sealed class AgentRunnerTimeContextTests
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             logger: NullLogger<AgentRunner>.Instance,
             clockContext: clock,
-            calendarContext: calendarContext);
+            calendarContext: calendarContext,
+            settings: new FakeSettingsRepo());
 
         var history = new[]
         {

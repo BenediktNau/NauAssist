@@ -27,4 +27,6 @@ public sealed class FakeSettingsRepo : IAppSettingsRepository
         Task.FromResult<GoogleCredentials?>(null);
     public Task SetGoogleCredentialsAsync(GoogleCredentials c, CancellationToken ct) =>
         Task.CompletedTask;
+    public Task<string> GetUserPersonaAsync(CancellationToken ct) => Task.FromResult(string.Empty);
+    public Task SetUserPersonaAsync(string text, CancellationToken ct) => Task.CompletedTask;
 }

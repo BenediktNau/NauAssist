@@ -31,7 +31,8 @@ public sealed class AgentRunnerCalendarContextTests
             options: Options.Create(new AgentOptions { MaxToolIterations = 5 }),
             logger: NullLogger<AgentRunner>.Instance,
             clockContext: clock,
-            calendarContext: builder);
+            calendarContext: builder,
+            settings: new FakeSettingsRepo());
 
         return (runner, llm);
     }

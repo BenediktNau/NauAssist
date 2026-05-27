@@ -6,6 +6,7 @@ using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Time;
+using NauAssist.Backend.Features.Settings;
 
 namespace NauAssist.Backend.Features.Agent;
 
@@ -17,6 +18,7 @@ public sealed class AgentRunner
     private readonly ILogger<AgentRunner> _logger;
     private readonly ClockContext _clockContext;
     private readonly CalendarContextBuilder _calendarContext;
+    private readonly IAppSettingsRepository _settings;
 
     public AgentRunner(
         ILlmClient llm,
@@ -24,7 +26,8 @@ public sealed class AgentRunner
         IOptions<AgentOptions> options,
         ILogger<AgentRunner> logger,
         ClockContext clockContext,
-        CalendarContextBuilder calendarContext)
+        CalendarContextBuilder calendarContext,
+        IAppSettingsRepository settings)
     {
         _llm = llm;
         _tools = tools.ToDictionary(t => t.Name);
@@ -32,6 +35,7 @@ public sealed class AgentRunner
         _logger = logger;
         _clockContext = clockContext;
         _calendarContext = calendarContext;
+        _settings = settings;
     }
 
     public async IAsyncEnumerable<AgentStreamEvent> HandleAsync(
@@ -50,6 +54,14 @@ public sealed class AgentRunner
         if (!string.IsNullOrWhiteSpace(calendarBlock))
         {
             conversation.Add(new LlmMessage("system", calendarBlock));
+        }
+
+        var persona = await _settings.GetUserPersonaAsync(ct);
+        if (!string.IsNullOrWhiteSpace(persona))
+        {
+            conversation.Add(new LlmMessage(
+                "system",
+                $"[Was du über den User weißt — read-only Kontext aus dem autonomen Agenten]\n{persona}"));
         }
 
         conversation.AddRange(history);

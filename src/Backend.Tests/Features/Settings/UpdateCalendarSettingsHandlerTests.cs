@@ -123,5 +123,7 @@ public sealed class UpdateCalendarSettingsHandlerTests
             Task.FromResult(new OllamaUserSettings("http://localhost:11434", null, 16384, 0.3));
         public Task SetOllamaAsync(OllamaUserSettings s, CancellationToken ct) =>
             Task.CompletedTask;
+        public Task<string> GetUserPersonaAsync(CancellationToken ct) => Task.FromResult(string.Empty);
+        public Task SetUserPersonaAsync(string text, CancellationToken ct) => Task.CompletedTask;
     }
 }

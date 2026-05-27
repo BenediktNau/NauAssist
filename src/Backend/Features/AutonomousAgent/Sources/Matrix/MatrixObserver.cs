@@ -68,9 +68,11 @@ public sealed class MatrixObserver : ISourceObserver
 
                 foreach (var m in sync.Messages)
                 {
+                    // SourceRef = nur Raum-ID, damit Thread-Awareness im selben Raum greift.
+                    // Event-ID wandert später separat mit, wenn wir Reply-Threading machen.
                     all.Add(new RawSignal(
                         Source: SourceKey,
-                        SourceRef: $"{m.RoomId}/{m.EventId}",
+                        SourceRef: m.RoomId,
                         Sender: m.Sender,
                         Text: m.Body,
                         ReceivedAt: m.Timestamp));

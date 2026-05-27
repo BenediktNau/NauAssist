@@ -137,6 +137,39 @@ public sealed class SuggestionRepository
         return affected > 0;
     }
 
+    /// <summary>
+    /// Aktualisiert eine bestehende <c>pending</c>-Suggestion mit neuem Topic/Requester/QuotedText/Slots/Draft.
+    /// Wird vom Reasoner genutzt, wenn innerhalb 24 h im selben Thread weitergeschrieben wurde.
+    /// </summary>
+    public async Task<bool> UpdateContentAsync(
+        long id,
+        string? topic,
+        string? requester,
+        string? quotedText,
+        IReadOnlyList<SuggestionSlot> slots,
+        string draftReply,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var slotsJson = JsonSerializer.Serialize(slots, JsonOpts);
+        using var conn = _db.OpenConnection();
+        var affected = await conn.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE suggestions
+            SET topic = @topic,
+                requester = @requester,
+                quoted_text = @quotedText,
+                slots_json = @slotsJson,
+                draft_reply = @draftReply,
+                picked_slot = NULL,
+                updated_at = @now
+            WHERE id = @id AND status = 'pending';
+            """,
+            new { id, topic, requester, quotedText, slotsJson, draftReply, now = now.ToString("O") },
+            cancellationToken: ct));
+        return affected > 0;
+    }
+
     public async Task<bool> UpdateDraftAsync(long id, string draftReply, DateTimeOffset now, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();

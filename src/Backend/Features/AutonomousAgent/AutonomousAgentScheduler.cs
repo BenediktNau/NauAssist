@@ -65,13 +65,15 @@ public sealed class AutonomousAgentScheduler : BackgroundService
         if (Interlocked.CompareExchange(ref _tickInFlight, 1, 0) != 0)
         {
             _logger.LogWarning("Tick übersprungen ({Trigger}) — vorheriger Lauf noch aktiv.", trigger);
-            return new TickResult(Skipped: true, SignalCount: 0, ExpiredCount: 0, ErrorCount: 0);
+            return new TickResult(Skipped: true, SignalCount: 0, CreatedCount: 0, UpdatedCount: 0, ExpiredCount: 0, ErrorCount: 0);
         }
 
         var startedAt = _clock();
         var signalCount = 0;
         var errorCount = 0;
         var expiredCount = 0;
+        var createdCount = 0;
+        var updatedCount = 0;
 
         try
         {
@@ -80,25 +82,39 @@ public sealed class AutonomousAgentScheduler : BackgroundService
             var observers = sp.GetServices<ISourceObserver>().ToList();
             var audit = sp.GetRequiredService<AuditLogRepository>();
             var suggestions = sp.GetRequiredService<SuggestionRepository>();
+            var reasoner = sp.GetRequiredService<AutonomousReasoner>();
 
+            var allSignals = new List<RawSignal>();
             foreach (var observer in observers)
             {
                 try
                 {
                     var signals = await observer.PollAsync(ct);
                     signalCount += signals.Count;
-                    // Phase 1: noch kein Classifier — Signale verworfen. Erst ab Phase 3 verarbeitet.
-                    if (signals.Count > 0)
-                    {
-                        _logger.LogDebug(
-                            "Observer {Source} lieferte {Count} Signale (noch keine Classifier-Pipeline).",
-                            observer.Source, signals.Count);
-                    }
+                    allSignals.AddRange(signals);
                 }
                 catch (Exception ex)
                 {
                     errorCount++;
                     _logger.LogWarning(ex, "Observer {Source} ist mit einer Exception abgebrochen.", observer.Source);
+                }
+            }
+
+            if (allSignals.Count > 0)
+            {
+                try
+                {
+                    var outcome = await reasoner.ProcessAsync(allSignals, ct);
+                    createdCount = outcome.Created;
+                    updatedCount = outcome.Updated;
+                    _logger.LogDebug(
+                        "Reasoner: {Classified} klassifiziert, {Created} neu, {Updated} aktualisiert, {Persona} Persona-Updates.",
+                        outcome.Classified, outcome.Created, outcome.Updated, outcome.PersonaUpdates);
+                }
+                catch (Exception ex)
+                {
+                    errorCount++;
+                    _logger.LogWarning(ex, "Reasoner hat eine Exception geworfen — Signale dieses Ticks verloren.");
                 }
             }
 
@@ -108,6 +124,8 @@ public sealed class AutonomousAgentScheduler : BackgroundService
             var result = new TickResult(
                 Skipped: false,
                 SignalCount: signalCount,
+                CreatedCount: createdCount,
+                UpdatedCount: updatedCount,
                 ExpiredCount: expiredCount,
                 ErrorCount: errorCount);
 
@@ -125,8 +143,8 @@ public sealed class AutonomousAgentScheduler : BackgroundService
                 CreatedAt: startedAt), ct);
 
             _logger.LogInformation(
-                "Autonomer Tick fertig ({Trigger}): {Observers} Observer, {Signals} Signale, {Expired} expired, {Errors} Fehler.",
-                trigger, observers.Count, signalCount, expiredCount, errorCount);
+                "Autonomer Tick fertig ({Trigger}): {Observers} Observer, {Signals} Signale, {Created} neu, {Updated} aktualisiert, {Expired} expired, {Errors} Fehler.",
+                trigger, observers.Count, signalCount, createdCount, updatedCount, expiredCount, errorCount);
 
             return result;
         }
@@ -137,7 +155,13 @@ public sealed class AutonomousAgentScheduler : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unerwarteter Fehler im autonomen Tick.");
-            return new TickResult(Skipped: false, SignalCount: signalCount, ExpiredCount: expiredCount, ErrorCount: errorCount + 1);
+            return new TickResult(
+                Skipped: false,
+                SignalCount: signalCount,
+                CreatedCount: createdCount,
+                UpdatedCount: updatedCount,
+                ExpiredCount: expiredCount,
+                ErrorCount: errorCount + 1);
         }
         finally
         {
@@ -164,7 +188,13 @@ public enum TickTrigger
     Manual,
 }
 
-public sealed record TickResult(bool Skipped, int SignalCount, int ExpiredCount, int ErrorCount);
+public sealed record TickResult(
+    bool Skipped,
+    int SignalCount,
+    int CreatedCount,
+    int UpdatedCount,
+    int ExpiredCount,
+    int ErrorCount);
 
 internal static class AuditToolNames
 {
