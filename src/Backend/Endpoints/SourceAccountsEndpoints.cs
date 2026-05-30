@@ -1,7 +1,7 @@
 using System.Text.Json;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Imap;
-using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.WhatsApp;
 
 namespace NauAssist.Backend.Endpoints;
 
@@ -37,13 +37,13 @@ public static class SourceAccountsEndpoints
             try
             {
                 // Kind-spezifische Validierung
-                if (body.Kind == MatrixObserver.SourceKey)
-                {
-                    _ = MatrixCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
-                }
-                else if (body.Kind == ImapObserver.SourceKey)
+                if (body.Kind == ImapObserver.SourceKey)
                 {
                     _ = ImapCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
+                }
+                else if (body.Kind == WhatsAppObserver.SourceKey)
+                {
+                    _ = WhatsAppCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
                 }
             }
             catch (ArgumentException ex)
@@ -90,32 +90,6 @@ public static class SourceAccountsEndpoints
             return ok ? Results.NoContent() : Results.NotFound();
         });
 
-        // Matrix-Hilfs-Endpoint: Räume listen anhand inline-übergebener Credentials.
-        // Wird genutzt, wenn der User gerade dabei ist einen neuen Account anzulegen.
-        group.MapPost("/matrix/list-rooms", async (
-            ListMatrixRoomsPayload body,
-            MatrixClient client,
-            CancellationToken ct) => await ListMatrixRoomsAsync(
-                () => Task.FromResult(JsonSerializer.Serialize(body.Credentials)),
-                client,
-                ct));
-
-        // Räume neu laden für einen bereits gespeicherten Account.
-        group.MapGet("/{id:long}/matrix/rooms", async (
-            long id,
-            SourceAccountRepository repo,
-            MatrixClient client,
-            CancellationToken ct) =>
-        {
-            var account = await repo.GetAsync(id, ct);
-            if (account is null) return Results.NotFound();
-            if (account.Kind != MatrixObserver.SourceKey)
-            {
-                return Results.BadRequest(new { error = "account_not_matrix" });
-            }
-            return await ListMatrixRoomsAsync(() => Task.FromResult(account.CredentialsJson), client, ct);
-        });
-
         // IMAP-Folder listen (inline Credentials beim Anlegen).
         group.MapPost("/imap/list-folders", async (
             ListImapFoldersPayload body,
@@ -144,6 +118,107 @@ public static class SourceAccountsEndpoints
         return app;
     }
 
+    /// <summary>
+    /// WhatsApp-spezifische Helfer (QR-Pairing-Flow + Chat-Listing). Wird nur gemappt,
+    /// wenn <c>AutonomousAgent:WhatsApp:Enabled</c> — dann ist auch der Sidecar-Client registriert.
+    /// </summary>
+    public static IEndpointRouteBuilder MapWhatsAppSourceEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/source-accounts");
+
+        // Neue Session starten (oder bestehende renutzen) → liefert sessionId + state.
+        group.MapPost("/whatsapp/start", async (
+            StartWhatsAppPayload? body,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await client.CreateSessionAsync(body?.SessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Pairing-Status pollen (QR-Data-URL + Telefonnummer sobald verbunden).
+        group.MapGet("/whatsapp/session/{sessionId}", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var status = await client.GetSessionAsync(sessionId, ct);
+                return status is null ? Results.NotFound() : Results.Ok(status);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Chats für die Allowlist-Auswahl (inline, während des Anlegens).
+        group.MapGet("/whatsapp/session/{sessionId}/chats", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await client.ListChatsAsync(sessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Chats für einen bereits gespeicherten Account neu laden.
+        group.MapGet("/{id:long}/whatsapp/chats", async (
+            long id,
+            SourceAccountRepository repo,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            var account = await repo.GetAsync(id, ct);
+            if (account is null) return Results.NotFound();
+            if (account.Kind != WhatsAppObserver.SourceKey)
+            {
+                return Results.BadRequest(new { error = "account_not_whatsapp" });
+            }
+            try
+            {
+                var creds = WhatsAppCredentials.Parse(account.CredentialsJson);
+                return Results.Ok(await client.ListChatsAsync(creds.SessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Sidecar-Session beenden (Logout + Auth-State löschen). Vom UI beim Account-Löschen.
+        group.MapDelete("/whatsapp/session/{sessionId}", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await client.DeleteSessionAsync(sessionId, ct);
+                return Results.NoContent();
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        return app;
+    }
+
     private static async Task<IResult> ListImapFoldersAsync(
         Func<Task<string>> credentialsJsonProvider,
         ImapClient client,
@@ -163,35 +238,6 @@ public static class SourceAccountsEndpoints
         catch (Exception ex)
         {
             return Results.BadRequest(new { error = "imap_request_failed", detail = ex.Message });
-        }
-    }
-
-    private static async Task<IResult> ListMatrixRoomsAsync(
-        Func<Task<string>> credentialsJsonProvider,
-        MatrixClient client,
-        CancellationToken ct)
-    {
-        try
-        {
-            var credentialsJson = await credentialsJsonProvider();
-            var creds = MatrixCredentials.Parse(credentialsJson);
-            var roomIds = await client.ListJoinedRoomsAsync(creds, ct);
-
-            var rooms = new List<MatrixRoomDto>();
-            foreach (var roomId in roomIds)
-            {
-                var name = await client.GetRoomNameAsync(creds, roomId, ct);
-                rooms.Add(new MatrixRoomDto(roomId, name));
-            }
-            return Results.Ok(rooms);
-        }
-        catch (ArgumentException ex)
-        {
-            return Results.BadRequest(new { error = ex.Message });
-        }
-        catch (HttpRequestException ex)
-        {
-            return Results.BadRequest(new { error = "matrix_request_failed", detail = ex.Message });
         }
     }
 
@@ -216,15 +262,7 @@ public static class SourceAccountsEndpoints
         try
         {
             using var doc = JsonDocument.Parse(credentialsJson);
-            if (kind == MatrixObserver.SourceKey)
-            {
-                if (doc.RootElement.TryGetProperty("homeserverUrl", out var hs))
-                    result["homeserverUrl"] = hs.GetString();
-                if (doc.RootElement.TryGetProperty("userId", out var uid))
-                    result["userId"] = uid.GetString();
-                result["accessToken"] = "***";
-            }
-            else if (kind == ImapObserver.SourceKey)
+            if (kind == ImapObserver.SourceKey)
             {
                 if (doc.RootElement.TryGetProperty("imapHost", out var ih))
                     result["imapHost"] = ih.GetString();
@@ -233,6 +271,14 @@ public static class SourceAccountsEndpoints
                 if (doc.RootElement.TryGetProperty("username", out var un))
                     result["username"] = un.GetString();
                 result["password"] = "***";
+            }
+            else if (kind == WhatsAppObserver.SourceKey)
+            {
+                // Keine Geheimnisse in den Credentials — Auth-State liegt im Sidecar.
+                if (doc.RootElement.TryGetProperty("sessionId", out var sid))
+                    result["sessionId"] = sid.GetString();
+                if (doc.RootElement.TryGetProperty("phoneLabel", out var pl))
+                    result["phoneLabel"] = pl.GetString();
             }
         }
         catch (JsonException)
@@ -254,8 +300,8 @@ public static class SourceAccountsEndpoints
         IReadOnlyList<string>? Allowlist,
         bool? Enabled);
 
-    private sealed record ListMatrixRoomsPayload(Dictionary<string, object> Credentials);
     private sealed record ListImapFoldersPayload(Dictionary<string, object> Credentials);
+    private sealed record StartWhatsAppPayload(string? SessionId);
 
     private sealed record SourceAccountDto(
         long Id,
@@ -266,6 +312,4 @@ public static class SourceAccountsEndpoints
         bool Enabled,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
-
-    private sealed record MatrixRoomDto(string RoomId, string? DisplayName);
 }

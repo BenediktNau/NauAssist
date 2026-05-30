@@ -42,7 +42,7 @@ export function PersonaSection({ anchor }: PersonaSectionProps) {
     <div id={anchor}>
       <div className="mb-6 pt-2">
         <div className="mb-4 flex items-center gap-3.5">
-          <span className="font-mono text-[13px] font-bold text-nau-accent">04</span>
+          <span className="font-mono text-[13px] font-bold text-nau-accent">03</span>
           <span className="h-px w-8 bg-nau-line" />
           <span className="font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
             PERSONA-MEMORY

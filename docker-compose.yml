@@ -1,0 +1,33 @@
+services:
+  nauassist:
+    build: .
+    image: ghcr.io/benediktnau/nauassist:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - nauassist-data:/app/data
+    environment:
+      - Time__Zone=Europe/Berlin
+      # WhatsApp ist opt-in. Standard: aus → kein Feature, keine Endpoints, keine UI-Section.
+      - AutonomousAgent__WhatsApp__Enabled=${WHATSAPP_ENABLED:-false}
+      - AutonomousAgent__WhatsApp__SidecarBaseUrl=http://nauassist-wa:3000
+      - AutonomousAgent__WhatsApp__SharedSecret=${WHATSAPP_SHARED_SECRET:-}
+    restart: unless-stopped
+
+  # Startet NUR mit aktivem Compose-Profil "whatsapp" (siehe .env / COMPOSE_PROFILES).
+  nauassist-wa:
+    build: ./sidecar
+    image: ghcr.io/benediktnau/nauassist-wa:latest
+    profiles: ["whatsapp"]
+    volumes:
+      - nauassist-wa:/data
+    environment:
+      - SIDECAR_TOKEN=${WHATSAPP_SHARED_SECRET:-}
+      - PORT=3000
+    expose:
+      - "3000" # nur internes Compose-Netz, kein Host-Port
+    restart: unless-stopped
+
+volumes:
+  nauassist-data:
+  nauassist-wa:

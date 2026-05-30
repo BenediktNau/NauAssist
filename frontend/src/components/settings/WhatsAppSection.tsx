@@ -1,22 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  createMatrixAccount,
+  createWhatsAppAccount,
   deleteSourceAccount,
-  listMatrixRooms,
-  listMatrixRoomsForAccount,
+  deleteWhatsAppSession,
+  getWhatsAppSession,
   listSourceAccounts,
+  listWhatsAppChats,
+  listWhatsAppChatsForAccount,
+  startWhatsAppSession,
   updateSourceAccount,
-  type MatrixCredentialsInput,
-  type MatrixRoomDto,
   type SourceAccountDto,
+  type WhatsAppChatDto,
 } from "@/api/source-accounts";
 
-interface MatrixSectionProps {
-  /** ID-Anchor für die Side-Nav. */
+interface WhatsAppSectionProps {
   anchor: string;
 }
 
-export function MatrixSection({ anchor }: MatrixSectionProps) {
+export function WhatsAppSection({ anchor }: WhatsAppSectionProps) {
   const [accounts, setAccounts] = useState<SourceAccountDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +27,7 @@ export function MatrixSection({ anchor }: MatrixSectionProps) {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSourceAccounts("matrix");
-      setAccounts(data);
+      setAccounts(await listSourceAccounts("whatsapp"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -40,13 +40,12 @@ export function MatrixSection({ anchor }: MatrixSectionProps) {
   }, []);
 
   return (
-    <div id={anchor}>
-      <SectionHead n={3} label="MATRIX" title="Chat-Accounts." />
+    <div id={anchor} className="mt-14">
+      <SectionHead n={6} label="WHATSAPP" title="WhatsApp-Nummer." />
       <p className="mb-4 max-w-[640px] font-sans text-sm leading-relaxed text-nau-fg-dim">
-        Der autonome Agent liest alle 20 min die freigegebenen Räume und schlägt
-        passende Termin-Slots vor. Für verschlüsselte Räume empfiehlt sich Pantalaimon
-        als Proxy &mdash; die Homeserver-URL zeigt dann auf Pantalaimon statt direkt
-        auf den Matrix-Server.
+        Verbinde eine WhatsApp-Nummer per QR-Scan. Der Agent liest die freigegebenen
+        Chats und schlägt passende Termin-Slots vor. Inoffizielle Anbindung &mdash; nutze
+        besser eine <strong>Zweitnummer</strong>, nicht deine private Hauptnummer.
       </p>
 
       {error && (
@@ -62,18 +61,14 @@ export function MatrixSection({ anchor }: MatrixSectionProps) {
       ) : (
         <ul className="flex flex-col gap-3">
           {accounts.map((a) => (
-            <AccountCard
-              key={a.id}
-              account={a}
-              onChanged={reload}
-            />
+            <WaAccountCard key={a.id} account={a} onChanged={reload} />
           ))}
         </ul>
       )}
 
       <div className="mt-5">
         {adding ? (
-          <AddAccountForm
+          <AddWhatsAppForm
             onCreated={async () => {
               setAdding(false);
               await reload();
@@ -86,7 +81,7 @@ export function MatrixSection({ anchor }: MatrixSectionProps) {
             onClick={() => setAdding(true)}
             className="min-h-11 cursor-pointer border border-nau-line bg-transparent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent"
           >
-            + ACCOUNT HINZUFÜGEN
+            + NUMMER VERBINDEN
           </button>
         )}
       </div>
@@ -102,9 +97,7 @@ function SectionHead({ n, label, title }: { n: number; label: string; title: str
           {String(n).padStart(2, "0")}
         </span>
         <span className="h-px w-8 bg-nau-line" />
-        <span className="font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
-          {label}
-        </span>
+        <span className="font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">{label}</span>
       </div>
       <h2 className="m-0 mb-2 font-sans text-3xl font-normal leading-tight tracking-tight text-nau-fg">
         {title}
@@ -113,41 +106,37 @@ function SectionHead({ n, label, title }: { n: number; label: string; title: str
   );
 }
 
-interface AccountCardProps {
+interface WaAccountCardProps {
   account: SourceAccountDto;
   onChanged: () => Promise<void>;
 }
 
-function AccountCard({ account, onChanged }: AccountCardProps) {
-  const [rooms, setRooms] = useState<MatrixRoomDto[] | null>(null);
-  const [loadingRooms, setLoadingRooms] = useState(false);
+function WaAccountCard({ account, onChanged }: WaAccountCardProps) {
+  const [chats, setChats] = useState<WhatsAppChatDto[] | null>(null);
+  const [draftAllowlist, setDraftAllowlist] = useState<string[]>(account.allowlist);
+  const [loadingChats, setLoadingChats] = useState(false);
   const [savingAllowlist, setSavingAllowlist] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draftAllowlist, setDraftAllowlist] = useState<string[]>(account.allowlist);
 
-  useEffect(() => {
-    setDraftAllowlist(account.allowlist);
-  }, [account.allowlist]);
+  useEffect(() => setDraftAllowlist(account.allowlist), [account.allowlist]);
 
-  const loadRooms = async () => {
-    setLoadingRooms(true);
+  const loadChats = async () => {
+    setLoadingChats(true);
     setError(null);
     try {
-      const data = await listMatrixRoomsForAccount(account.id);
-      setRooms(data);
+      setChats(await listWhatsAppChatsForAccount(account.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoadingRooms(false);
+      setLoadingChats(false);
     }
   };
 
-  const toggle = (roomId: string) => {
+  const toggle = (chatId: string) =>
     setDraftAllowlist((prev) =>
-      prev.includes(roomId) ? prev.filter((r) => r !== roomId) : [...prev, roomId],
+      prev.includes(chatId) ? prev.filter((c) => c !== chatId) : [...prev, chatId],
     );
-  };
 
   const saveAllowlist = async () => {
     setSavingAllowlist(true);
@@ -172,30 +161,31 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
     }
   };
 
-  const removeAccount = async () => {
+  const remove = async () => {
     if (!confirm(`Account "${account.displayName}" wirklich löschen?`)) return;
     setError(null);
     try {
+      const sessionId = account.credentials.sessionId;
       await deleteSourceAccount(account.id);
+      if (sessionId) {
+        await deleteWhatsAppSession(sessionId).catch(() => {});
+      }
       await onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const allowlistDirty =
-    draftAllowlist.length !== account.allowlist.length
-    || draftAllowlist.some((r) => !account.allowlist.includes(r));
+  const dirty =
+    draftAllowlist.length !== account.allowlist.length ||
+    draftAllowlist.some((c) => !account.allowlist.includes(c));
 
   return (
     <li className="border border-nau-line bg-white/[0.02] p-4">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="font-sans text-base font-medium text-nau-fg">{account.displayName}</span>
         <span className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
-          {account.credentials.homeserverUrl ?? "—"}
-        </span>
-        <span className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
-          {account.credentials.userId ?? "—"}
+          {account.credentials.phoneLabel ?? "—"}
         </span>
         <span
           className={
@@ -208,7 +198,7 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
       </div>
 
       <div className="mt-2 font-mono text-[11px] tracking-mono text-nau-fg-dim">
-        // {account.allowlist.length} Raum/Räume freigegeben
+        // {account.allowlist.length} Chat(s) freigegeben
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -217,7 +207,7 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
           onClick={() => setExpanded((v) => !v)}
           className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent"
         >
-          {expanded ? "SCHLIESSEN" : "RÄUME VERWALTEN"}
+          {expanded ? "SCHLIESSEN" : "CHATS VERWALTEN"}
         </button>
         <button
           type="button"
@@ -228,7 +218,7 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
         </button>
         <button
           type="button"
-          onClick={removeAccount}
+          onClick={remove}
           className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:border-nau-danger hover:text-nau-danger"
         >
           LÖSCHEN
@@ -244,13 +234,13 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={loadRooms}
-              disabled={loadingRooms}
+              onClick={loadChats}
+              disabled={loadingChats}
               className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-50"
             >
-              {loadingRooms ? "LADE …" : rooms === null ? "RÄUME LADEN" : "AKTUALISIEREN"}
+              {loadingChats ? "LADE …" : chats === null ? "CHATS LADEN" : "AKTUALISIEREN"}
             </button>
-            {allowlistDirty && (
+            {dirty && (
               <button
                 type="button"
                 onClick={saveAllowlist}
@@ -262,25 +252,23 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
             )}
           </div>
 
-          {rooms && rooms.length > 0 && (
+          {chats && chats.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1.5">
-              {rooms.map((r) => {
-                const active = draftAllowlist.includes(r.roomId);
+              {chats.map((c) => {
+                const active = draftAllowlist.includes(c.chatId);
                 return (
-                  <li key={r.roomId}>
+                  <li key={c.chatId}>
                     <label className="flex cursor-pointer items-start gap-3 py-1">
                       <input
                         type="checkbox"
                         checked={active}
-                        onChange={() => toggle(r.roomId)}
+                        onChange={() => toggle(c.chatId)}
                         className="mt-1 cursor-pointer"
                       />
                       <span className="flex flex-col">
-                        <span className="font-sans text-sm text-nau-fg">
-                          {r.displayName ?? r.roomId}
-                        </span>
+                        <span className="font-sans text-sm text-nau-fg">{c.name || c.chatId}</span>
                         <span className="font-mono text-[10px] tracking-mono text-nau-fg-dim">
-                          {r.roomId}
+                          {c.chatId}
                         </span>
                       </span>
                     </label>
@@ -290,9 +278,9 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
             </ul>
           )}
 
-          {rooms && rooms.length === 0 && (
+          {chats && chats.length === 0 && (
             <div className="mt-3 font-mono text-[11px] tracking-mono text-nau-fg-dim">
-              // Keine Räume gefunden.
+              // Keine Chats gefunden. Schreib der Nummer einmal, dann neu laden.
             </div>
           )}
         </div>
@@ -301,34 +289,67 @@ function AccountCard({ account, onChanged }: AccountCardProps) {
   );
 }
 
-interface AddAccountFormProps {
+interface AddWhatsAppFormProps {
   onCreated: () => Promise<void>;
   onCancel: () => void;
 }
 
-function AddAccountForm({ onCreated, onCancel }: AddAccountFormProps) {
-  const [displayName, setDisplayName] = useState("");
-  const [homeserverUrl, setHomeserverUrl] = useState("");
-  const [userId, setUserId] = useState("");
-  const [accessToken, setAccessToken] = useState("");
-
-  const [rooms, setRooms] = useState<MatrixRoomDto[] | null>(null);
+function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
+  const [step, setStep] = useState<"idle" | "pairing" | "connected">("idle");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [chats, setChats] = useState<WhatsAppChatDto[] | null>(null);
   const [allowlist, setAllowlist] = useState<string[]>([]);
+  const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const creds = (): MatrixCredentialsInput => ({
-    homeserverUrl: homeserverUrl.trim(),
-    userId: userId.trim(),
-    accessToken: accessToken.trim(),
-  });
+  const pollRef = useRef<number | null>(null);
+  const savedRef = useRef(false);
+
+  const stopPoll = () => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  // Beim Verlassen ohne Speichern: angefangene Session im Sidecar verwerfen.
+  useEffect(() => {
+    return () => {
+      stopPoll();
+      if (sessionId && !savedRef.current) {
+        void deleteWhatsAppSession(sessionId).catch(() => {});
+      }
+    };
+  }, [sessionId]);
 
   const connect = async () => {
     setBusy(true);
     setError(null);
     try {
-      const data = await listMatrixRooms(creds());
-      setRooms(data);
+      const s = await startWhatsAppSession();
+      setSessionId(s.sessionId);
+      setStep("pairing");
+      stopPoll();
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const status = await getWhatsAppSession(s.sessionId);
+          setQr(status.qr);
+          if (status.state === "connected") {
+            stopPoll();
+            setPhone(status.phone);
+            setStep("connected");
+            setChats(await listWhatsAppChats(s.sessionId));
+          } else if (status.state === "loggedOut") {
+            stopPoll();
+            setError("Session abgemeldet — bitte erneut verbinden.");
+          }
+        } catch {
+          // transient — nächster Tick versucht es erneut
+        }
+      }, 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -336,11 +357,22 @@ function AddAccountForm({ onCreated, onCancel }: AddAccountFormProps) {
     }
   };
 
+  const toggle = (chatId: string) =>
+    setAllowlist((prev) =>
+      prev.includes(chatId) ? prev.filter((c) => c !== chatId) : [...prev, chatId],
+    );
+
   const save = async () => {
+    if (!sessionId) return;
     setBusy(true);
     setError(null);
     try {
-      await createMatrixAccount(displayName.trim() || userId.trim() || "Matrix", creds(), allowlist);
+      await createWhatsAppAccount(
+        displayName.trim() || phone || "WhatsApp",
+        { sessionId, phoneLabel: phone ?? "" },
+        allowlist,
+      );
+      savedRef.current = true;
       await onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -349,69 +381,93 @@ function AddAccountForm({ onCreated, onCancel }: AddAccountFormProps) {
     }
   };
 
-  const toggle = (roomId: string) =>
-    setAllowlist((prev) =>
-      prev.includes(roomId) ? prev.filter((r) => r !== roomId) : [...prev, roomId],
-    );
-
   return (
     <div className="border border-nau-line bg-white/[0.02] p-4">
       <div className="mb-3 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
-        // NEUER MATRIX-ACCOUNT
-      </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <FormRow label="Anzeigename">
-          <input
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="z.B. Privat-Element"
-            className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-          />
-        </FormRow>
-        <FormRow label="Homeserver / Pantalaimon">
-          <input
-            value={homeserverUrl}
-            onChange={(e) => setHomeserverUrl(e.target.value)}
-            placeholder="https://matrix.example.org"
-            className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-          />
-        </FormRow>
-        <FormRow label="User-ID">
-          <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="@nau-agent:example.org"
-            className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-          />
-        </FormRow>
-        <FormRow label="Access-Token">
-          <input
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-            type="password"
-            placeholder="syt_…"
-            className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg"
-          />
-        </FormRow>
+        // NEUE WHATSAPP-NUMMER
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {step === "idle" && (
         <button
           type="button"
           onClick={connect}
-          disabled={busy || !homeserverUrl || !accessToken}
+          disabled={busy}
           className="min-h-11 cursor-pointer border border-nau-line bg-transparent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-40"
         >
-          {busy && rooms === null ? "VERBINDE …" : "VERBINDEN & RÄUME LADEN"}
+          {busy ? "STARTE …" : "VERBINDEN & QR ANZEIGEN"}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="min-h-11 cursor-pointer border border-nau-line bg-transparent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:text-nau-fg"
-        >
-          ABBRECHEN
-        </button>
-        {rooms !== null && (
+      )}
+
+      {step === "pairing" && (
+        <div className="flex flex-col items-start gap-3">
+          <div className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
+            // Öffne WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät verknüpfen
+          </div>
+          {qr ? (
+            <img
+              src={qr}
+              alt="WhatsApp QR-Code"
+              className="h-56 w-56 border border-nau-line bg-white p-2"
+            />
+          ) : (
+            <div className="flex h-56 w-56 items-center justify-center border border-dashed border-nau-line font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
+              // WARTE AUF QR …
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === "connected" && (
+        <div className="flex flex-col gap-3">
+          <div className="font-mono text-[11px] tracking-mono text-nau-accent">
+            ● VERBUNDEN {phone ? `· ${phone}` : ""}
+          </div>
+          <FormRow label="Anzeigename">
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="z.B. Agent-Nummer"
+              className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg lg:max-w-[360px]"
+            />
+          </FormRow>
+
+          <div className="border-t border-nau-line pt-3">
+            <div className="mb-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
+              // CHATS ({chats?.length ?? 0}) — wähle, was der Agent beobachten darf
+            </div>
+            {chats && chats.length > 0 ? (
+              <ul className="flex flex-col gap-1.5">
+                {chats.map((c) => (
+                  <li key={c.chatId}>
+                    <label className="flex cursor-pointer items-start gap-3 py-1">
+                      <input
+                        type="checkbox"
+                        checked={allowlist.includes(c.chatId)}
+                        onChange={() => toggle(c.chatId)}
+                        className="mt-1 cursor-pointer"
+                      />
+                      <span className="flex flex-col">
+                        <span className="font-sans text-sm text-nau-fg">{c.name || c.chatId}</span>
+                        <span className="font-mono text-[10px] tracking-mono text-nau-fg-dim">
+                          {c.chatId}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
+                // Noch keine Chats sichtbar. Schreib der Nummer einmal — sie erscheinen
+                dann automatisch (du kannst auch ohne Auswahl speichern und später ergänzen).
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {step === "connected" && (
           <button
             type="button"
             onClick={save}
@@ -421,46 +477,17 @@ function AddAccountForm({ onCreated, onCancel }: AddAccountFormProps) {
             {busy ? "SPEICHERE …" : "SPEICHERN"}
           </button>
         )}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-11 cursor-pointer border border-nau-line bg-transparent px-4 py-2.5 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:text-nau-fg"
+        >
+          ABBRECHEN
+        </button>
       </div>
 
       {error && (
         <div className="mt-3 font-mono text-[11px] tracking-mono text-nau-danger">// {error}</div>
-      )}
-
-      {rooms !== null && (
-        <div className="mt-4 border-t border-nau-line pt-3">
-          <div className="mb-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
-            // RÄUME ({rooms.length}) — wähle, was der Agent beobachten darf
-          </div>
-          {rooms.length === 0 ? (
-            <div className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
-              // Keine Räume gefunden. Den Agent-Account in Räume einladen und neu laden.
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {rooms.map((r) => (
-                <li key={r.roomId}>
-                  <label className="flex cursor-pointer items-start gap-3 py-1">
-                    <input
-                      type="checkbox"
-                      checked={allowlist.includes(r.roomId)}
-                      onChange={() => toggle(r.roomId)}
-                      className="mt-1 cursor-pointer"
-                    />
-                    <span className="flex flex-col">
-                      <span className="font-sans text-sm text-nau-fg">
-                        {r.displayName ?? r.roomId}
-                      </span>
-                      <span className="font-mono text-[10px] tracking-mono text-nau-fg-dim">
-                        {r.roomId}
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       )}
     </div>
   );
