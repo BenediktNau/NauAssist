@@ -10,6 +10,7 @@ using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Imap;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.WhatsApp;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
@@ -112,6 +113,29 @@ builder.Services.AddScoped<ISourceSender, MatrixSender>();
 builder.Services.AddScoped<ImapClient>();
 builder.Services.AddScoped<ISourceObserver, ImapObserver>();
 builder.Services.AddScoped<ISourceSender, SmtpSender>();
+
+// WhatsApp (opt-in): nur registrieren, wenn aktiviert. Options werden immer gebunden,
+// damit der Capabilities-Endpoint den Enabled-Status lesen kann.
+builder.Services.Configure<WhatsAppOptions>(
+    builder.Configuration.GetSection("AutonomousAgent:WhatsApp"));
+var whatsAppOptions = builder.Configuration
+    .GetSection("AutonomousAgent:WhatsApp").Get<WhatsAppOptions>() ?? new WhatsAppOptions();
+if (whatsAppOptions.Enabled)
+{
+    builder.Services.AddHttpClient("WhatsApp", client =>
+    {
+        client.BaseAddress = new Uri(whatsAppOptions.SidecarBaseUrl.TrimEnd('/') + "/");
+        if (!string.IsNullOrEmpty(whatsAppOptions.SharedSecret))
+        {
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", whatsAppOptions.SharedSecret);
+        }
+    });
+    builder.Services.AddScoped<IWhatsAppSidecarClient, WhatsAppSidecarClient>();
+    builder.Services.AddScoped<ISourceObserver, WhatsAppObserver>();
+    builder.Services.AddScoped<ISourceSender, WhatsAppSender>();
+}
+
 builder.Services.AddScoped<IntentClassifier>();
 builder.Services.AddScoped<DraftReplyGenerator>();
 builder.Services.AddScoped<AutonomousReasoner>();
