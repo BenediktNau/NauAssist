@@ -1,7 +1,6 @@
 using System.Text.Json;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Imap;
-using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.WhatsApp;
 
 namespace NauAssist.Backend.Endpoints;
@@ -38,11 +37,7 @@ public static class SourceAccountsEndpoints
             try
             {
                 // Kind-spezifische Validierung
-                if (body.Kind == MatrixObserver.SourceKey)
-                {
-                    _ = MatrixCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
-                }
-                else if (body.Kind == ImapObserver.SourceKey)
+                if (body.Kind == ImapObserver.SourceKey)
                 {
                     _ = ImapCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
                 }
@@ -93,32 +88,6 @@ public static class SourceAccountsEndpoints
         {
             var ok = await repo.DeleteAsync(id, ct);
             return ok ? Results.NoContent() : Results.NotFound();
-        });
-
-        // Matrix-Hilfs-Endpoint: Räume listen anhand inline-übergebener Credentials.
-        // Wird genutzt, wenn der User gerade dabei ist einen neuen Account anzulegen.
-        group.MapPost("/matrix/list-rooms", async (
-            ListMatrixRoomsPayload body,
-            MatrixClient client,
-            CancellationToken ct) => await ListMatrixRoomsAsync(
-                () => Task.FromResult(JsonSerializer.Serialize(body.Credentials)),
-                client,
-                ct));
-
-        // Räume neu laden für einen bereits gespeicherten Account.
-        group.MapGet("/{id:long}/matrix/rooms", async (
-            long id,
-            SourceAccountRepository repo,
-            MatrixClient client,
-            CancellationToken ct) =>
-        {
-            var account = await repo.GetAsync(id, ct);
-            if (account is null) return Results.NotFound();
-            if (account.Kind != MatrixObserver.SourceKey)
-            {
-                return Results.BadRequest(new { error = "account_not_matrix" });
-            }
-            return await ListMatrixRoomsAsync(() => Task.FromResult(account.CredentialsJson), client, ct);
         });
 
         // IMAP-Folder listen (inline Credentials beim Anlegen).
@@ -272,35 +241,6 @@ public static class SourceAccountsEndpoints
         }
     }
 
-    private static async Task<IResult> ListMatrixRoomsAsync(
-        Func<Task<string>> credentialsJsonProvider,
-        MatrixClient client,
-        CancellationToken ct)
-    {
-        try
-        {
-            var credentialsJson = await credentialsJsonProvider();
-            var creds = MatrixCredentials.Parse(credentialsJson);
-            var roomIds = await client.ListJoinedRoomsAsync(creds, ct);
-
-            var rooms = new List<MatrixRoomDto>();
-            foreach (var roomId in roomIds)
-            {
-                var name = await client.GetRoomNameAsync(creds, roomId, ct);
-                rooms.Add(new MatrixRoomDto(roomId, name));
-            }
-            return Results.Ok(rooms);
-        }
-        catch (ArgumentException ex)
-        {
-            return Results.BadRequest(new { error = ex.Message });
-        }
-        catch (HttpRequestException ex)
-        {
-            return Results.BadRequest(new { error = "matrix_request_failed", detail = ex.Message });
-        }
-    }
-
     private static SourceAccountDto ToDto(SourceAccount a)
     {
         var credentialsRedacted = RedactCredentials(a.Kind, a.CredentialsJson);
@@ -322,15 +262,7 @@ public static class SourceAccountsEndpoints
         try
         {
             using var doc = JsonDocument.Parse(credentialsJson);
-            if (kind == MatrixObserver.SourceKey)
-            {
-                if (doc.RootElement.TryGetProperty("homeserverUrl", out var hs))
-                    result["homeserverUrl"] = hs.GetString();
-                if (doc.RootElement.TryGetProperty("userId", out var uid))
-                    result["userId"] = uid.GetString();
-                result["accessToken"] = "***";
-            }
-            else if (kind == ImapObserver.SourceKey)
+            if (kind == ImapObserver.SourceKey)
             {
                 if (doc.RootElement.TryGetProperty("imapHost", out var ih))
                     result["imapHost"] = ih.GetString();
@@ -368,7 +300,6 @@ public static class SourceAccountsEndpoints
         IReadOnlyList<string>? Allowlist,
         bool? Enabled);
 
-    private sealed record ListMatrixRoomsPayload(Dictionary<string, object> Credentials);
     private sealed record ListImapFoldersPayload(Dictionary<string, object> Credentials);
     private sealed record StartWhatsAppPayload(string? SessionId);
 
@@ -381,6 +312,4 @@ public static class SourceAccountsEndpoints
         bool Enabled,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
-
-    private sealed record MatrixRoomDto(string RoomId, string? DisplayName);
 }

@@ -41,7 +41,7 @@ export function WhatsAppSection({ anchor }: WhatsAppSectionProps) {
 
   return (
     <div id={anchor} className="mt-14">
-      <SectionHead n={7} label="WHATSAPP" title="WhatsApp-Nummer." />
+      <SectionHead n={6} label="WHATSAPP" title="WhatsApp-Nummer." />
       <p className="mb-4 max-w-[640px] font-sans text-sm leading-relaxed text-nau-fg-dim">
         Verbinde eine WhatsApp-Nummer per QR-Scan. Der Agent liest die freigegebenen
         Chats und schlägt passende Termin-Slots vor. Inoffizielle Anbindung &mdash; nutze

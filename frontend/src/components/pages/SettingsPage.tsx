@@ -21,7 +21,6 @@ import {
   type CalendarSettings,
 } from "@/api/calendar-settings";
 import { ImapSection } from "@/components/settings/ImapSection";
-import { MatrixSection } from "@/components/settings/MatrixSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
 import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
@@ -265,12 +264,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const navItems = [
     { n: "01", label: "Sprachmodell", anchor: "section-llm" },
     { n: "02", label: "Kalender", anchor: "section-calendar" },
-    { n: "03", label: "Matrix", anchor: "section-matrix" },
-    { n: "04", label: "Persona", anchor: "section-persona" },
-    { n: "05", label: "Push", anchor: "section-push" },
-    { n: "06", label: "E-Mail", anchor: "section-imap" },
+    { n: "03", label: "Persona", anchor: "section-persona" },
+    { n: "04", label: "Push", anchor: "section-push" },
+    { n: "05", label: "E-Mail", anchor: "section-imap" },
     ...(caps?.whatsapp
-      ? [{ n: "07", label: "WhatsApp", anchor: "section-whatsapp" }]
+      ? [{ n: "06", label: "WhatsApp", anchor: "section-whatsapp" }]
       : []),
   ];
 
@@ -348,8 +346,6 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         {calendar && (
           <CalendarSection calendar={calendar} setCalendar={setCalendar} />
         )}
-
-        <MatrixSection anchor="section-matrix" />
 
         <PersonaSection anchor="section-persona" />
 
