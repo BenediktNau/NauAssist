@@ -180,6 +180,11 @@ app.MapCalendarEndpoints();
 app.MapSuggestionsEndpoints();
 app.MapSourceAccountsEndpoints();
 app.MapPushEndpoints();
+app.MapCapabilitiesEndpoints();
+if (whatsAppOptions.Enabled)
+{
+    app.MapWhatsAppSourceEndpoints();
+}
 
 app.MapFallbackToFile("index.html");
 

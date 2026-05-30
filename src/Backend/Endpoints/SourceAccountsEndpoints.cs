@@ -2,6 +2,7 @@ using System.Text.Json;
 using NauAssist.Backend.Features.AutonomousAgent.Sources;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Imap;
 using NauAssist.Backend.Features.AutonomousAgent.Sources.Matrix;
+using NauAssist.Backend.Features.AutonomousAgent.Sources.WhatsApp;
 
 namespace NauAssist.Backend.Endpoints;
 
@@ -44,6 +45,10 @@ public static class SourceAccountsEndpoints
                 else if (body.Kind == ImapObserver.SourceKey)
                 {
                     _ = ImapCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
+                }
+                else if (body.Kind == WhatsAppObserver.SourceKey)
+                {
+                    _ = WhatsAppCredentials.Parse(JsonSerializer.Serialize(body.Credentials));
                 }
             }
             catch (ArgumentException ex)
@@ -144,6 +149,107 @@ public static class SourceAccountsEndpoints
         return app;
     }
 
+    /// <summary>
+    /// WhatsApp-spezifische Helfer (QR-Pairing-Flow + Chat-Listing). Wird nur gemappt,
+    /// wenn <c>AutonomousAgent:WhatsApp:Enabled</c> — dann ist auch der Sidecar-Client registriert.
+    /// </summary>
+    public static IEndpointRouteBuilder MapWhatsAppSourceEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/source-accounts");
+
+        // Neue Session starten (oder bestehende renutzen) → liefert sessionId + state.
+        group.MapPost("/whatsapp/start", async (
+            StartWhatsAppPayload? body,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await client.CreateSessionAsync(body?.SessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Pairing-Status pollen (QR-Data-URL + Telefonnummer sobald verbunden).
+        group.MapGet("/whatsapp/session/{sessionId}", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var status = await client.GetSessionAsync(sessionId, ct);
+                return status is null ? Results.NotFound() : Results.Ok(status);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Chats für die Allowlist-Auswahl (inline, während des Anlegens).
+        group.MapGet("/whatsapp/session/{sessionId}/chats", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await client.ListChatsAsync(sessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Chats für einen bereits gespeicherten Account neu laden.
+        group.MapGet("/{id:long}/whatsapp/chats", async (
+            long id,
+            SourceAccountRepository repo,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            var account = await repo.GetAsync(id, ct);
+            if (account is null) return Results.NotFound();
+            if (account.Kind != WhatsAppObserver.SourceKey)
+            {
+                return Results.BadRequest(new { error = "account_not_whatsapp" });
+            }
+            try
+            {
+                var creds = WhatsAppCredentials.Parse(account.CredentialsJson);
+                return Results.Ok(await client.ListChatsAsync(creds.SessionId, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        // Sidecar-Session beenden (Logout + Auth-State löschen). Vom UI beim Account-Löschen.
+        group.MapDelete("/whatsapp/session/{sessionId}", async (
+            string sessionId,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await client.DeleteSessionAsync(sessionId, ct);
+                return Results.NoContent();
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
+        return app;
+    }
+
     private static async Task<IResult> ListImapFoldersAsync(
         Func<Task<string>> credentialsJsonProvider,
         ImapClient client,
@@ -234,6 +340,14 @@ public static class SourceAccountsEndpoints
                     result["username"] = un.GetString();
                 result["password"] = "***";
             }
+            else if (kind == WhatsAppObserver.SourceKey)
+            {
+                // Keine Geheimnisse in den Credentials — Auth-State liegt im Sidecar.
+                if (doc.RootElement.TryGetProperty("sessionId", out var sid))
+                    result["sessionId"] = sid.GetString();
+                if (doc.RootElement.TryGetProperty("phoneLabel", out var pl))
+                    result["phoneLabel"] = pl.GetString();
+            }
         }
         catch (JsonException)
         {
@@ -256,6 +370,7 @@ public static class SourceAccountsEndpoints
 
     private sealed record ListMatrixRoomsPayload(Dictionary<string, object> Credentials);
     private sealed record ListImapFoldersPayload(Dictionary<string, object> Credentials);
+    private sealed record StartWhatsAppPayload(string? SessionId);
 
     private sealed record SourceAccountDto(
         long Id,
