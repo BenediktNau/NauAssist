@@ -1,0 +1,30 @@
+{
+  "name": "nauassist-wa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NauAssist WhatsApp-Sidecar (Baileys) — hält die WA-Session und puffert Nachrichten für den autonomen Agenten.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "better-sqlite3": "^11.10.0",
+    "fastify": "^4.28.1",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.10.1",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
