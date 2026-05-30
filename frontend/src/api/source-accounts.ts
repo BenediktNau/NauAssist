@@ -157,3 +157,92 @@ export async function createImapAccount(
   }
   return (await res.json()) as SourceAccountDto;
 }
+
+// --- WhatsApp ---
+
+export interface WhatsAppCredentialsInput {
+  sessionId: string;
+  phoneLabel: string;
+}
+
+export interface WhatsAppSessionDto {
+  sessionId: string;
+  state: string;
+}
+
+export interface WhatsAppSessionStatusDto {
+  state: string;
+  qr: string | null;
+  phone: string | null;
+}
+
+export interface WhatsAppChatDto {
+  chatId: string;
+  name: string;
+}
+
+export async function startWhatsAppSession(sessionId?: string): Promise<WhatsAppSessionDto> {
+  const res = await fetch("/api/source-accounts/whatsapp/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `WhatsApp-Start fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as WhatsAppSessionDto;
+}
+
+export async function getWhatsAppSession(sessionId: string): Promise<WhatsAppSessionStatusDto> {
+  const res = await fetch(`/api/source-accounts/whatsapp/session/${encodeURIComponent(sessionId)}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `WhatsApp-Status fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as WhatsAppSessionStatusDto;
+}
+
+export async function listWhatsAppChats(sessionId: string): Promise<WhatsAppChatDto[]> {
+  const res = await fetch(`/api/source-accounts/whatsapp/session/${encodeURIComponent(sessionId)}/chats`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `WhatsApp-Chats fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as WhatsAppChatDto[];
+}
+
+export async function listWhatsAppChatsForAccount(id: number): Promise<WhatsAppChatDto[]> {
+  const res = await fetch(`/api/source-accounts/${id}/whatsapp/chats`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `WhatsApp-Chats fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as WhatsAppChatDto[];
+}
+
+export async function deleteWhatsAppSession(sessionId: string): Promise<void> {
+  const res = await fetch(`/api/source-accounts/whatsapp/session/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`WhatsApp-Session-Delete fehlgeschlagen: HTTP ${res.status}`);
+  }
+}
+
+export async function createWhatsAppAccount(
+  displayName: string,
+  credentials: WhatsAppCredentialsInput,
+  allowlist: string[],
+): Promise<SourceAccountDto> {
+  const res = await fetch("/api/source-accounts/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "whatsapp", displayName, credentials, allowlist }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Account-Anlage fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as SourceAccountDto;
+}

@@ -24,6 +24,8 @@ import { ImapSection } from "@/components/settings/ImapSection";
 import { MatrixSection } from "@/components/settings/MatrixSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
+import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
+import { getCapabilities, type Capabilities } from "@/api/capabilities";
 
 interface SettingsPageProps {
   onNavigate: (page: AppPage) => void;
@@ -243,6 +245,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const [llm, setLlm] = useState<LlmSettings | null>(null);
   const [ollama, setOllama] = useState<OllamaSettings | null>(null);
   const [calendar, setCalendar] = useState<CalendarSettings | null>(null);
+  const [caps, setCaps] = useState<Capabilities | null>(null);
   const [topError, setTopError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -253,6 +256,12 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       .catch((e) => setTopError(String(e.message ?? e)));
   }, []);
 
+  useEffect(() => {
+    getCapabilities()
+      .then(setCaps)
+      .catch(() => setCaps({ whatsapp: false }));
+  }, []);
+
   const navItems = [
     { n: "01", label: "Sprachmodell", anchor: "section-llm" },
     { n: "02", label: "Kalender", anchor: "section-calendar" },
@@ -260,6 +269,9 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "04", label: "Persona", anchor: "section-persona" },
     { n: "05", label: "Push", anchor: "section-push" },
     { n: "06", label: "E-Mail", anchor: "section-imap" },
+    ...(caps?.whatsapp
+      ? [{ n: "07", label: "WhatsApp", anchor: "section-whatsapp" }]
+      : []),
   ];
 
   return (
@@ -344,6 +356,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         <PushSection anchor="section-push" />
 
         <ImapSection anchor="section-imap" />
+
+        {caps?.whatsapp && <WhatsAppSection anchor="section-whatsapp" />}
 
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>
