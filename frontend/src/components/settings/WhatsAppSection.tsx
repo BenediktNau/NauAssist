@@ -307,6 +307,7 @@ function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
 
   const pollRef = useRef<number | null>(null);
   const savedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
 
   const stopPoll = () => {
     if (pollRef.current !== null) {
@@ -315,15 +316,25 @@ function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
     }
   };
 
-  // Beim Verlassen ohne Speichern: angefangene Session im Sidecar verwerfen.
+  // sessionId in einer Ref spiegeln, damit der Unmount-Cleanup unten die aktuelle ID
+  // kennt, ohne selbst von [sessionId] abzuhängen.
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  // NUR beim Verlassen der Komponente: laufenden Poll stoppen und eine angefangene,
+  // ungespeicherte Session im Sidecar verwerfen. Wichtig: Dependency-Array []! Hinge
+  // der Effekt an [sessionId], liefe sein Cleanup bei jedem setSessionId() — und würde
+  // den in connect() gerade gestarteten QR-Poll sofort wieder abräumen (→ "WARTE AUF QR").
   useEffect(() => {
     return () => {
       stopPoll();
-      if (sessionId && !savedRef.current) {
-        void deleteWhatsAppSession(sessionId).catch(() => {});
+      if (sessionIdRef.current && !savedRef.current) {
+        void deleteWhatsAppSession(sessionIdRef.current).catch(() => {});
       }
     };
-  }, [sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const connect = async () => {
     setBusy(true);
