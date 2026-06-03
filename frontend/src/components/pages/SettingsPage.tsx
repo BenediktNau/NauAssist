@@ -258,7 +258,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   useEffect(() => {
     getCapabilities()
       .then(setCaps)
-      .catch(() => setCaps({ whatsapp: false }));
+      .catch(() => setCaps({ whatsApp: false }));
   }, []);
 
   const navItems = [
@@ -267,7 +267,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "03", label: "Persona", anchor: "section-persona" },
     { n: "04", label: "Push", anchor: "section-push" },
     { n: "05", label: "E-Mail", anchor: "section-imap" },
-    ...(caps?.whatsapp
+    ...(caps?.whatsApp
       ? [{ n: "06", label: "WhatsApp", anchor: "section-whatsapp" }]
       : []),
   ];
@@ -353,7 +353,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
         <ImapSection anchor="section-imap" />
 
-        {caps?.whatsapp && <WhatsAppSection anchor="section-whatsapp" />}
+        {caps?.whatsApp && <WhatsAppSection anchor="section-whatsapp" />}
 
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
           <SecondaryButton onClick={() => onNavigate("chat")}>

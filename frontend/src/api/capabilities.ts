@@ -1,5 +1,5 @@
 export interface Capabilities {
-  whatsapp: boolean;
+  whatsApp: boolean;
 }
 
 export async function getCapabilities(): Promise<Capabilities> {
