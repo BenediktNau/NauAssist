@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.AutonomousAgent.Sources;
@@ -9,10 +10,12 @@ public sealed class SourceAccountRepository
     private static readonly JsonSerializerOptions JsonOpts = new();
 
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public SourceAccountRepository(AppDb db)
+    public SourceAccountRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<SourceAccount> AddAsync(
@@ -26,12 +29,13 @@ public sealed class SourceAccountRepository
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(new CommandDefinition(
             """
-            INSERT INTO source_accounts(kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at)
-            VALUES(@kind, @displayName, @credentialsJson, @allowlistJson, 1, @now, @now);
+            INSERT INTO source_accounts(user_id, kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at)
+            VALUES(@userId, @kind, @displayName, @credentialsJson, @allowlistJson, 1, @now, @now);
             SELECT last_insert_rowid();
             """,
             new
             {
+                userId = _user.UserId,
                 kind,
                 displayName,
                 credentialsJson,
@@ -55,8 +59,8 @@ public sealed class SourceAccountRepository
     {
         using var conn = _db.OpenConnection();
         var row = await conn.QuerySingleOrDefaultAsync<AccountRow>(new CommandDefinition(
-            "SELECT * FROM source_accounts WHERE id = @id;",
-            new { id },
+            "SELECT id, kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at FROM source_accounts WHERE id = @id AND user_id = @userId;",
+            new { id, userId = _user.UserId },
             cancellationToken: ct));
         return row is null ? null : MapToDomain(row);
     }
@@ -66,11 +70,12 @@ public sealed class SourceAccountRepository
         using var conn = _db.OpenConnection();
         var rows = kind is null
             ? await conn.QueryAsync<AccountRow>(new CommandDefinition(
-                "SELECT * FROM source_accounts ORDER BY id ASC;",
+                "SELECT id, kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at FROM source_accounts WHERE user_id = @userId ORDER BY id ASC;",
+                new { userId = _user.UserId },
                 cancellationToken: ct))
             : await conn.QueryAsync<AccountRow>(new CommandDefinition(
-                "SELECT * FROM source_accounts WHERE kind = @kind ORDER BY id ASC;",
-                new { kind },
+                "SELECT id, kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at FROM source_accounts WHERE user_id = @userId AND kind = @kind ORDER BY id ASC;",
+                new { userId = _user.UserId, kind },
                 cancellationToken: ct));
         return rows.Select(MapToDomain).ToList();
     }
@@ -79,8 +84,8 @@ public sealed class SourceAccountRepository
     {
         using var conn = _db.OpenConnection();
         var rows = await conn.QueryAsync<AccountRow>(new CommandDefinition(
-            "SELECT * FROM source_accounts WHERE kind = @kind AND enabled = 1 ORDER BY id ASC;",
-            new { kind },
+            "SELECT id, kind, display_name, credentials_json, allowlist_json, enabled, created_at, updated_at FROM source_accounts WHERE user_id = @userId AND kind = @kind AND enabled = 1 ORDER BY id ASC;",
+            new { userId = _user.UserId, kind },
             cancellationToken: ct));
         return rows.Select(MapToDomain).ToList();
     }
@@ -103,11 +108,12 @@ public sealed class SourceAccountRepository
                 allowlist_json    = COALESCE(@allowlistJson, allowlist_json),
                 enabled           = COALESCE(@enabled, enabled),
                 updated_at        = @now
-            WHERE id = @id;
+            WHERE id = @id AND user_id = @userId;
             """,
             new
             {
                 id,
+                userId = _user.UserId,
                 displayName,
                 credentialsJson,
                 allowlistJson = allowlist is null ? null : JsonSerializer.Serialize(allowlist, JsonOpts),
@@ -122,8 +128,8 @@ public sealed class SourceAccountRepository
     {
         using var conn = _db.OpenConnection();
         var affected = await conn.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM source_accounts WHERE id = @id;",
-            new { id },
+            "DELETE FROM source_accounts WHERE id = @id AND user_id = @userId;",
+            new { id, userId = _user.UserId },
             cancellationToken: ct));
         return affected > 0;
     }

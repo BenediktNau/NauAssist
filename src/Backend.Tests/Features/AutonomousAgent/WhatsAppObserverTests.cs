@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -15,8 +16,8 @@ public sealed class WhatsAppObserverTests
     private static (WhatsAppObserver observer, SourceAccountRepository accounts, SourceCursorRepository cursors)
         Build(TempSqliteDb db, IWhatsAppSidecarClient client)
     {
-        var accounts = new SourceAccountRepository(db.AppDb);
-        var cursors = new SourceCursorRepository(db.AppDb);
+        var accounts = new SourceAccountRepository(db.AppDb, new UserContextHolder());
+        var cursors = new SourceCursorRepository(db.AppDb, new UserContextHolder());
         var observer = new WhatsAppObserver(
             accounts,
             cursors,

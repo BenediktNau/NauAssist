@@ -1,4 +1,5 @@
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.AutonomousAgent.Push;
@@ -6,10 +7,12 @@ namespace NauAssist.Backend.Features.AutonomousAgent.Push;
 public sealed class PushSubscriptionRepository
 {
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public PushSubscriptionRepository(AppDb db)
+    public PushSubscriptionRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<PushSubscription> UpsertAsync(
@@ -23,15 +26,16 @@ public sealed class PushSubscriptionRepository
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(new CommandDefinition(
             """
-            INSERT INTO web_push_subscriptions(endpoint, p256dh, auth, user_agent, created_at)
-            VALUES(@endpoint, @p256dh, @auth, @userAgent, @now)
+            INSERT INTO web_push_subscriptions(user_id, endpoint, p256dh, auth, user_agent, created_at)
+            VALUES(@userId, @endpoint, @p256dh, @auth, @userAgent, @now)
             ON CONFLICT(endpoint) DO UPDATE SET
+                user_id = excluded.user_id,
                 p256dh = excluded.p256dh,
                 auth = excluded.auth,
                 user_agent = excluded.user_agent;
             SELECT id FROM web_push_subscriptions WHERE endpoint = @endpoint;
             """,
-            new { endpoint, p256dh, auth, userAgent, now = now.ToString("O") },
+            new { userId = _user.UserId, endpoint, p256dh, auth, userAgent, now = now.ToString("O") },
             cancellationToken: ct));
 
         return new PushSubscription(
@@ -48,7 +52,8 @@ public sealed class PushSubscriptionRepository
     {
         using var conn = _db.OpenConnection();
         var rows = await conn.QueryAsync<SubRow>(new CommandDefinition(
-            "SELECT * FROM web_push_subscriptions ORDER BY id ASC;",
+            "SELECT id, endpoint, p256dh, auth, user_agent, created_at, last_used FROM web_push_subscriptions WHERE user_id = @userId ORDER BY id ASC;",
+            new { userId = _user.UserId },
             cancellationToken: ct));
         return rows.Select(MapToDomain).ToList();
     }
@@ -57,8 +62,8 @@ public sealed class PushSubscriptionRepository
     {
         using var conn = _db.OpenConnection();
         var affected = await conn.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM web_push_subscriptions WHERE id = @id;",
-            new { id },
+            "DELETE FROM web_push_subscriptions WHERE id = @id AND user_id = @userId;",
+            new { id, userId = _user.UserId },
             cancellationToken: ct));
         return affected > 0;
     }
@@ -67,8 +72,8 @@ public sealed class PushSubscriptionRepository
     {
         using var conn = _db.OpenConnection();
         var affected = await conn.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM web_push_subscriptions WHERE endpoint = @endpoint;",
-            new { endpoint },
+            "DELETE FROM web_push_subscriptions WHERE endpoint = @endpoint AND user_id = @userId;",
+            new { endpoint, userId = _user.UserId },
             cancellationToken: ct));
         return affected > 0;
     }

@@ -1,4 +1,5 @@
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.Infrastructure.Audit;
@@ -6,10 +7,12 @@ namespace NauAssist.Backend.Features.Infrastructure.Audit;
 public sealed class AuditLogRepository
 {
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public AuditLogRepository(AppDb db)
+    public AuditLogRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<AuditEntry> AppendAsync(AuditEntry entry, CancellationToken ct)
@@ -17,12 +20,13 @@ public sealed class AuditLogRepository
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(
             """
-            INSERT INTO audit_log(triggering_message_id, tool_name, tool_args_json, result_json, provider_event_id, created_at)
-            VALUES(@TriggeringMessageId, @ToolName, @ToolArgsJson, @ResultJson, @ProviderEventId, @CreatedAt);
+            INSERT INTO audit_log(user_id, triggering_message_id, tool_name, tool_args_json, result_json, provider_event_id, created_at)
+            VALUES(@UserId, @TriggeringMessageId, @ToolName, @ToolArgsJson, @ResultJson, @ProviderEventId, @CreatedAt);
             SELECT last_insert_rowid();
             """,
             new
             {
+                UserId = _user.UserId,
                 entry.TriggeringMessageId,
                 entry.ToolName,
                 entry.ToolArgsJson,
@@ -40,17 +44,19 @@ public sealed class AuditLogRepository
             """
             SELECT id, triggering_message_id, tool_name, tool_args_json, result_json, provider_event_id, created_at
             FROM audit_log
-            WHERE triggering_message_id = @messageId
+            WHERE user_id = @userId AND triggering_message_id = @messageId
             ORDER BY id;
             """,
-            new { messageId });
+            new { userId = _user.UserId, messageId });
         return rows.Select(MapToDomain).ToList();
     }
 
     public async Task<long> CountAsync(CancellationToken ct)
     {
         using var conn = _db.OpenConnection();
-        return await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM audit_log;");
+        return await conn.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_log WHERE user_id = @userId;",
+            new { userId = _user.UserId });
     }
 
     private static AuditEntry MapToDomain(AuditRow r) => new(

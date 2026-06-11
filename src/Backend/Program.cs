@@ -14,6 +14,7 @@ using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
@@ -31,6 +32,14 @@ builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time")
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
+
+// User-Kontext: scoped, beide Interfaces auf derselben Instanz. Default = Single-User;
+// gesetzt wird er von der Auth-Middleware (HTTP) bzw. vom Scheduler (Background).
+builder.Services.AddScoped<UserContextHolder>();
+builder.Services.AddScoped<IUserContext>(sp => sp.GetRequiredService<UserContextHolder>());
+builder.Services.AddScoped<IUserContextSetter>(sp => sp.GetRequiredService<UserContextHolder>());
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<Func<DateTimeOffset>>(_ => () => DateTimeOffset.UtcNow);
 builder.Services.AddSingleton<TimeZoneInfo>(sp =>

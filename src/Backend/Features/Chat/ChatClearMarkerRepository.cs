@@ -1,4 +1,5 @@
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.Chat;
@@ -6,10 +7,12 @@ namespace NauAssist.Backend.Features.Chat;
 public sealed class ChatClearMarkerRepository : IChatClearMarkerSource
 {
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public ChatClearMarkerRepository(AppDb db)
+    public ChatClearMarkerRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<DateTimeOffset?> GetLatestCreatedAtSinceAsync(string sessionId, DateTimeOffset since, CancellationToken ct)
@@ -23,12 +26,13 @@ public sealed class ChatClearMarkerRepository : IChatClearMarkerSource
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(
             """
-            INSERT INTO chat_clear_markers(session_id, created_at)
-            VALUES(@sessionId, @createdAt);
+            INSERT INTO chat_clear_markers(user_id, session_id, created_at)
+            VALUES(@userId, @sessionId, @createdAt);
             SELECT last_insert_rowid();
             """,
             new
             {
+                userId = _user.UserId,
                 sessionId,
                 createdAt = createdAt.ToString("O"),
             });
@@ -42,11 +46,11 @@ public sealed class ChatClearMarkerRepository : IChatClearMarkerSource
             """
             SELECT id, session_id, created_at
             FROM chat_clear_markers
-            WHERE session_id = @sessionId AND created_at > @since
+            WHERE user_id = @userId AND session_id = @sessionId AND created_at > @since
             ORDER BY created_at DESC
             LIMIT 1;
             """,
-            new { sessionId, since = since.ToString("O") });
+            new { userId = _user.UserId, sessionId, since = since.ToString("O") });
         return row is null ? null : MapToDomain(row);
     }
 
@@ -57,10 +61,10 @@ public sealed class ChatClearMarkerRepository : IChatClearMarkerSource
             """
             SELECT id, session_id, created_at
             FROM chat_clear_markers
-            WHERE session_id = @sessionId AND created_at > @since
+            WHERE user_id = @userId AND session_id = @sessionId AND created_at > @since
             ORDER BY created_at ASC;
             """,
-            new { sessionId, since = since.ToString("O") });
+            new { userId = _user.UserId, sessionId, since = since.ToString("O") });
         return rows.Select(MapToDomain).ToList();
     }
 

@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Audit;
@@ -11,7 +12,7 @@ public sealed class AuditLogRepositoryTests
     public async Task AppendAsync_PersistsRow_ReturnsId()
     {
         using var temp = new TempSqliteDb();
-        var repo = new AuditLogRepository(temp.AppDb);
+        var repo = new AuditLogRepository(temp.AppDb, new UserContextHolder());
 
         var saved = await repo.AppendAsync(new AuditEntry(
             Id: 0,
@@ -32,8 +33,8 @@ public sealed class AuditLogRepositoryTests
     public async Task GetByMessageIdAsync_ReturnsOnlyMatchingEntries_OrderedByIdAsc()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
-        var repo = new AuditLogRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
+        var repo = new AuditLogRepository(temp.AppDb, new UserContextHolder());
 
         var msgA = await messages.AddAsync(new Message(0, "default", MessageRole.User, "a", null, false,
             DateTimeOffset.Parse("2026-05-19T09:00:00Z")), CancellationToken.None);
@@ -58,7 +59,7 @@ public sealed class AuditLogRepositoryTests
     public async Task AppendAsync_AllowsNullTriggeringMessageAndNullProviderEventId()
     {
         using var temp = new TempSqliteDb();
-        var repo = new AuditLogRepository(temp.AppDb);
+        var repo = new AuditLogRepository(temp.AppDb, new UserContextHolder());
 
         var saved = await repo.AppendAsync(new AuditEntry(0, null, "add_rule",
             """{"text":"abends frei"}""", """{"id":1}""", null,

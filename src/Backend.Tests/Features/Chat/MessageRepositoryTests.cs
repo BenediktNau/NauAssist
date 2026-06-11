@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Tests.Helpers;
@@ -10,7 +11,7 @@ public sealed class MessageRepositoryTests
     public async Task AddAsync_PersistsRow_ReturnsAssignedId()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var saved = await repo.AddAsync(
             new Message(0, "default", MessageRole.User, "hallo", null, false,
@@ -26,7 +27,7 @@ public sealed class MessageRepositoryTests
     public async Task GetRecentAsync_ReturnsNewestFirstUpToTake()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         for (var i = 0; i < 5; i++)
         {
@@ -46,7 +47,7 @@ public sealed class MessageRepositoryTests
     public async Task GetRecentAsync_FiltersBySessionId()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         await repo.AddAsync(new Message(0, "a", MessageRole.User, "a1", null, false,
             DateTimeOffset.Parse("2026-05-19T10:00:00Z")), CancellationToken.None);
@@ -63,7 +64,7 @@ public sealed class MessageRepositoryTests
     public async Task AddAsync_RoundTripsProposalsJsonAndAssistantRole()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var saved = await repo.AddAsync(
             new Message(0, "default", MessageRole.Assistant, "Vorschläge:", """[{"start":"2026-05-20T09:00:00Z"}]""",
@@ -80,7 +81,7 @@ public sealed class MessageRepositoryTests
     public async Task MarkIncompleteAsync_FlipsFlag()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var saved = await repo.AddAsync(
             new Message(0, "default", MessageRole.Assistant, "halb", null, false,

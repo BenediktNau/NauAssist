@@ -1,4 +1,5 @@
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.Chat;
@@ -6,10 +7,12 @@ namespace NauAssist.Backend.Features.Chat;
 public sealed class MessageRepository
 {
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public MessageRepository(AppDb db)
+    public MessageRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<Message> AddAsync(Message msg, CancellationToken ct)
@@ -17,12 +20,13 @@ public sealed class MessageRepository
         using var conn = _db.OpenConnection();
         var id = await conn.ExecuteScalarAsync<long>(
             """
-            INSERT INTO messages(session_id, role, content, proposals_json, incomplete, created_at)
-            VALUES(@SessionId, @Role, @Content, @ProposalsJson, @Incomplete, @CreatedAt);
+            INSERT INTO messages(user_id, session_id, role, content, proposals_json, incomplete, created_at)
+            VALUES(@UserId, @SessionId, @Role, @Content, @ProposalsJson, @Incomplete, @CreatedAt);
             SELECT last_insert_rowid();
             """,
             new
             {
+                UserId = _user.UserId,
                 msg.SessionId,
                 Role = msg.Role.ToString().ToLowerInvariant(),
                 msg.Content,
@@ -40,11 +44,11 @@ public sealed class MessageRepository
             """
             SELECT id, session_id, role, content, proposals_json, incomplete, created_at
             FROM messages
-            WHERE session_id = @sessionId
+            WHERE user_id = @userId AND session_id = @sessionId
             ORDER BY id DESC
             LIMIT @take;
             """,
-            new { sessionId, take });
+            new { userId = _user.UserId, sessionId, take });
         return rows.Select(MapToDomain).ToList();
     }
 
@@ -55,11 +59,11 @@ public sealed class MessageRepository
             """
             SELECT id, session_id, role, content, proposals_json, incomplete, created_at
             FROM messages
-            WHERE session_id = @sessionId AND created_at > @since
+            WHERE user_id = @userId AND session_id = @sessionId AND created_at > @since
             ORDER BY id DESC
             LIMIT @take;
             """,
-            new { sessionId, since = since.ToString("O"), take });
+            new { userId = _user.UserId, sessionId, since = since.ToString("O"), take });
         return rows.Select(MapToDomain).ToList();
     }
 
@@ -70,10 +74,10 @@ public sealed class MessageRepository
             """
             SELECT id, session_id, role, content, proposals_json, incomplete, created_at
             FROM messages
-            WHERE session_id = @sessionId AND created_at >= @since
+            WHERE user_id = @userId AND session_id = @sessionId AND created_at >= @since
             ORDER BY id ASC;
             """,
-            new { sessionId, since = since.ToString("O") });
+            new { userId = _user.UserId, sessionId, since = since.ToString("O") });
         return rows.Select(MapToDomain).ToList();
     }
 
@@ -81,8 +85,8 @@ public sealed class MessageRepository
     {
         using var conn = _db.OpenConnection();
         await conn.ExecuteAsync(
-            "UPDATE messages SET incomplete = 1 WHERE id = @id;",
-            new { id });
+            "UPDATE messages SET incomplete = 1 WHERE id = @id AND user_id = @userId;",
+            new { id, userId = _user.UserId });
     }
 
     private static Message MapToDomain(MessageRow r) => new(

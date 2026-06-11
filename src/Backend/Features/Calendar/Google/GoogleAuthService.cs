@@ -3,26 +3,33 @@ using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Microsoft.Extensions.Logging;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Settings;
 
 namespace NauAssist.Backend.Features.Calendar.Google;
 
 public sealed class GoogleAuthService
 {
-    public const string UserId = "nauassist-default";
     public const string RedirectUri = "http://localhost";
 
     private readonly IAppSettingsRepository _settings;
     private readonly SqliteDataStore _dataStore;
+    private readonly IUserContext _user;
     private readonly ILogger<GoogleAuthService> _logger;
+
+    // Token-Key im SqliteDataStore = User-ID. Der Default-User nutzt weiterhin
+    // "nauassist-default" — bestehende Tokens bleiben damit ohne Migration gültig.
+    private string UserId => _user.UserId;
 
     public GoogleAuthService(
         IAppSettingsRepository settings,
         SqliteDataStore dataStore,
+        IUserContext user,
         ILogger<GoogleAuthService> logger)
     {
         _settings = settings;
         _dataStore = dataStore;
+        _user = user;
         _logger = logger;
     }
 
@@ -68,7 +75,7 @@ public sealed class GoogleAuthService
         return token is not null;
     }
 
-    public Task DisconnectAsync() => _dataStore.ClearAsync();
+    public Task DisconnectAsync() => _dataStore.DeleteAsync<TokenResponse>(UserId);
 
     private async Task<ClientSecrets> LoadClientSecretsAsync(CancellationToken ct)
     {
