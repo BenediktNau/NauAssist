@@ -1,5 +1,11 @@
+export interface AuthCapabilities {
+  enabled: boolean;
+  loginUrl: string;
+}
+
 export interface Capabilities {
   whatsApp: boolean;
+  auth: AuthCapabilities;
 }
 
 export async function getCapabilities(): Promise<Capabilities> {

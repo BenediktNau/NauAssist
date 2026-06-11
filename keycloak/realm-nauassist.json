@@ -1,0 +1,42 @@
+{
+  "realm": "nauassist",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "clients": [
+    {
+      "clientId": "nauassist-web",
+      "name": "NauAssist",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${NAUASSIST_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["${NAUASSIST_PUBLIC_URL}/*"],
+      "webOrigins": ["${NAUASSIST_PUBLIC_URL}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${NAUASSIST_PUBLIC_URL}/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "${NAUASSIST_TEST_USER}",
+      "email": "${NAUASSIST_TEST_USER}@nauassist.local",
+      "firstName": "Test",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${NAUASSIST_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
