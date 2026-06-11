@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
@@ -13,7 +14,7 @@ public sealed class GetLlmSettingsHandlerTests
     public async Task Handle_DefaultsFromMigration()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
         var handler = new GetLlmSettingsHandler(repo, OllamaOpts("default-prompt"));
 
         var response = await handler.Handle(new GetLlmSettingsRequest(), CancellationToken.None);
@@ -27,7 +28,7 @@ public sealed class GetLlmSettingsHandlerTests
     public async Task Handle_ReturnsUpdatedModelAndSystemPrompt()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
         await repo.SetLlmAsync(
             new LlmSettings("mistral:7b", "you are a helper"),
             CancellationToken.None);
@@ -44,7 +45,7 @@ public sealed class GetLlmSettingsHandlerTests
     public async Task Handle_NullDefaultSystemPrompt_ReturnsEmptyString()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
         var handler = new GetLlmSettingsHandler(repo, OllamaOpts(null));
 
         var response = await handler.Handle(new GetLlmSettingsRequest(), CancellationToken.None);

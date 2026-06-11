@@ -1,5 +1,6 @@
 using Dapper;
 using Microsoft.Data.Sqlite;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.Settings;
@@ -26,10 +27,12 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyVapidSubject       = "push.vapid_subject";
 
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public AppSettingsRepository(AppDb db)
+    public AppSettingsRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<LlmSettings> GetLlmAsync(CancellationToken ct)
@@ -127,22 +130,39 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             throw;
         }
     }
+    // Kalender-Einstellungen sind user-scoped (Multi-User): gelesen wird
+    // user_settings des aktuellen Users mit Fallback auf die globalen
+    // app_settings (Seed/Default), geschrieben wird nur in user_settings.
     public async Task<CalendarUserSettings> GetCalendarAsync(CancellationToken ct)
     {
         using var conn = _db.OpenConnection();
-        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+        var keys = new
+        {
+            k1 = KeyCalendarId,
+            k2 = KeyWorkingStart,
+            k3 = KeyWorkingEnd,
+            k4 = KeyDefaultDuration,
+            k5 = KeySearchHorizon,
+        };
+
+        var globalRows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
             "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2, @k3, @k4, @k5);",
+            keys,
+            cancellationToken: ct));
+        var map = globalRows.ToDictionary(r => r.Key, r => r.Value);
+
+        var userRows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM user_settings WHERE user_id = @userId AND key IN (@k1, @k2, @k3, @k4, @k5);",
             new
             {
-                k1 = KeyCalendarId,
-                k2 = KeyWorkingStart,
-                k3 = KeyWorkingEnd,
-                k4 = KeyDefaultDuration,
-                k5 = KeySearchHorizon,
+                userId = _user.UserId,
+                keys.k1, keys.k2, keys.k3, keys.k4, keys.k5,
             },
             cancellationToken: ct));
-
-        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        foreach (var (key, value) in userRows)
+        {
+            map[key] = value;
+        }
 
         return new CalendarUserSettings(
             CalendarId: map.GetValueOrDefault(KeyCalendarId, "primary"),
@@ -158,11 +178,11 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
         using var tx = conn.BeginTransaction();
         try
         {
-            await UpsertAsync(conn, tx, KeyCalendarId, settings.CalendarId, ct);
-            await UpsertAsync(conn, tx, KeyWorkingStart, settings.WorkingHoursStart.ToString("HH:mm"), ct);
-            await UpsertAsync(conn, tx, KeyWorkingEnd, settings.WorkingHoursEnd.ToString("HH:mm"), ct);
-            await UpsertAsync(conn, tx, KeyDefaultDuration, settings.DefaultDurationMinutes.ToString(), ct);
-            await UpsertAsync(conn, tx, KeySearchHorizon, settings.SearchHorizonDays.ToString(), ct);
+            await UpsertUserAsync(conn, tx, KeyCalendarId, settings.CalendarId, ct);
+            await UpsertUserAsync(conn, tx, KeyWorkingStart, settings.WorkingHoursStart.ToString("HH:mm"), ct);
+            await UpsertUserAsync(conn, tx, KeyWorkingEnd, settings.WorkingHoursEnd.ToString("HH:mm"), ct);
+            await UpsertUserAsync(conn, tx, KeyDefaultDuration, settings.DefaultDurationMinutes.ToString(), ct);
+            await UpsertUserAsync(conn, tx, KeySearchHorizon, settings.SearchHorizonDays.ToString(), ct);
             tx.Commit();
         }
         catch
@@ -170,6 +190,23 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             tx.Rollback();
             throw;
         }
+    }
+
+    private Task UpsertUserAsync(
+        SqliteConnection conn,
+        SqliteTransaction? tx,
+        string key,
+        string value,
+        CancellationToken ct)
+    {
+        return conn.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT INTO user_settings(user_id, key, value) VALUES(@userId, @key, @value)
+            ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value;
+            """,
+            new { userId = _user.UserId, key, value },
+            transaction: tx,
+            cancellationToken: ct));
     }
     public async Task<GoogleCredentials?> GetGoogleCredentialsAsync(CancellationToken ct)
     {

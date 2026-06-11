@@ -20,10 +20,14 @@ Eigen-Authentifizierung — ausschließlich Keycloak.
 ### Scope (pro User getrennt)
 - **Chats** (`messages`, `chat_clear_markers`, `audit_log`)
 - **Kalender** (Google-OAuth-Token pro User)
+- **Kalender-Einstellungen** (Arbeitszeiten, Termindauer, Such-Horizont,
+  CalendarId) — *Erweiterung 2026-06-11*: `user_settings`-Tabelle (Migration
+  0015), Lesen mit Fallback auf die globalen `app_settings` als Seed/Default,
+  Schreiben nur user-scoped
 - **Autonomer Agent**: IMAP-Quellen, Suggestions, Scheduler-Lauf pro User
 
 ### Global (geteilt, kein User-Bezug)
-- `rules`, `app_settings` (LLM-Endpoint, Arbeitszeiten, Google-Client-Credentials, VAPID), Persona
+- `rules`, `app_settings` (LLM-Endpoint, Google-Client-Credentials, VAPID), Persona
 
 ### Bewusst out of scope (dokumentierte Limitierungen)
 - **WhatsApp**: Der Sidecar hält eine Baileys-Session. WhatsApp bleibt in dieser

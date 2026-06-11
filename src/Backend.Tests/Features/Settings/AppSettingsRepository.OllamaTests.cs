@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using Dapper;
 using FluentAssertions;
 using NauAssist.Backend.Features.Settings;
@@ -11,7 +12,7 @@ public sealed class AppSettingsRepositoryOllamaTests
     public async Task GetOllama_ReturnsSeededDefaults()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         var s = await repo.GetOllamaAsync(CancellationToken.None);
 
@@ -25,7 +26,7 @@ public sealed class AppSettingsRepositoryOllamaTests
     public async Task SetOllama_RoundtripsAllFields()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetOllamaAsync(
             new OllamaUserSettings("https://ollama.lan:11434", "secret-key", 8192, 0.7),
@@ -43,7 +44,7 @@ public sealed class AppSettingsRepositoryOllamaTests
     public async Task SetOllama_EmptyApiKey_ReadsBackAsNull()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetOllamaAsync(
             new OllamaUserSettings("http://h", ApiKey: "", 16384, 0.3),
@@ -57,7 +58,7 @@ public sealed class AppSettingsRepositoryOllamaTests
     public async Task SetOllama_NullApiKey_PersistsAsEmpty()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetOllamaAsync(
             new OllamaUserSettings("http://h", ApiKey: null, 16384, 0.3),

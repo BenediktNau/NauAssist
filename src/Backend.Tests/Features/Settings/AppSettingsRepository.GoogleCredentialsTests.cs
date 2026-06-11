@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using Dapper;
 using FluentAssertions;
 using NauAssist.Backend.Features.Settings;
@@ -11,7 +12,7 @@ public sealed class AppSettingsRepositoryGoogleCredentialsTests
     public async Task GetGoogleCredentials_FreshDb_ReturnsNull()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         var creds = await repo.GetGoogleCredentialsAsync(CancellationToken.None);
 
@@ -22,7 +23,7 @@ public sealed class AppSettingsRepositoryGoogleCredentialsTests
     public async Task SetThenGet_Roundtrips()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetGoogleCredentialsAsync(
             new GoogleCredentials("123.apps.googleusercontent.com", "GOCSPX-secret"),
@@ -39,7 +40,7 @@ public sealed class AppSettingsRepositoryGoogleCredentialsTests
     public async Task SetGoogleCredentials_ClearsExistingOauthTokens()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         using (var conn = db.AppDb.OpenConnection())
         {
