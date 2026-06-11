@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace NauAssist.Backend.Tests.Helpers;
 
-public sealed class TestAppFactory : WebApplicationFactory<Program>
+public class TestAppFactory : WebApplicationFactory<Program>
 {
     private readonly string _dbPath;
 
