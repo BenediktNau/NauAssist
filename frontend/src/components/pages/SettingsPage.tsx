@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys, useCalendarSettingsQuery } from "@/hooks/queries";
+import { PageLoader } from "@/components/nau/PageLoader";
 import type { AppPage } from "@/App";
 import {
   getLlmSettings,
@@ -24,7 +27,7 @@ import { ImapSection } from "@/components/settings/ImapSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
 import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
-import { getCapabilities, type Capabilities } from "@/api/capabilities";
+import { getCapabilities } from "@/api/capabilities";
 import { useAuth } from "@/lib/authContext";
 
 interface SettingsPageProps {
@@ -261,27 +264,60 @@ function ModelCombobox({
 }
 
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
-  const [llm, setLlm] = useState<LlmSettings | null>(null);
-  const [ollama, setOllama] = useState<OllamaSettings | null>(null);
-  const [calendar, setCalendar] = useState<CalendarSettings | null>(null);
-  const [caps, setCaps] = useState<Capabilities | null>(null);
-  const [topError, setTopError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const llmQuery = useQuery({ queryKey: queryKeys.llmSettings, queryFn: getLlmSettings });
+  const ollamaQuery = useQuery({
+    queryKey: queryKeys.ollamaSettings,
+    queryFn: getOllamaSettings,
+  });
+  const calendarQuery = useCalendarSettingsQuery();
+  const capsQuery = useQuery({
+    queryKey: queryKeys.capabilities,
+    queryFn: getCapabilities,
+  });
 
-  useEffect(() => {
-    Promise.all([getLlmSettings(), getOllamaSettings(), getCalendarSettings()])
-      .then(([l, o, c]) => {
-        setLlm(l);
-        setOllama(o);
-        setCalendar(c);
-      })
-      .catch((e) => setTopError(String(e.message ?? e)));
-  }, []);
+  // Lokale Kopien gewinnen nach Saves; Query-Daten füllen initial.
+  // Die Setter spiegeln Saves in den Cache, damit andere Seiten
+  // (z. B. CalendarBoard via calendar-settings) frische Werte sehen.
+  const [llmLocal, setLlmLocal] = useState<LlmSettings | null>(null);
+  const [ollamaLocal, setOllamaLocal] = useState<OllamaSettings | null>(null);
+  const [calendarLocal, setCalendarLocal] = useState<CalendarSettings | null>(null);
 
-  useEffect(() => {
-    getCapabilities()
-      .then(setCaps)
-      .catch(() => setCaps({ whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }));
-  }, []);
+  const llm = llmLocal ?? llmQuery.data ?? null;
+  const ollama = ollamaLocal ?? ollamaQuery.data ?? null;
+  const calendar = calendarLocal ?? calendarQuery.data ?? null;
+
+  const setLlm = (l: LlmSettings) => {
+    setLlmLocal(l);
+    queryClient.setQueryData(queryKeys.llmSettings, l);
+  };
+  const setOllama = (o: OllamaSettings) => {
+    setOllamaLocal(o);
+    queryClient.setQueryData(queryKeys.ollamaSettings, o);
+  };
+  const setCalendar = (c: CalendarSettings) => {
+    setCalendarLocal(c);
+    queryClient.setQueryData(queryKeys.calendarSettings, c);
+  };
+
+  // Capabilities-Fehler → konservative Defaults (wie bisheriger catch-Fallback).
+  const caps =
+    capsQuery.data ??
+    (capsQuery.isError
+      ? { whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }
+      : null);
+
+  const topError =
+    llmQuery.error?.message ??
+    ollamaQuery.error?.message ??
+    calendarQuery.error?.message ??
+    null;
+
+  const initialPending =
+    llmQuery.isPending ||
+    ollamaQuery.isPending ||
+    calendarQuery.isPending ||
+    capsQuery.isPending;
 
   const navItems = [
     { n: "01", label: "Sprachmodell", anchor: "section-llm" },
@@ -341,40 +377,46 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         </nav>
       </aside>
 
-      <main className="max-w-[980px] px-4 pb-12 pt-6 lg:px-16 lg:pb-20 lg:pt-10">
-        <div className="mb-9">
-          <div className="mb-3 hidden font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim lg:block">
-            — EINSTELLUNGEN —
-          </div>
-          <h1 className="m-0 font-sans text-3xl font-normal leading-[1.05] tracking-tight text-nau-fg lg:text-4xl">
-            Provider &amp; Kalender.
-          </h1>
-        </div>
+      <main className="flex max-w-[980px] flex-col px-4 pb-12 pt-6 lg:px-16 lg:pb-20 lg:pt-10">
+        {initialPending ? (
+          <PageLoader label="LADE EINSTELLUNGEN" />
+        ) : (
+          <>
+            <div className="mb-9">
+              <div className="mb-3 hidden font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim lg:block">
+                — EINSTELLUNGEN —
+              </div>
+              <h1 className="m-0 font-sans text-3xl font-normal leading-[1.05] tracking-tight text-nau-fg lg:text-4xl">
+                Provider &amp; Kalender.
+              </h1>
+            </div>
 
-        {topError && (
-          <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
-            // SETTINGS NICHT LADBAR — {topError}
-          </div>
+            {topError && (
+              <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
+                // SETTINGS NICHT LADBAR — {topError}
+              </div>
+            )}
+
+            {llm && ollama && (
+              <LlmSection llm={llm} setLlm={setLlm} ollama={ollama} setOllama={setOllama} />
+            )}
+            {calendar && <CalendarSection calendar={calendar} setCalendar={setCalendar} />}
+
+            <PersonaSection anchor="section-persona" />
+
+            <PushSection anchor="section-push" />
+
+            <ImapSection anchor="section-imap" />
+
+            {caps?.whatsApp && <WhatsAppSection anchor="section-whatsapp" />}
+
+            <AccountFooter />
+
+            <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
+              <SecondaryButton onClick={() => onNavigate("chat")}>ZURÜCK ZUM CHAT</SecondaryButton>
+            </div>
+          </>
         )}
-
-        {llm && ollama && (
-          <LlmSection llm={llm} setLlm={setLlm} ollama={ollama} setOllama={setOllama} />
-        )}
-        {calendar && <CalendarSection calendar={calendar} setCalendar={setCalendar} />}
-
-        <PersonaSection anchor="section-persona" />
-
-        <PushSection anchor="section-push" />
-
-        <ImapSection anchor="section-imap" />
-
-        {caps?.whatsApp && <WhatsAppSection anchor="section-whatsapp" />}
-
-        <AccountFooter />
-
-        <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
-          <SecondaryButton onClick={() => onNavigate("chat")}>ZURÜCK ZUM CHAT</SecondaryButton>
-        </div>
       </main>
     </div>
   );
