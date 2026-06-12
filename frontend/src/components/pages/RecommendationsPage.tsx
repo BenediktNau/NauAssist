@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queries";
 import { PageLoader } from "@/components/nau/PageLoader";
@@ -47,7 +47,7 @@ export function RecommendationsPage({
     queryFn: () => listSuggestions(filter === "all" ? undefined : filter),
     placeholderData: keepPreviousData,
   });
-  const items = suggestionsQuery.data ?? [];
+  const items = useMemo(() => suggestionsQuery.data ?? [], [suggestionsQuery.data]);
   const reloadSuggestions = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.suggestionsPrefix });
 
