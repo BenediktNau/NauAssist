@@ -1,0 +1,57 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  schedule:
+    # Jeden Montag 06:00 UTC — wöchentlicher Scan auch ohne neue Commits
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── npm audit (Frontend + Sidecar) ─────────────────────────────
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [frontend, sidecar]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm audit (${{ matrix.project }})
+        working-directory: ${{ matrix.project }}
+        # Schlägt erst ab "high" fehl; Warnungen darunter werden geloggt, brechen
+        # den Build aber nicht ab.
+        run: npm audit --audit-level=high
+
+  # ── Trivy: Dependencies + Dockerfile/IaC im gesamten Repo ──────
+  trivy-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
