@@ -14,6 +14,7 @@ using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
@@ -25,12 +26,28 @@ using NauAssist.Backend.Features.Settings;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection("Persistence"));
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
 builder.Services.Configure<AutonomousAgentOptions>(builder.Configuration.GetSection("AutonomousAgent"));
 builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time"));
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
+
+// User-Kontext: scoped, beide Interfaces auf derselben Instanz. Default = Single-User;
+// gesetzt wird er von der Auth-Middleware (HTTP) bzw. vom Scheduler (Background).
+builder.Services.AddScoped<UserContextHolder>();
+builder.Services.AddScoped<IUserContext>(sp => sp.GetRequiredService<UserContextHolder>());
+builder.Services.AddScoped<IUserContextSetter>(sp => sp.GetRequiredService<UserContextHolder>());
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddHttpContextAccessor();
+
+// Keycloak-Auth (BFF) ist opt-in — aus heißt: exakt heutiges Single-User-Verhalten.
+var authOptions = builder.Configuration.GetSection("Auth").Get<AuthOptions>() ?? new AuthOptions();
+if (authOptions.Enabled)
+{
+    builder.AddBffAuth(authOptions);
+}
 
 builder.Services.AddSingleton<Func<DateTimeOffset>>(_ => () => DateTimeOffset.UtcNow);
 builder.Services.AddSingleton<TimeZoneInfo>(sp =>
@@ -166,6 +183,12 @@ if (args.Contains("auth"))
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+if (authOptions.Enabled)
+{
+    app.UseBffAuth();
+    app.MapAuthEndpoints();
+}
+
 app.MapHealthEndpoints();
 app.MapRulesEndpoints();
 app.MapChatEndpoints();
@@ -181,7 +204,8 @@ if (whatsAppOptions.Enabled)
     app.MapWhatsAppSourceEndpoints();
 }
 
-app.MapFallbackToFile("index.html");
+// Frontend muss vor dem Login laden — es stößt den Redirect zu Keycloak selbst an.
+app.MapFallbackToFile("index.html").AllowAnonymous();
 
 await app.RunAsync();
 return 0;

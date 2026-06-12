@@ -12,6 +12,15 @@ services:
       - AutonomousAgent__WhatsApp__Enabled=${WHATSAPP_ENABLED:-false}
       - AutonomousAgent__WhatsApp__SidecarBaseUrl=http://nauassist-wa:3000
       - AutonomousAgent__WhatsApp__SharedSecret=${WHATSAPP_SHARED_SECRET:-}
+      # Keycloak-Auth ist opt-in (BFF). Standard: aus → Single-User wie bisher.
+      - Auth__Enabled=${AUTH_ENABLED:-false}
+      - Auth__Authority=${AUTH_AUTHORITY:-http://localhost:8081}
+      - Auth__Realm=${AUTH_REALM:-nauassist}
+      - Auth__ClientId=${AUTH_CLIENT_ID:-nauassist-web}
+      - Auth__ClientSecret=${AUTH_CLIENT_SECRET:-nauassist-dev-secret}
+      # Backchannel übers Compose-Netz (kein TLS-Hairpin durch den Coolify-Proxy).
+      - Auth__InternalUrl=${AUTH_INTERNAL_URL:-http://keycloak:8080}
+      - Auth__RequireHttpsMetadata=${AUTH_REQUIRE_HTTPS_METADATA:-false}
     restart: unless-stopped
 
   # Startet NUR mit aktivem Compose-Profil "whatsapp" (siehe .env / COMPOSE_PROFILES).
@@ -28,6 +37,33 @@ services:
       - "3000" # nur internes Compose-Netz, kein Host-Port
     restart: unless-stopped
 
+  # Startet NUR mit aktivem Compose-Profil "auth" (siehe .env / COMPOSE_PROFILES).
+  # Lokal/personal: start-dev mit H2-Datei im Volume; Postgres-Hardening = Later.
+  # Coolify: dem Service eine eigene (Sub-)Domain zuweisen → KC_HOSTNAME setzen,
+  # TLS terminiert am Proxy (KC_PROXY_HEADERS/KC_HTTP_ENABLED).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    profiles: ["auth"]
+    command: start-dev --import-realm
+    ports:
+      - "8081:8080" # Browser muss Keycloak direkt erreichen (Login-Redirect)
+    volumes:
+      - keycloak-data:/opt/keycloak/data/h2
+      - ./keycloak/realm-nauassist.json:/opt/keycloak/data/import/realm-nauassist.json:ro
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN:-admin}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_HOSTNAME=${KC_HOSTNAME:-}
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+      # Platzhalter im Realm-Import (keycloak/realm-nauassist.json):
+      - NAUASSIST_OIDC_SECRET=${AUTH_CLIENT_SECRET:-nauassist-dev-secret}
+      - NAUASSIST_PUBLIC_URL=${AUTH_PUBLIC_URL:-http://localhost:8080}
+      - NAUASSIST_TEST_USER=${NAUASSIST_TEST_USER:-test}
+      - NAUASSIST_TEST_PASSWORD=${NAUASSIST_TEST_PASSWORD:-test}
+    restart: unless-stopped
+
 volumes:
   nauassist-data:
   nauassist-wa:
+  keycloak-data:

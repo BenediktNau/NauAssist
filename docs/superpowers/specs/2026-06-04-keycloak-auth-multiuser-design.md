@@ -1,7 +1,14 @@
 # Keycloak-Auth & Multi-User — Design
 
 **Datum:** 2026-06-04
-**Status:** Approved (Brainstorming abgeschlossen, Review durch User ausstehend)
+**Status:** Approved
+**Update 2026-06-11:** §1, §7, §8 vom SPA-Token-Ansatz (react-oidc-context + PKCE
++ Bearer) auf das **BFF-Pattern** umgestellt — Cookie + serverseitiger OIDC-Flow,
+nach Review der Referenz-Implementierung im Abrechner (`../abrechner`,
+`Api/Program.cs`). Begründung: NauAssist serviert das Frontend aus dem Backend
+(same-origin) → Cookie-Auth ohne CORS-Themen, das komplette Token-Handling im
+Frontend entfällt, und der Abrechner-Code (inkl. Coolify-Erfahrungswerte wie
+Backchannel-Handler und Proxy-Konfiguration) ist direkt wiederverwendbar.
 
 ## Ziel
 
@@ -13,10 +20,14 @@ Eigen-Authentifizierung — ausschließlich Keycloak.
 ### Scope (pro User getrennt)
 - **Chats** (`messages`, `chat_clear_markers`, `audit_log`)
 - **Kalender** (Google-OAuth-Token pro User)
+- **Kalender-Einstellungen** (Arbeitszeiten, Termindauer, Such-Horizont,
+  CalendarId) — *Erweiterung 2026-06-11*: `user_settings`-Tabelle (Migration
+  0015), Lesen mit Fallback auf die globalen `app_settings` als Seed/Default,
+  Schreiben nur user-scoped
 - **Autonomer Agent**: IMAP-Quellen, Suggestions, Scheduler-Lauf pro User
 
 ### Global (geteilt, kein User-Bezug)
-- `rules`, `app_settings` (LLM-Endpoint, Arbeitszeiten, Google-Client-Credentials, VAPID), Persona
+- `rules`, `app_settings` (LLM-Endpoint, Google-Client-Credentials, VAPID), Persona
 
 ### Bewusst out of scope (dokumentierte Limitierungen)
 - **WhatsApp**: Der Sidecar hält eine Baileys-Session. WhatsApp bleibt in dieser
@@ -32,26 +43,51 @@ Eigen-Authentifizierung — ausschließlich Keycloak.
 
 ---
 
-## §1 · Auth-Toggle & Konfiguration
+## §1 · Auth-Toggle & Konfiguration (BFF-Pattern)
 
 Neuer Config-Block `Auth`, env-getrieben (Coolify-tauglich), gespiegelt am
 bestehenden WhatsApp-Opt-in-Muster.
 
 ```
 Auth__Enabled=true|false            # der eine Schalter
-Auth__Issuer=https://auth.domain/realms/nauassist
-Auth__Audience=nauassist-api
-Auth__ClientId=nauassist-web        # fürs Frontend
+Auth__Authority=https://auth.domain # Keycloak-Basis-URL (öffentlich, ohne /realms/...)
+Auth__Realm=nauassist
+Auth__ClientId=nauassist-web
+Auth__ClientSecret=...              # confidential Client (BFF) — Secret nur im Backend
+Auth__InternalUrl=                  # optional: http://keycloak:8080 (Backchannel, s.u.)
 Auth__RequireHttpsMetadata=true     # lokal false
 ```
 
 - `Enabled=false` → heutiges Verhalten, kein Login, kein Keycloak nötig.
-- Backend registriert JWT-Bearer-Middleware + `UseAuthentication`/`UseAuthorization`
-  **nur** wenn `Enabled=true`.
-- Der bestehende **`/api/capabilities`**-Endpoint liefert künftig
-  `auth: { enabled, issuer, audience, clientId }`, damit das **Frontend seine
-  OIDC-Config zur Laufzeit vom Backend** zieht → kein Frontend-Rebuild pro
-  Umgebung (wichtig für Coolify).
+- **BFF-Pattern** (wie Abrechner): Backend registriert **Cookie-Auth + OIDC-Handler**
+  **nur** wenn `Enabled=true`. Der Authorization-Code-Flow läuft komplett
+  serverseitig (confidential Client); der Browser bekommt ausschließlich ein
+  HttpOnly-Session-Cookie (`nauassist.session`, SameSite=Lax, sliding 8h) —
+  **nie ein Token**.
+- **BFF-Endpoints** (anonym erreichbar, eigene Gruppe `/auth`):
+  - `GET /auth/login?returnUrl=…` → `Challenge` Richtung Keycloak
+    (returnUrl-Validierung gegen Open Redirect, wie Abrechner `BffRoutes`)
+  - `POST /auth/logout` → Cookie-SignOut + Keycloak-SignOut
+  - `GET /auth/me` → `{ isAuthenticated, sub, username, email }`
+- **Cookie-Events**: `OnRedirectToLogin` → 401 (statt HTML-Redirect), damit
+  API-Calls aus dem Frontend sauber reagieren können.
+- **OIDC-Details** (aus dem Abrechner übernommen): `ResponseType=code`,
+  `MapInboundClaims=false` (→ `sub` bleibt `sub`), Scopes `openid profile email`,
+  `PushedAuthorizationBehavior.Disable` (.NET 10 aktiviert PAR automatisch →
+  405 bei Keycloak).
+- **Backchannel über Compose-Netz**: Ist `Auth__InternalUrl` gesetzt, gehen
+  Metadata-/Token-Requests über `http://keycloak:8080` statt über die öffentliche
+  Domain (Abrechner-`KeycloakBackchannelHandler` 1:1 übernehmen). Vermeidet
+  TLS-Hairpin durch den Coolify-Proxy; Browser-Redirects nutzen weiter die
+  öffentliche `Authority`.
+- Der bestehende **`/api/capabilities`**-Endpoint liefert künftig nur noch
+  `auth: { enabled, loginUrl }` — das Frontend braucht **keine OIDC-Config mehr**
+  (kein Rebuild pro Umgebung; noch Coolify-freundlicher als der alte Ansatz).
+- **CSRF**: SameSite=Lax deckt state-ändernde Cross-Site-Requests ab (Cookies
+  werden nur bei Top-Level-GET-Navigation mitgesendet); explizites Antiforgery
+  wie im Abrechner = optionales Hardening (Later).
+- Hinter dem Proxy: `UseForwardedHeaders` (X-Forwarded-Proto/Host), sonst stimmen
+  Redirect-URIs nicht.
 
 `AuthOptions` wird wie die übrigen Options aus der Config gebunden (`builder.Configuration.GetSection("Auth")`).
 
@@ -75,7 +111,9 @@ Registrierung: scoped, beide Interfaces auf dieselbe Instanz.
 `builder.Services.AddHttpContextAccessor()` wird ergänzt.
 
 - **HTTP-Pfad**: Middleware liest `sub` aus `HttpContext.User` und ruft
-  `Set(sub)`. Auth aus → Holder bleibt auf Default-User.
+  `Set(sub)`. Auth aus → Holder bleibt auf Default-User. Funktioniert mit dem
+  Cookie-Principal identisch wie mit Bearer (`MapInboundClaims=false` → der
+  `sub`-Claim bleibt unverändert erhalten).
 - **Background-Pfad** (autonomer Agent): Der Scheduler öffnet pro User einen
   DI-Scope und ruft `IUserContextSetter.Set(userId)` — dort gibt es keinen
   HttpContext.
@@ -102,14 +140,22 @@ keycloak:
     - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
     - KC_HOSTNAME=${KC_HOSTNAME:-}
     - KC_PROXY_HEADERS=xforwarded
+    - KC_HTTP_ENABLED=true
     - NAUASSIST_TEST_USER=${NAUASSIST_TEST_USER:-test}
     - NAUASSIST_TEST_PASSWORD=${NAUASSIST_TEST_PASSWORD:-test}
   restart: unless-stopped
 ```
 
 - Über `COMPOSE_PROFILES=auth` (analog `whatsapp`) zuschaltbar.
-- **Coolify**: `KC_HOSTNAME` = öffentliche Auth-(Sub-)Domain, `KC_PROXY_HEADERS=xforwarded`
-  hinter Traefik. Alles über env → derselbe Stack lokal & auf Coolify.
+- **Coolify**: `KC_HOSTNAME` = öffentliche Auth-(Sub-)Domain (in Coolify dem
+  `keycloak`-Service als Domain zuweisen; Zertifikate macht der Coolify-Proxy),
+  `KC_PROXY_HEADERS=xforwarded` + `KC_HTTP_ENABLED=true` hinter dem Proxy
+  (TLS terminiert am Proxy; bei `start-dev` ist HTTP eh an, bei späterem
+  Prod-Mode `start` Pflicht — Abrechner-Staging macht es genau so). Alles über
+  env → derselbe Stack lokal & auf Coolify.
+- Die NauAssist-App bekommt zusätzlich `Auth__InternalUrl=http://keycloak:8080`,
+  damit der OIDC-Backchannel übers interne Compose-Netz läuft (kein Hairpin
+  durch den Proxy, siehe §1).
 - H2-Datei im Volume (personal/dev). Postgres-Hardening = Later.
 
 `.env.example` wird um den Auth-Block ergänzt (analog WhatsApp-Block), mit
@@ -154,10 +200,11 @@ Source-Cursor-Tabelle, `web_push`, `reply_metadata`.
 - **Provisioning**: Beim ersten authentifizierten Request Upsert in `users`
   (`sub`, `preferred_username`, `email`, `last_seen_at`). Keycloak bleibt
   Source-of-Truth, kein eigenes Admin-UI. Der Upsert läuft in der
-  User-Context-Middleware (nach erfolgreicher Token-Validierung).
+  User-Context-Middleware (nach erfolgreicher Authentifizierung).
 - **Schutz**: Alle `/api/*`-Endpoints `RequireAuthorization()` wenn Auth an;
-  `/api/health` und `/api/capabilities` bleiben offen (Frontend braucht
-  Capabilities **vor** dem Login).
+  `/api/health`, `/api/capabilities` und die `/auth/*`-BFF-Endpoints bleiben
+  offen (Frontend braucht Capabilities **vor** dem Login; Login/Logout/me sind
+  per Definition anonym erreichbar).
 - **Repos**: bekommen `IUserContext` injiziert → `WHERE user_id = @UserId` in
   allen per-User-Queries; Inserts setzen `user_id = ctx.UserId`.
 - **Chat-Session**: `ChatEndpoints` behält `session_id = "default"`;
@@ -189,9 +236,18 @@ Realm-Export `keycloak/realm-nauassist.json`, via `--import-realm` gemountet,
 enthält deklarativ:
 
 - Realm `nauassist`
-- Public-Client `nauassist-web` (Standard-Flow + PKCE, Redirect-URIs/Web-Origins
-  aus env bzw. mit lokalen Defaults `http://localhost:8080/*`)
-- Audience-Mapper, der `nauassist-api` als `aud` ins Access-Token schreibt
+- **Confidential-Client** `nauassist-web` (Standard-Flow, `publicClient: false`,
+  zusätzlich PKCE S256 als Hardening — wie der Abrechner-Client). Redirect-URIs
+  zeigen auf den **OIDC-Callback des Backends** (`<App-URL>/signin-oidc`,
+  Post-Logout `<App-URL>/signout-callback-oidc`), aus env bzw. mit lokalem
+  Default `http://localhost:8080/*`.
+- **Client-Secret**: im Export `${NAUASSIST_OIDC_SECRET}` (Keycloak ersetzt
+  env-Platzhalter beim Realm-Import — derselbe Mechanismus wie beim Test-User).
+  Dasselbe Secret bekommt die App als `Auth__ClientSecret`. Fallback, falls die
+  Substitution Probleme macht: Placeholder importieren und Secret einmalig in
+  der Admin-Konsole setzen (so handhabt es der Abrechner in Staging).
+- ~~Audience-Mapper~~ entfällt — es gibt kein Access-Token im Browser mehr,
+  das Backend validiert den Code-Flow direkt gegen Keycloak.
 - **Vorab angelegter Test-User** (Username/Passwort aus
   `NAUASSIST_TEST_USER`/`NAUASSIST_TEST_PASSWORD`, Default `test`/`test`, mit
   E-Mail) → nach `docker compose --profile auth up` sofort einloggbar.
@@ -202,14 +258,16 @@ Weitere User legt der Betreiber in der Keycloak-Admin-Konsole an.
 
 ## §8 · Frontend
 
-- Lib: `react-oidc-context` (+ `oidc-client-ts`).
-- OIDC-Config wird zur **Laufzeit** aus `/api/capabilities` gelesen
-  (`auth.issuer`, `auth.clientId`) → kein Rebuild pro Umgebung.
-- Flow: Auth an & nicht eingeloggt → Redirect zu Keycloak (Auth-Code + PKCE).
-  Access-Token in-memory + Refresh-Token-Handling durch die Lib.
-- `api/client.ts`: hängt **Bearer-Header** an alle Calls. 401 → Silent-Refresh,
-  bei Fehlschlag Re-Login.
-- Logout-Button (ruft Keycloak-Logout + lokales Token-Clearing).
+Durch das BFF-Pattern **keine OIDC-Bibliothek, kein Token-Handling** — das
+Frontend kennt nur das Session-Cookie (läuft bei same-origin automatisch mit).
+
+- **AuthProvider** (analog Abrechner `shared/lib/auth/AuthProvider.tsx`):
+  liest beim Boot `capabilities.auth.enabled`; wenn an → `GET /auth/me`.
+  Nicht eingeloggt → `window.location = '/auth/login?returnUrl=<aktuelle Route>'`.
+- `api/client.ts`: **kein** Bearer-Header. Antwortet ein Call mit 401
+  (Session abgelaufen) → Redirect auf `/auth/login` (Keycloak-SSO-Session
+  loggt i.d.R. transparent wieder ein, ohne Passwort-Prompt).
+- Logout-Button: `POST /auth/logout` (beendet Cookie- und Keycloak-Session).
 - Auth aus (`capabilities.auth.enabled === false`) → **keinerlei Login-UI**,
   exakt wie heute.
 
@@ -219,9 +277,9 @@ Weitere User legt der Betreiber in der Keycloak-Admin-Konsole an.
 
 | Situation | Verhalten |
 |-----------|-----------|
-| Auth an, kein/ungültiges Token | 401 → Frontend leitet zum Login |
-| Token abgelaufen mid-session | 401 → Silent-Refresh; scheitert → Re-Login |
-| Keycloak beim Start nicht erreichbar | JWKS wird lazy beim ersten Request geladen; bis dahin 401/503 (dokumentiert) |
+| Auth an, keine/ungültige Session | 401 (`OnRedirectToLogin` → Statuscode statt HTML-Redirect) → Frontend leitet auf `/auth/login` |
+| Session abgelaufen mid-session | 401 → Redirect auf `/auth/login`; solange die Keycloak-SSO-Session lebt, läuft der Re-Login transparent ohne Passwort-Prompt |
+| Keycloak beim Start nicht erreichbar | OIDC-Metadata wird lazy beim ersten Login-Versuch geladen; bis dahin schlägt nur der Login fehl (5xx), `Enabled=false`-Betrieb ist nie betroffen |
 | Auth aus | Alle Requests laufen als Default-User durch |
 | Scheduler: User ohne Kalender-Token | User wird übersprungen, Lauf geht weiter |
 
@@ -234,8 +292,9 @@ Weitere User legt der Betreiber in der Keycloak-Admin-Konsole an.
 - **Neue Isolations-Tests**: zwei User-Kontexte, Daten-Trennung asserten
   (Chats, Kalender-Token, Suggestions sehen sich gegenseitig nicht).
 - **Toggle-Test**: „Auth aus → Default-User" liefert `nauassist-default`.
-- **Provisioning-Test**: erster authentifizierter Zugriff legt `users`-Zeile an.
-- Token-Signatur-Validierung = Standard-JWT-Bearer-Middleware, nicht eigens
+- **Provisioning-Test**: erster authentifizierter Zugriff legt `users`-Zeile an
+  (Integrationstest mit Test-Auth-Handler/fixem `ClaimsPrincipal`, kein Keycloak).
+- OIDC-Code-Flow & Cookie-Handling = Standard-ASP.NET-Middleware, nicht eigens
   getestet.
 - **E2E/manuell**: `docker compose --profile auth up`, Login mit Seed-User,
   zweiter User → getrennte Chats/Kalender verifizieren.
@@ -246,15 +305,19 @@ Weitere User legt der Betreiber in der Keycloak-Admin-Konsole an.
 
 **Neu**
 - `src/Backend/Features/Infrastructure/Auth/` — `AuthOptions`, `IUserContext`,
-  `UserContextHolder`, User-Context-Middleware, `UserRepository`, `DefaultUser`
+  `UserContextHolder`, User-Context-Middleware, `UserRepository`, `DefaultUser`,
+  BFF-Endpoints (`/auth/login|logout|me`), `KeycloakBackchannelHandler`
+  (aus Abrechner `Api/Program.cs` portieren)
 - `src/Backend/Features/Infrastructure/Persistence/Migrations/0014_multi_user.sql`
 - `keycloak/realm-nauassist.json`
-- Frontend: OIDC-Provider-Wiring, Login/Logout-UI, Token-Interceptor
+- Frontend: `AuthProvider` (capabilities → `/auth/me` → ggf. Login-Redirect),
+  Logout-Button
 
 **Geändert**
-- `Program.cs` (Auth-Wiring conditional, HttpContextAccessor, UserContext-DI)
+- `Program.cs` (Cookie+OIDC-Wiring conditional, `UseForwardedHeaders`,
+  HttpContextAccessor, UserContext-DI)
 - `docker-compose.yml`, `.env.example` (Keycloak-Service + Auth-Block)
-- `CapabilitiesEndpoints.cs` (auth-Block)
+- `CapabilitiesEndpoints.cs` (auth-Block: `{ enabled, loginUrl }`)
 - Alle per-User-Repos (`MessageRepository`, `ChatClearMarkerRepository`,
   `AuditLogRepository`, `SuggestionRepository`, `SourceAccountRepository`,
   `SourceCursorRepository`, Web-Push-Repo) → `IUserContext`-Filter

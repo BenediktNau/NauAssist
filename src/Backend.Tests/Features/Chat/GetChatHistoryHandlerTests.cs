@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Chat.ChatHistory;
@@ -11,8 +12,8 @@ public sealed class GetChatHistoryHandlerTests
 
     private static GetChatHistoryHandler BuildHandler(TempSqliteDb temp)
     {
-        var messages = new MessageRepository(temp.AppDb);
-        var markers = new ChatClearMarkerRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
+        var markers = new ChatClearMarkerRepository(temp.AppDb, new UserContextHolder());
         var cutoff = new ChatContextCutoff(markers, () => Now, TimeZoneInfo.Utc);
         return new GetChatHistoryHandler(messages, markers, cutoff);
     }
@@ -21,7 +22,7 @@ public sealed class GetChatHistoryHandlerTests
     public async Task Handle_ReturnsMessagesOldestFirst()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         for (var i = 0; i < 3; i++)
         {
@@ -40,7 +41,7 @@ public sealed class GetChatHistoryHandlerTests
     public async Task Handle_ExcludesMessagesBeforeDayStart()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         // Day start = 2026-05-19T05:00Z. Die erste Message liegt davor.
         await repo.AddAsync(
@@ -61,7 +62,7 @@ public sealed class GetChatHistoryHandlerTests
     public async Task Handle_FiltersBySession()
     {
         using var temp = new TempSqliteDb();
-        var repo = new MessageRepository(temp.AppDb);
+        var repo = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         await repo.AddAsync(new Message(0, "a", MessageRole.User, "alpha", null, false, Now), CancellationToken.None);
         await repo.AddAsync(new Message(0, "b", MessageRole.User, "beta", null, false, Now.AddMinutes(1)), CancellationToken.None);
@@ -75,7 +76,7 @@ public sealed class GetChatHistoryHandlerTests
     public async Task Handle_ReturnsMarkersWithinDayStart()
     {
         using var temp = new TempSqliteDb();
-        var markerRepo = new ChatClearMarkerRepository(temp.AppDb);
+        var markerRepo = new ChatClearMarkerRepository(temp.AppDb, new UserContextHolder());
 
         // Marker vor day-start (04:00Z) wird ignoriert; späterer Marker erscheint.
         await markerRepo.AddAsync("default", DateTimeOffset.Parse("2026-05-19T04:00:00Z"), CancellationToken.None);

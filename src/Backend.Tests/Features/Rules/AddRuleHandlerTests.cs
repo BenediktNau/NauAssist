@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NauAssist.Backend.Features.Infrastructure.Audit;
@@ -14,7 +15,7 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit, () => DateTimeOffset.Parse("2026-05-19T12:00:00+02:00"));
 
         var request = new AddRuleRequest(
@@ -38,7 +39,7 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         var request = new AddRuleRequest(
@@ -58,7 +59,7 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         var request = new AddRuleRequest(
@@ -78,7 +79,7 @@ public sealed class AddRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         await handler.Handle(new AddRuleRequest(

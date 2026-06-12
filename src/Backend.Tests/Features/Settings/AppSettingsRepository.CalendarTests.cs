@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Tests.Helpers;
@@ -10,7 +11,7 @@ public sealed class AppSettingsRepositoryCalendarTests
     public async Task GetCalendar_ReturnsSeededDefaults()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         var s = await repo.GetCalendarAsync(CancellationToken.None);
 
@@ -25,7 +26,7 @@ public sealed class AppSettingsRepositoryCalendarTests
     public async Task SetCalendar_RoundtripsAllFields()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetCalendarAsync(
             new CalendarUserSettings(
@@ -43,5 +44,34 @@ public sealed class AppSettingsRepositoryCalendarTests
         loaded.WorkingHoursEnd.Should().Be(new TimeOnly(19, 45));
         loaded.DefaultDurationMinutes.Should().Be(30);
         loaded.SearchHorizonDays.Should().Be(21);
+    }
+
+    [Fact]
+    public async Task SetCalendar_IstProUser_AndereUserBehaltenDefaults()
+    {
+        using var db = new TempSqliteDb();
+        var alice = new UserContextHolder();
+        alice.Set("alice");
+        var bob = new UserContextHolder();
+        bob.Set("bob");
+        var aliceRepo = new AppSettingsRepository(db.AppDb, alice);
+        var bobRepo = new AppSettingsRepository(db.AppDb, bob);
+
+        await aliceRepo.SetCalendarAsync(
+            new CalendarUserSettings(
+                CalendarId: "alice@nau.studio",
+                WorkingHoursStart: new TimeOnly(6, 0),
+                WorkingHoursEnd: new TimeOnly(14, 0),
+                DefaultDurationMinutes: 45,
+                SearchHorizonDays: 7),
+            CancellationToken.None);
+
+        var bobSettings = await bobRepo.GetCalendarAsync(CancellationToken.None);
+        bobSettings.CalendarId.Should().Be("primary");
+        bobSettings.WorkingHoursStart.Should().Be(new TimeOnly(9, 0));
+
+        var aliceSettings = await aliceRepo.GetCalendarAsync(CancellationToken.None);
+        aliceSettings.CalendarId.Should().Be("alice@nau.studio");
+        aliceSettings.WorkingHoursStart.Should().Be(new TimeOnly(6, 0));
     }
 }

@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NauAssist.Backend.Features.Calendar;
@@ -14,7 +15,7 @@ public sealed class CreateEventHandlerTests
     {
         using var db = new TempSqliteDb();
         var provider = new FakeCalendarProvider();
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(provider, audit);
 
         var response = await handler.Handle(new CreateEventRequest(
@@ -32,7 +33,7 @@ public sealed class CreateEventHandlerTests
     {
         using var db = new TempSqliteDb();
         var provider = new FakeCalendarProvider();
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(provider, audit);
 
         var act = async () => await handler.Handle(new CreateEventRequest(
@@ -50,7 +51,7 @@ public sealed class CreateEventHandlerTests
     {
         using var db = new TempSqliteDb();
         var provider = new FakeCalendarProvider();
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(provider, audit);
 
         var act = async () => await handler.Handle(new CreateEventRequest(
@@ -68,7 +69,7 @@ public sealed class CreateEventHandlerTests
     {
         using var db = new TempSqliteDb();
         var provider = new FakeCalendarProvider();
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(provider, audit);
 
         var response = await handler.Handle(new CreateEventRequest(
@@ -97,7 +98,7 @@ public sealed class CreateEventHandlerTests
     {
         using var db = new TempSqliteDb();
         var provider = new FakeCalendarProvider();
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(provider, audit);
 
         await handler.Handle(new CreateEventRequest(

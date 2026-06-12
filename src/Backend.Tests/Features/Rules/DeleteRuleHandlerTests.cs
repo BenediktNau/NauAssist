@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NauAssist.Backend.Features.Infrastructure.Audit;
@@ -14,7 +15,7 @@ public sealed class DeleteRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         var saved = await repo.AddAsync(new Rule(0, "weg", DayOfWeekFlags.AllDays, null, null, RuleHardness.Soft, DateTimeOffset.UtcNow), CancellationToken.None);
@@ -30,7 +31,7 @@ public sealed class DeleteRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         var response = await handler.Handle(new DeleteRuleRequest(99999), CancellationToken.None);
@@ -43,7 +44,7 @@ public sealed class DeleteRuleHandlerTests
     {
         using var db = new TempSqliteDb();
         var repo = new RuleRepository(db.AppDb);
-        var audit = new AuditLogRepository(db.AppDb);
+        var audit = new AuditLogRepository(db.AppDb, new UserContextHolder());
         var handler = BuildHandler(repo, audit);
 
         var saved = await repo.AddAsync(new Rule(0, "weg", DayOfWeekFlags.AllDays, null, null, RuleHardness.Soft, DateTimeOffset.UtcNow), CancellationToken.None);

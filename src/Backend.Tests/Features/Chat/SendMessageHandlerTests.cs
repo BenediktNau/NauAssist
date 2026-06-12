@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,7 +21,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_HappyPath_PersistsUserAndAssistant_YieldsDone()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var fakeLlm = new FakeLlmClient();
         fakeLlm.QueueResponse(new TextDeltaChunk("Hallo "), new TextDeltaChunk("Benedikt"));
@@ -47,7 +48,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_DoneEvent_AssignsMessageIdInSseDone()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var fakeLlm = new FakeLlmClient();
         fakeLlm.QueueResponse(new TextDeltaChunk("ok"));
@@ -65,7 +66,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_ProposalsEvent_PersistsProposalsJsonOnAssistantMessage()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var fakeLlm = new FakeLlmClient();
         fakeLlm.QueueResponse(new ToolCallChunk(new LlmToolCall(
@@ -92,7 +93,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_ToolLoopLimit_PersistsPartialAsIncomplete_YieldsError()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         var fakeLlm = new FakeLlmClient();
         // Unbekanntes Tool → AgentRunner loopt bis MaxToolIterations und yieldet ErrorEvent.
@@ -118,7 +119,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_RespectsClearMarker_ExcludesMessagesBefore()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         // Sechs alte Messages am 2026-05-19 vormittags …
         await messages.AddAsync(new Message(0, "default", MessageRole.User, "alt-frage", null, false,
@@ -147,7 +148,7 @@ public sealed class SendMessageHandlerTests
     public async Task Handle_PassesPriorHistoryToRunner()
     {
         using var temp = new TempSqliteDb();
-        var messages = new MessageRepository(temp.AppDb);
+        var messages = new MessageRepository(temp.AppDb, new UserContextHolder());
 
         await messages.AddAsync(new Message(0, "default", MessageRole.User, "alt-frage", null, false,
             DateTimeOffset.Parse("2026-05-19T09:00:00Z")), CancellationToken.None);

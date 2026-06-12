@@ -25,6 +25,7 @@ import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
 import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
 import { getCapabilities, type Capabilities } from "@/api/capabilities";
+import { useAuth } from "@/lib/authContext";
 
 interface SettingsPageProps {
   onNavigate: (page: AppPage) => void;
@@ -72,9 +73,7 @@ function SectionHead({ n, label, title, kicker }: SectionHeadProps) {
           {String(n).padStart(2, "0")}
         </span>
         <span className="h-px w-8 bg-nau-line" />
-        <span className="font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
-          {label}
-        </span>
+        <span className="font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">{label}</span>
       </div>
       <h2 className="m-0 mb-2 font-sans text-3xl font-normal leading-tight tracking-tight text-nau-fg">
         {title}
@@ -89,7 +88,11 @@ function SectionHead({ n, label, title, kicker }: SectionHeadProps) {
 }
 
 function TextInput({
-  value, onChange, placeholder, type = "text", disabled = false,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -109,8 +112,14 @@ function TextInput({
   );
 }
 
-function PrimaryButton({ children, onClick, disabled }: {
-  children: ReactNode; onClick: () => void; disabled?: boolean;
+function PrimaryButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -124,8 +133,14 @@ function PrimaryButton({ children, onClick, disabled }: {
   );
 }
 
-function SecondaryButton({ children, onClick, disabled }: {
-  children: ReactNode; onClick: () => void; disabled?: boolean;
+function SecondaryButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -140,7 +155,10 @@ function SecondaryButton({ children, onClick, disabled }: {
 }
 
 function ModelCombobox({
-  value, onCommit, suggestions, placeholder,
+  value,
+  onCommit,
+  suggestions,
+  placeholder,
 }: {
   value: string;
   onCommit: (v: string) => void;
@@ -161,9 +179,7 @@ function ModelCombobox({
   const isBrowseMode = trimmedDraft === "" || trimmedDraft === value;
   const filtered = isBrowseMode
     ? [...suggestions]
-    : suggestions.filter((s) =>
-        s.toLowerCase().includes(trimmedDraft.toLowerCase()),
-      );
+    : suggestions.filter((s) => s.toLowerCase().includes(trimmedDraft.toLowerCase()));
 
   const commit = (v: string) => {
     const trimmed = v.trim();
@@ -183,9 +199,15 @@ function ModelCombobox({
         <input
           ref={inputRef}
           value={draft}
-          onChange={(e) => { setDraft(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
-          onBlur={() => { setOpen(false); commit(draft); }}
+          onBlur={() => {
+            setOpen(false);
+            commit(draft);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -217,9 +239,7 @@ function ModelCombobox({
         </button>
       </div>
       {open && filtered.length > 0 && (
-        <ul
-          className="absolute left-0 right-0 z-10 mt-1 max-h-60 list-none overflow-auto border border-nau-line bg-nau-bg p-0 shadow-lg"
-        >
+        <ul className="absolute left-0 right-0 z-10 mt-1 max-h-60 list-none overflow-auto border border-nau-line bg-nau-bg p-0 shadow-lg">
           {filtered.map((s) => (
             <li key={s}>
               <button
@@ -250,7 +270,9 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   useEffect(() => {
     Promise.all([getLlmSettings(), getOllamaSettings(), getCalendarSettings()])
       .then(([l, o, c]) => {
-        setLlm(l); setOllama(o); setCalendar(c);
+        setLlm(l);
+        setOllama(o);
+        setCalendar(c);
       })
       .catch((e) => setTopError(String(e.message ?? e)));
   }, []);
@@ -258,7 +280,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   useEffect(() => {
     getCapabilities()
       .then(setCaps)
-      .catch(() => setCaps({ whatsApp: false }));
+      .catch(() => setCaps({ whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }));
   }, []);
 
   const navItems = [
@@ -267,9 +289,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     { n: "03", label: "Persona", anchor: "section-persona" },
     { n: "04", label: "Push", anchor: "section-push" },
     { n: "05", label: "E-Mail", anchor: "section-imap" },
-    ...(caps?.whatsApp
-      ? [{ n: "06", label: "WhatsApp", anchor: "section-whatsapp" }]
-      : []),
+    ...(caps?.whatsApp ? [{ n: "06", label: "WhatsApp", anchor: "section-whatsapp" }] : []),
   ];
 
   return (
@@ -338,14 +358,9 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         )}
 
         {llm && ollama && (
-          <LlmSection
-            llm={llm} setLlm={setLlm}
-            ollama={ollama} setOllama={setOllama}
-          />
+          <LlmSection llm={llm} setLlm={setLlm} ollama={ollama} setOllama={setOllama} />
         )}
-        {calendar && (
-          <CalendarSection calendar={calendar} setCalendar={setCalendar} />
-        )}
+        {calendar && <CalendarSection calendar={calendar} setCalendar={setCalendar} />}
 
         <PersonaSection anchor="section-persona" />
 
@@ -355,18 +370,36 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
         {caps?.whatsApp && <WhatsAppSection anchor="section-whatsapp" />}
 
+        <AccountFooter />
+
         <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
-          <SecondaryButton onClick={() => onNavigate("chat")}>
-            ZURÜCK ZUM CHAT
-          </SecondaryButton>
+          <SecondaryButton onClick={() => onNavigate("chat")}>ZURÜCK ZUM CHAT</SecondaryButton>
         </div>
       </main>
     </div>
   );
 }
 
+/** Nur sichtbar mit aktivierter Keycloak-Auth: eingeloggter User + Logout. */
+function AccountFooter() {
+  const auth = useAuth();
+  if (!auth.enabled) return null;
+
+  return (
+    <div className="mt-14 flex items-center justify-between border-t border-nau-line pt-6">
+      <span className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
+        // ANGEMELDET ALS {(auth.username ?? auth.email ?? "?").toUpperCase()}
+      </span>
+      <SecondaryButton onClick={() => void auth.logout()}>ABMELDEN</SecondaryButton>
+    </div>
+  );
+}
+
 function LlmSection({
-  llm, setLlm, ollama, setOllama,
+  llm,
+  setLlm,
+  ollama,
+  setOllama,
 }: {
   llm: LlmSettings;
   setLlm: (l: LlmSettings) => void;
@@ -410,16 +443,15 @@ function LlmSection({
     editingOllamaKey;
 
   const systemPromptDirty =
-    (systemPromptDraft.trim() === "" ? null : systemPromptDraft.trim())
-      !== (llm.systemPrompt ?? null);
+    (systemPromptDraft.trim() === "" ? null : systemPromptDraft.trim()) !==
+    (llm.systemPrompt ?? null);
 
   const saveLlm = async (patch: { ollamaModel?: string; systemPrompt?: string | null }) => {
     setLlmError(null);
     try {
       await updateLlmSettings({
         ollamaModel: patch.ollamaModel ?? llm.ollamaModel,
-        systemPrompt:
-          patch.systemPrompt !== undefined ? patch.systemPrompt : llm.systemPrompt,
+        systemPrompt: patch.systemPrompt !== undefined ? patch.systemPrompt : llm.systemPrompt,
       });
       const fresh = await getLlmSettings();
       setLlm(fresh);
@@ -458,10 +490,7 @@ function LlmSection({
 
   const runTest = async () => {
     setTestResult("// TESTE …");
-    const r = await testOllamaConnection(
-      hostDraft,
-      editingOllamaKey ? apiKeyDraft : null,
-    );
+    const r = await testOllamaConnection(hostDraft, editingOllamaKey ? apiKeyDraft : null);
     if (r.ok) {
       if (r.models && r.models.length > 0) {
         setAvailableModels(r.models);
@@ -476,10 +505,7 @@ function LlmSection({
     <div id="section-llm">
       <SectionHead n={1} label="SPRACHMODELL" title="Wie Nau denkt." />
 
-      <Row
-        label="Modell"
-        hint="Vorschläge — oder eigenes lokal gepulltes Modell eintippen."
-      >
+      <Row label="Modell" hint="Vorschläge — oder eigenes lokal gepulltes Modell eintippen.">
         <ModelCombobox
           value={llm.ollamaModel}
           onCommit={(v) => saveLlm({ ollamaModel: v })}
@@ -496,7 +522,9 @@ function LlmSection({
           <textarea
             value={systemPromptDraft}
             onChange={(e) => setSystemPromptDraft(e.target.value)}
-            placeholder={llm.defaultSystemPrompt || "Du bist NauAssist, ein persönlicher Kalender-Agent."}
+            placeholder={
+              llm.defaultSystemPrompt || "Du bist NauAssist, ein persönlicher Kalender-Agent."
+            }
             rows={6}
             className="min-h-[140px] w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm leading-relaxed text-nau-fg"
           />
@@ -541,7 +569,10 @@ function LlmSection({
 
       {showAdvanced && (
         <>
-          <Row label="Ollama-Host" hint="Z.B. http://localhost:11434 oder hinter einem Reverse-Proxy.">
+          <Row
+            label="Ollama-Host"
+            hint="Z.B. http://localhost:11434 oder hinter einem Reverse-Proxy."
+          >
             <div className="flex w-full flex-col gap-2 lg:max-w-[480px]">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <TextInput
@@ -580,9 +611,12 @@ function LlmSection({
                   className="min-h-11 w-full border border-nau-line bg-white/[0.03] px-3.5 py-3 font-sans text-sm text-nau-fg lg:max-w-[360px] lg:flex-1"
                 />
                 {ollama.hasApiKey && (
-                  <SecondaryButton onClick={() => {
-                    setEditingOllamaKey(false); setApiKeyDraft("");
-                  }}>
+                  <SecondaryButton
+                    onClick={() => {
+                      setEditingOllamaKey(false);
+                      setApiKeyDraft("");
+                    }}
+                  >
                     ABBRECHEN
                   </SecondaryButton>
                 )}
@@ -626,7 +660,8 @@ function LlmSection({
 }
 
 function CalendarSection({
-  calendar, setCalendar,
+  calendar,
+  setCalendar,
 }: {
   calendar: CalendarSettings;
   setCalendar: (c: CalendarSettings) => void;
@@ -737,10 +772,7 @@ function CalendarSection({
           {calendar.isConnected ? (
             <SecondaryButton onClick={disconnect}>TRENNEN</SecondaryButton>
           ) : (
-            <PrimaryButton
-              onClick={startAuth}
-              disabled={!calendar.hasGoogleCredentials}
-            >
+            <PrimaryButton onClick={startAuth} disabled={!calendar.hasGoogleCredentials}>
               MIT GOOGLE VERBINDEN →
             </PrimaryButton>
           )}
@@ -754,8 +786,13 @@ function CalendarSection({
           </div>
           <ol className="m-0 mb-3 list-decimal pl-5 font-sans text-[13px] leading-relaxed text-nau-fg-dim">
             <li>Öffne die URL in einem Browser und klicke „Erlauben".</li>
-            <li>Nach „Erlauben" landet der Browser auf einer nicht-erreichbaren Seite (Absicht).</li>
-            <li>Kopiere aus der Adresszeile den Wert hinter <code>code=</code> bis zum nächsten <code>&amp;</code>.</li>
+            <li>
+              Nach „Erlauben" landet der Browser auf einer nicht-erreichbaren Seite (Absicht).
+            </li>
+            <li>
+              Kopiere aus der Adresszeile den Wert hinter <code>code=</code> bis zum nächsten{" "}
+              <code>&amp;</code>.
+            </li>
           </ol>
           <div className="mb-3 max-w-[600px] break-all border border-nau-line bg-nau-bg px-3 py-2 font-mono text-[11px] text-nau-fg">
             {authState.url}
@@ -771,7 +808,12 @@ function CalendarSection({
             <PrimaryButton onClick={completeAuth} disabled={authCode.trim().length === 0}>
               CODE ÜBERMITTELN ↵
             </PrimaryButton>
-            <SecondaryButton onClick={() => { setAuthState(null); setAuthCode(""); }}>
+            <SecondaryButton
+              onClick={() => {
+                setAuthState(null);
+                setAuthCode("");
+              }}
+            >
               ABBRECHEN
             </SecondaryButton>
           </div>
@@ -792,15 +834,16 @@ function CalendarSection({
       <Row label="Google Client-ID" hint="Aus Google Cloud Console → OAuth-Client (Desktop App).">
         {calendar.hasGoogleCredentials && !editingCreds ? (
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">
-              GESPEICHERT
-            </span>
+            <span className="font-mono text-[12px] tracking-mono text-nau-fg-dim">GESPEICHERT</span>
             <SecondaryButton onClick={() => setEditingCreds(true)}>ÄNDERN</SecondaryButton>
           </div>
         ) : (
           <TextInput
             value={clientIdDraft}
-            onChange={(v) => { setClientIdDraft(v); setEditingCreds(true); }}
+            onChange={(v) => {
+              setClientIdDraft(v);
+              setEditingCreds(true);
+            }}
             placeholder="123-abc.apps.googleusercontent.com"
           />
         )}
@@ -815,13 +858,16 @@ function CalendarSection({
           <TextInput
             type="password"
             value={clientSecretDraft}
-            onChange={(v) => { setClientSecretDraft(v); setEditingCreds(true); }}
+            onChange={(v) => {
+              setClientSecretDraft(v);
+              setEditingCreds(true);
+            }}
             placeholder="GOCSPX-..."
           />
         )}
       </Row>
 
-      <Row label="Calendar-ID" hint="„primary&quot; oder eine konkrete Kalender-Adresse.">
+      <Row label="Calendar-ID" hint='„primary" oder eine konkrete Kalender-Adresse.'>
         <TextInput value={calendarId} onChange={setCalendarId} />
       </Row>
 

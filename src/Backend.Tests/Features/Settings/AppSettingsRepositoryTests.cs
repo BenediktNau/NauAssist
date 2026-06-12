@@ -1,3 +1,4 @@
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using FluentAssertions;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Tests.Helpers;
@@ -10,7 +11,7 @@ public sealed class AppSettingsRepositoryTests
     public async Task GetLlm_ReturnsSeededDefault()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         var settings = await repo.GetLlmAsync(CancellationToken.None);
 
@@ -22,7 +23,7 @@ public sealed class AppSettingsRepositoryTests
     public async Task SetLlm_RoundtripsOllamaModel()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetLlmAsync(new LlmSettings("qwen2.5:7b-instruct", null), CancellationToken.None);
 
@@ -35,7 +36,7 @@ public sealed class AppSettingsRepositoryTests
     public async Task SetLlm_RoundtripsSystemPrompt()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetLlmAsync(
             new LlmSettings("qwen2.5:7b-instruct", "Du bist Nau."),
@@ -49,7 +50,7 @@ public sealed class AppSettingsRepositoryTests
     public async Task SetLlm_EmptySystemPrompt_ReadsAsNull()
     {
         using var db = new TempSqliteDb();
-        var repo = new AppSettingsRepository(db.AppDb);
+        var repo = new AppSettingsRepository(db.AppDb, new UserContextHolder());
 
         await repo.SetLlmAsync(
             new LlmSettings("qwen2.5:7b-instruct", "Du bist Nau."),

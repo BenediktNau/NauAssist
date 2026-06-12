@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Audit;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 
 namespace NauAssist.Backend.Features.AutonomousAgent;
 
@@ -77,8 +78,81 @@ public sealed class AutonomousAgentScheduler : BackgroundService
 
         try
         {
+            // Multi-User: pro User ein eigener DI-Scope mit gesetztem Kontext —
+            // Quellen, Suggestions und Kalender-Token laufen dadurch user-getrennt.
+            IReadOnlyList<UserRecord> users;
+            using (var userScope = _services.CreateScope())
+            {
+                users = await userScope.ServiceProvider
+                    .GetRequiredService<UserRepository>()
+                    .ListAsync(ct);
+            }
+
+            foreach (var user in users)
+            {
+                var userResult = await RunUserTickAsync(user.Id, trigger, startedAt, ct);
+                signalCount += userResult.SignalCount;
+                createdCount += userResult.CreatedCount;
+                updatedCount += userResult.UpdatedCount;
+                expiredCount += userResult.ExpiredCount;
+                errorCount += userResult.ErrorCount;
+            }
+
+            var result = new TickResult(
+                Skipped: false,
+                SignalCount: signalCount,
+                CreatedCount: createdCount,
+                UpdatedCount: updatedCount,
+                ExpiredCount: expiredCount,
+                ErrorCount: errorCount);
+
+            _logger.LogInformation(
+                "Autonomer Tick fertig ({Trigger}): {Users} User, {Signals} Signale, {Created} neu, {Updated} aktualisiert, {Expired} expired, {Errors} Fehler.",
+                trigger, users.Count, signalCount, createdCount, updatedCount, expiredCount, errorCount);
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unerwarteter Fehler im autonomen Tick.");
+            return new TickResult(
+                Skipped: false,
+                SignalCount: signalCount,
+                CreatedCount: createdCount,
+                UpdatedCount: updatedCount,
+                ExpiredCount: expiredCount,
+                ErrorCount: errorCount + 1);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _tickInFlight, 0);
+        }
+    }
+
+    /// <summary>
+    /// Tick für einen einzelnen User: Observer pollen, Reasoner, Retention, Audit.
+    /// Fehler eines Users brechen den Gesamtlauf nicht ab (z.B. fehlender
+    /// Kalender-Token → NotAuthenticatedException → nur dieser User wird übersprungen).
+    /// </summary>
+    private async Task<TickResult> RunUserTickAsync(
+        string userId, TickTrigger trigger, DateTimeOffset startedAt, CancellationToken ct)
+    {
+        var signalCount = 0;
+        var errorCount = 0;
+        var createdCount = 0;
+        var updatedCount = 0;
+        var expiredCount = 0;
+
+        try
+        {
             using var scope = _services.CreateScope();
             var sp = scope.ServiceProvider;
+            sp.GetRequiredService<IUserContextSetter>().Set(userId);
+
             var observers = sp.GetServices<ISourceObserver>().ToList();
             var audit = sp.GetRequiredService<AuditLogRepository>();
             var suggestions = sp.GetRequiredService<SuggestionRepository>();
@@ -96,7 +170,7 @@ public sealed class AutonomousAgentScheduler : BackgroundService
                 catch (Exception ex)
                 {
                     errorCount++;
-                    _logger.LogWarning(ex, "Observer {Source} ist mit einer Exception abgebrochen.", observer.Source);
+                    _logger.LogWarning(ex, "Observer {Source} (User {UserId}) ist mit einer Exception abgebrochen.", observer.Source, userId);
                 }
             }
 
@@ -108,13 +182,13 @@ public sealed class AutonomousAgentScheduler : BackgroundService
                     createdCount = outcome.Created;
                     updatedCount = outcome.Updated;
                     _logger.LogDebug(
-                        "Reasoner: {Classified} klassifiziert, {Created} neu, {Updated} aktualisiert, {Persona} Persona-Updates.",
-                        outcome.Classified, outcome.Created, outcome.Updated, outcome.PersonaUpdates);
+                        "Reasoner (User {UserId}): {Classified} klassifiziert, {Created} neu, {Updated} aktualisiert, {Persona} Persona-Updates.",
+                        userId, outcome.Classified, outcome.Created, outcome.Updated, outcome.PersonaUpdates);
                 }
                 catch (Exception ex)
                 {
                     errorCount++;
-                    _logger.LogWarning(ex, "Reasoner hat eine Exception geworfen — Signale dieses Ticks verloren.");
+                    _logger.LogWarning(ex, "Reasoner (User {UserId}) hat eine Exception geworfen — Signale dieses Ticks verloren.", userId);
                 }
             }
 
@@ -142,10 +216,6 @@ public sealed class AutonomousAgentScheduler : BackgroundService
                 ProviderEventId: null,
                 CreatedAt: startedAt), ct);
 
-            _logger.LogInformation(
-                "Autonomer Tick fertig ({Trigger}): {Observers} Observer, {Signals} Signale, {Created} neu, {Updated} aktualisiert, {Expired} expired, {Errors} Fehler.",
-                trigger, observers.Count, signalCount, createdCount, updatedCount, expiredCount, errorCount);
-
             return result;
         }
         catch (OperationCanceledException)
@@ -154,7 +224,7 @@ public sealed class AutonomousAgentScheduler : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unerwarteter Fehler im autonomen Tick.");
+            _logger.LogError(ex, "Unerwarteter Fehler im autonomen Tick für User {UserId}.", userId);
             return new TickResult(
                 Skipped: false,
                 SignalCount: signalCount,
@@ -162,10 +232,6 @@ public sealed class AutonomousAgentScheduler : BackgroundService
                 UpdatedCount: updatedCount,
                 ExpiredCount: expiredCount,
                 ErrorCount: errorCount + 1);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _tickInFlight, 0);
         }
     }
 

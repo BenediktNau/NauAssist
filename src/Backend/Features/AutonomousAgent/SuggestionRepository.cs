@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dapper;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 
 namespace NauAssist.Backend.Features.AutonomousAgent;
@@ -12,10 +13,12 @@ public sealed class SuggestionRepository
     };
 
     private readonly AppDb _db;
+    private readonly IUserContext _user;
 
-    public SuggestionRepository(AppDb db)
+    public SuggestionRepository(AppDb db, IUserContext user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<Suggestion> InsertAsync(
@@ -37,15 +40,16 @@ public sealed class SuggestionRepository
         var id = await conn.ExecuteScalarAsync<long>(new CommandDefinition(
             """
             INSERT INTO suggestions(
-                source, source_ref, intent, topic, requester, quoted_text,
+                user_id, source, source_ref, intent, topic, requester, quoted_text,
                 slots_json, draft_reply, reply_metadata_json, status, created_at, updated_at)
             VALUES(
-                @source, @sourceRef, @intent, @topic, @requester, @quotedText,
+                @userId, @source, @sourceRef, @intent, @topic, @requester, @quotedText,
                 @slotsJson, @draftReply, @metaJson, 'pending', @now, @now);
             SELECT last_insert_rowid();
             """,
             new
             {
+                userId = _user.UserId,
                 source,
                 sourceRef,
                 intent,
@@ -81,8 +85,8 @@ public sealed class SuggestionRepository
     {
         using var conn = _db.OpenConnection();
         var row = await conn.QuerySingleOrDefaultAsync<SuggestionRow>(new CommandDefinition(
-            "SELECT * FROM suggestions WHERE id = @id;",
-            new { id },
+            "SELECT id, source, source_ref, intent, topic, requester, quoted_text, slots_json, draft_reply, reply_metadata_json, status, picked_slot, created_at, updated_at, responded_at FROM suggestions WHERE id = @id AND user_id = @userId;",
+            new { id, userId = _user.UserId },
             cancellationToken: ct));
         return row is null ? null : MapToDomain(row);
     }
@@ -95,12 +99,12 @@ public sealed class SuggestionRepository
         using var conn = _db.OpenConnection();
         var rows = statusFilter is null
             ? await conn.QueryAsync<SuggestionRow>(new CommandDefinition(
-                "SELECT * FROM suggestions ORDER BY id DESC LIMIT @take;",
-                new { take },
+                "SELECT id, source, source_ref, intent, topic, requester, quoted_text, slots_json, draft_reply, reply_metadata_json, status, picked_slot, created_at, updated_at, responded_at FROM suggestions WHERE user_id = @userId ORDER BY id DESC LIMIT @take;",
+                new { userId = _user.UserId, take },
                 cancellationToken: ct))
             : await conn.QueryAsync<SuggestionRow>(new CommandDefinition(
-                "SELECT * FROM suggestions WHERE status = @status ORDER BY id DESC LIMIT @take;",
-                new { status = statusFilter.Value.ToWire(), take },
+                "SELECT id, source, source_ref, intent, topic, requester, quoted_text, slots_json, draft_reply, reply_metadata_json, status, picked_slot, created_at, updated_at, responded_at FROM suggestions WHERE user_id = @userId AND status = @status ORDER BY id DESC LIMIT @take;",
+                new { userId = _user.UserId, status = statusFilter.Value.ToWire(), take },
                 cancellationToken: ct));
         return rows.Select(MapToDomain).ToList();
     }
@@ -114,15 +118,16 @@ public sealed class SuggestionRepository
         using var conn = _db.OpenConnection();
         var row = await conn.QuerySingleOrDefaultAsync<SuggestionRow>(new CommandDefinition(
             """
-            SELECT * FROM suggestions
-            WHERE source = @source
+            SELECT id, source, source_ref, intent, topic, requester, quoted_text, slots_json, draft_reply, reply_metadata_json, status, picked_slot, created_at, updated_at, responded_at FROM suggestions
+            WHERE user_id = @userId
+              AND source = @source
               AND source_ref = @sourceRef
               AND status = 'pending'
               AND created_at >= @notOlderThan
             ORDER BY id DESC
             LIMIT 1;
             """,
-            new { source, sourceRef, notOlderThan = notOlderThan.ToString("O") },
+            new { userId = _user.UserId, source, sourceRef, notOlderThan = notOlderThan.ToString("O") },
             cancellationToken: ct));
         return row is null ? null : MapToDomain(row);
     }
@@ -134,9 +139,9 @@ public sealed class SuggestionRepository
             """
             UPDATE suggestions
             SET picked_slot = @slotIndex, updated_at = @now
-            WHERE id = @id AND status = 'pending';
+            WHERE id = @id AND user_id = @userId AND status = 'pending';
             """,
-            new { id, slotIndex, now = now.ToString("O") },
+            new { id, userId = _user.UserId, slotIndex, now = now.ToString("O") },
             cancellationToken: ct));
         return affected > 0;
     }
@@ -170,9 +175,9 @@ public sealed class SuggestionRepository
                 reply_metadata_json = COALESCE(@metaJson, reply_metadata_json),
                 picked_slot = NULL,
                 updated_at = @now
-            WHERE id = @id AND status = 'pending';
+            WHERE id = @id AND user_id = @userId AND status = 'pending';
             """,
-            new { id, topic, requester, quotedText, slotsJson, draftReply, metaJson, now = now.ToString("O") },
+            new { id, userId = _user.UserId, topic, requester, quotedText, slotsJson, draftReply, metaJson, now = now.ToString("O") },
             cancellationToken: ct));
         return affected > 0;
     }
@@ -184,9 +189,9 @@ public sealed class SuggestionRepository
             """
             UPDATE suggestions
             SET draft_reply = @draftReply, updated_at = @now
-            WHERE id = @id AND status = 'pending';
+            WHERE id = @id AND user_id = @userId AND status = 'pending';
             """,
-            new { id, draftReply, now = now.ToString("O") },
+            new { id, userId = _user.UserId, draftReply, now = now.ToString("O") },
             cancellationToken: ct));
         return affected > 0;
     }
@@ -205,11 +210,12 @@ public sealed class SuggestionRepository
             SET status = @status,
                 responded_at = COALESCE(@respondedAt, responded_at),
                 updated_at = @now
-            WHERE id = @id;
+            WHERE id = @id AND user_id = @userId;
             """,
             new
             {
                 id,
+                userId = _user.UserId,
                 status = newStatus.ToWire(),
                 respondedAt,
                 now = now.ToString("O"),
@@ -226,9 +232,9 @@ public sealed class SuggestionRepository
             """
             UPDATE suggestions
             SET status = 'dismissed', updated_at = @now
-            WHERE status = 'pending' AND created_at < @cutoff;
+            WHERE user_id = @userId AND status = 'pending' AND created_at < @cutoff;
             """,
-            new { cutoff = cutoff.ToString("O"), now = now.ToString("O") },
+            new { userId = _user.UserId, cutoff = cutoff.ToString("O"), now = now.ToString("O") },
             cancellationToken: ct));
     }
 
