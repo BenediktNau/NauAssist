@@ -329,6 +329,11 @@ export function useChat(): ChatState & {
           );
         })
         .finally(() => {
+          // Snapshots, die vor/während des Streams gefetcht wurden, beim Sync
+          // überspringen — sonst blitzt kurz eine History ohne die eben
+          // gestreamten Nachrichten auf, bis der frische Refetch landet.
+          lastSyncedAtRef.current =
+            queryClient.getQueryState(queryKeys.chatHistory)?.dataUpdatedAt ?? 0;
           setSending(false);
           setToolStatus(null);
           abortRef.current = null;
