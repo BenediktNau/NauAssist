@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/nau/Header";
+import { MobileTabBar } from "@/components/nau/MobileTabBar";
 import type { AppPage } from "@/App";
 import {
   dismissSuggestion,
@@ -127,12 +128,8 @@ export function RecommendationsPage({
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-nau-bg text-nau-fg">
-      <Header
-        onOpenSettings={() => onNavigate("settings")}
-        currentTab="recommendations"
-        onSelectTab={onNavigate}
-      />
+    <div className="flex min-h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <Header onOpenSettings={() => onNavigate("settings")} />
       <div className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 lg:px-8 lg:py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -216,6 +213,8 @@ export function RecommendationsPage({
           </ul>
         )}
       </div>
+
+      <MobileTabBar current="recommendations" onSelect={onNavigate} />
     </div>
   );
 }
