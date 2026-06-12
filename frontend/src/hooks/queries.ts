@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { endOfDay, format, startOfDay } from "date-fns";
+import { endOfDay, format, parseISO, startOfDay } from "date-fns";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCalendarRange, NotConnectedError } from "@/api/calendar";
 import { getCalendarSettings } from "@/api/calendar-settings";
@@ -21,7 +21,10 @@ export const queryKeys = {
   chatHistory: ["chat-history"] as const,
 };
 
-/** NotConnected (409) ändert sich nicht von allein — kein Retry darauf. */
+/**
+ * NotConnected (409) ändert sich nicht von allein — kein Retry darauf.
+ * `failureCount < 1` spiegelt bewusst das globale `retry: 1` aus main.tsx.
+ */
 function retryUnlessNotConnected(failureCount: number, error: Error): boolean {
   return !(error instanceof NotConnectedError) && failureCount < 1;
 }
@@ -34,9 +37,12 @@ export function useCalendarSettingsQuery() {
 }
 
 export function useCalendarRangeQuery(from: Date, to: Date, enabled: boolean) {
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
   return useQuery({
-    queryKey: queryKeys.calendarRange(from.toISOString(), to.toISOString()),
-    queryFn: () => getCalendarRange(from, to),
+    queryKey: queryKeys.calendarRange(fromIso, toIso),
+    // Bounds aus den Key-Strings ableiten — Key und Fetch bleiben garantiert synchron.
+    queryFn: () => getCalendarRange(new Date(fromIso), new Date(toIso)),
     enabled,
     placeholderData: keepPreviousData,
     retry: retryUnlessNotConnected,
@@ -44,10 +50,15 @@ export function useCalendarRangeQuery(from: Date, to: Date, enabled: boolean) {
 }
 
 export function useTodayEventsQuery() {
+  // Tagesgrenze rollt erst beim nächsten Render über Mitternacht — bewusst in
+  // Kauf genommen; Key und Fetch-Bereich bleiben dafür immer konsistent.
   const day = format(new Date(), "yyyy-MM-dd");
   return useQuery({
     queryKey: queryKeys.calendarToday(day),
-    queryFn: () => getCalendarRange(startOfDay(new Date()), endOfDay(new Date())),
+    queryFn: () => {
+      const anchor = parseISO(day);
+      return getCalendarRange(startOfDay(anchor), endOfDay(anchor));
+    },
     retry: retryUnlessNotConnected,
   });
 }
