@@ -29,7 +29,7 @@ export default function App() {
   }, []);
 
   return (
-    <div key={page} className="motion-safe:animate-page-in">
+    <div key={page} className="h-full motion-safe:animate-page-in">
       {page === "settings" ? (
         <SettingsPage onNavigate={setPage} />
       ) : page === "calendar" ? (
