@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "NauAssist",
   "short_name": "NauAssist",
   "description": "Persönlicher Kalender-Assistent mit autonomem Agenten.",

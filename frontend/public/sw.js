@@ -1,12 +1,77 @@
-// NauAssist Service Worker — minimal: Push-Empfang + Click-Handler.
-// Keine Caching-Strategie (PWA-Offline-Caching ist explizit nicht Teil von Phase 4).
+// NauAssist Service Worker
+// - Push-Empfang + Click-Handler (Web Push)
+// - Minimaler fetch-Handler mit App-Shell-Caching: NÖTIG, damit Chrome die App
+//   als installierbare PWA erkennt ("App installieren" statt nur "Verknüpfung").
+//   Liefert zugleich einen Offline-Fallback der App-Shell.
+
+const CACHE_VERSION = "nauassist-v1";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_VERSION);
+      // addAll soll die Installation nicht scheitern lassen, falls eine Ressource
+      // (z.B. hinter Auth) gerade nicht abrufbar ist.
+      await Promise.allSettled(APP_SHELL.map((url) => cache.add(url)));
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+
+  // Nur GET cachen; alles andere unverändert ans Netz.
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+
+  // Fremde Origins (z.B. Google Fonts) nicht abfangen.
+  if (url.origin !== self.location.origin) return;
+
+  // API- und Auth-Routen niemals cachen — immer frisch ans Netz.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth")) return;
+
+  // Navigations-Requests (HTML): network-first mit Offline-Fallback auf App-Shell.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      (async () => {
+        try {
+          return await fetch(request);
+        } catch {
+          const cache = await caches.open(CACHE_VERSION);
+          return (await cache.match("/")) || Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  // Statische Assets: stale-while-revalidate.
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE_VERSION);
+      const cached = await cache.match(request);
+      const network = fetch(request)
+        .then((response) => {
+          if (response && response.ok) cache.put(request, response.clone());
+          return response;
+        })
+        .catch(() => undefined);
+      return cached || (await network) || Response.error();
+    })(),
+  );
 });
 
 self.addEventListener("push", (event) => {
