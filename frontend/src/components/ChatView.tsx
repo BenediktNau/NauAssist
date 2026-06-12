@@ -14,6 +14,7 @@ import { NewEventModal } from "./NewEventModal";
 import { RulesModal } from "./RulesModal";
 import { WeekViewModal } from "./WeekViewModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
+import { MobileTabBar } from "./nau/MobileTabBar";
 import type { AppPage } from "@/App";
 
 const TOOL_STATUS_LABEL: Record<string, string> = {
@@ -79,12 +80,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
       : null;
 
   return (
-    <div className="flex h-screen flex-col bg-nau-bg text-nau-fg">
-      <Header
-        onOpenSettings={() => onNavigate("settings")}
-        currentTab="chat"
-        onSelectTab={onNavigate}
-      />
+    <div className="flex h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <Header onOpenSettings={() => onNavigate("settings")} />
 
       <main className="min-h-0 flex-1 px-0 py-0 lg:px-10 lg:py-8">
         <div className="mx-auto flex h-full w-full max-w-[1480px] gap-6">
@@ -156,6 +153,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
         onClose={closeMoveEventsModal}
         onMutated={bumpCalendarReload}
       />
+
+      <MobileTabBar current="chat" onSelect={onNavigate} />
     </div>
   );
 }
