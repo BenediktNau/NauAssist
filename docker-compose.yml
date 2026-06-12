@@ -48,12 +48,13 @@ services:
     ports:
       - "8081:8080" # Browser muss Keycloak direkt erreichen (Login-Redirect)
     volumes:
-      - keycloak-data:/opt/keycloak/data/h2
-      - ./keycloak/realm-nauassist.json:/opt/keycloak/data/import/realm-nauassist.json:ro
+      # Keep the bind mount for the realm import (with :z for SELinux)
+      - ./keycloak/realm-nauassist.json:/opt/keycloak/data/import/realm-nauassist.json:ro,z
+
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN:-admin}
       - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      - KC_HOSTNAME=${KC_HOSTNAME:-}
+      - KC_HOSTNAME=${KC_HOSTNAME:-http://localhost:8081}
       - KC_PROXY_HEADERS=xforwarded
       - KC_HTTP_ENABLED=true
       # Platzhalter im Realm-Import (keycloak/realm-nauassist.json):

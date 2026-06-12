@@ -63,6 +63,16 @@ public static class AuthWiring
             // Keycloak kann kein PAR; .NET 10 aktiviert es sonst automatisch → 405.
             options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
 
+            // Correlation-/Nonce-Cookie sind per Default SameSite=None und damit nur
+            // über HTTPS gültig — lokal über HTTP verwirft der Browser sie, der
+            // Callback findet sie nicht mehr → "Correlation failed". Lax reicht für
+            // den Code-Flow (GET-Callback ist Top-Level-Navigation) und funktioniert
+            // sowohl lokal (HTTP) als auch hinter dem Proxy (HTTPS).
+            options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+            options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.NonceCookie.SameSite = SameSiteMode.Lax;
+            options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
             options.Scope.Clear();
             options.Scope.Add("openid");
             options.Scope.Add("profile");

@@ -9,7 +9,7 @@ namespace NauAssist.Backend.Features.Infrastructure.Auth;
 /// </summary>
 public sealed class KeycloakBackchannelHandler(string externalUrl, string internalUrl) : DelegatingHandler
 {
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         if (request.RequestUri?.AbsoluteUri.StartsWith(externalUrl, StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -18,6 +18,23 @@ public sealed class KeycloakBackchannelHandler(string externalUrl, string intern
         }
 
         InnerHandler ??= new HttpClientHandler();
-        return base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+
+        // Interne URLs im Response-Body ersetzen (z.B. OIDC-Discovery-Dokument),
+        // damit authorization_endpoint im Browser erreichbar ist.
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? "";
+        if (mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (body.Contains(internalUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                response.Content = new StringContent(
+                    body.Replace(internalUrl, externalUrl, StringComparison.OrdinalIgnoreCase),
+                    System.Text.Encoding.UTF8,
+                    mediaType);
+            }
+        }
+
+        return response;
     }
 }
