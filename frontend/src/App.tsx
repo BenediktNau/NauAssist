@@ -28,20 +28,21 @@ export default function App() {
     window.history.replaceState({}, "", newUrl);
   }, []);
 
-  if (page === "settings") {
-    return <SettingsPage onNavigate={setPage} />;
-  }
-  if (page === "calendar") {
-    return <CalendarPage onNavigate={setPage} />;
-  }
-  if (page === "recommendations") {
-    return (
-      <RecommendationsPage
-        onNavigate={setPage}
-        focusSuggestionId={focusSuggestionId}
-        onFocusHandled={() => setFocusSuggestionId(null)}
-      />
-    );
-  }
-  return <ChatView onNavigate={setPage} />;
+  return (
+    <div key={page} className="motion-safe:animate-page-in">
+      {page === "settings" ? (
+        <SettingsPage onNavigate={setPage} />
+      ) : page === "calendar" ? (
+        <CalendarPage onNavigate={setPage} />
+      ) : page === "recommendations" ? (
+        <RecommendationsPage
+          onNavigate={setPage}
+          focusSuggestionId={focusSuggestionId}
+          onFocusHandled={() => setFocusSuggestionId(null)}
+        />
+      ) : (
+        <ChatView onNavigate={setPage} />
+      )}
+    </div>
+  );
 }
