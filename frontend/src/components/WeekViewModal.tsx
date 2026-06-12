@@ -7,10 +7,9 @@ interface WeekViewModalProps {
   open: boolean;
   onClose: () => void;
   onNavigate: (page: AppPage) => void;
-  reloadKey?: number;
 }
 
-export function WeekViewModal({ open, onClose, onNavigate, reloadKey }: WeekViewModalProps) {
+export function WeekViewModal({ open, onClose, onNavigate }: WeekViewModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -50,7 +49,6 @@ export function WeekViewModal({ open, onClose, onNavigate, reloadKey }: WeekView
           <CalendarBoard
             variant="full"
             onNavigate={onNavigate}
-            reloadKey={reloadKey}
           />
         </div>
       </div>

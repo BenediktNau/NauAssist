@@ -1,49 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
-import { endOfDay, format, startOfDay } from "date-fns";
+import { useMemo } from "react";
+import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import {
-  getCalendarRange,
-  NotConnectedError,
-  type CalendarEvent,
-} from "@/api/calendar";
+import { NotConnectedError } from "@/api/calendar";
+import { useTodayEventsQuery } from "@/hooks/queries";
 import { parseEvents, type ParsedEvent } from "./utils";
 import type { PopoverState } from "./EventPopover";
 
 interface WhatsNextProps {
   onHoverEvent: (state: PopoverState | null) => void;
   onClickEvent: (state: PopoverState) => void;
-  reloadKey?: number;
 }
 
-export function WhatsNext({
-  onHoverEvent,
-  onClickEvent,
-  reloadKey,
-}: WhatsNextProps) {
-  const [raw, setRaw] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const now = new Date();
-    const from = startOfDay(now);
-    const to = endOfDay(now);
-    setLoading(true);
-    setError(null);
-    getCalendarRange(from, to)
-      .then((events) => { if (!cancelled) setRaw(events); })
-      .catch((e) => {
-        if (cancelled) return;
-        if (e instanceof NotConnectedError) {
-          setRaw([]);
-        } else {
-          setError(String((e as Error).message ?? e));
-        }
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [reloadKey]);
+export function WhatsNext({ onHoverEvent, onClickEvent }: WhatsNextProps) {
+  const query = useTodayEventsQuery();
+  // Nicht verbunden → wie "keine Termine" behandeln (Board zeigt den Hinweis).
+  const notConnected = query.error instanceof NotConnectedError;
+  const raw = useMemo(
+    () => (notConnected ? [] : (query.data ?? [])),
+    [notConnected, query.data],
+  );
+  const errorMessage =
+    query.error && !notConnected ? query.error.message : null;
 
   const items = useMemo(() => {
     const now = new Date();
@@ -65,13 +42,13 @@ export function WhatsNext({
         </span>
       </div>
 
-      {loading && items.length === 0 ? (
+      {query.isPending ? (
         <div className="font-mono text-[10px] tracking-mono text-nau-fg-dim">
           // LADE …
         </div>
-      ) : error ? (
+      ) : errorMessage ? (
         <div className="font-mono text-[10px] tracking-mono text-nau-danger">
-          // {error}
+          // {errorMessage}
         </div>
       ) : items.length === 0 ? (
         <div className="font-mono text-[10px] tracking-mono text-nau-fg-dim">

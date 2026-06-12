@@ -51,7 +51,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     closeDeleteEventsModal,
     moveEventsModalOpen,
     closeMoveEventsModal,
-    calendarReloadKey,
     bumpCalendarReload,
   } = useChat();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -124,7 +123,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
               onNavigate={onNavigate}
               proposals={activeProposals}
               onPickProposal={onPickSlot}
-              reloadKey={calendarReloadKey}
             />
           </aside>
         </div>
@@ -140,7 +138,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
         open={weekViewModalOpen}
         onClose={closeWeekViewModal}
         onNavigate={onNavigate}
-        reloadKey={calendarReloadKey}
       />
       <FreeSlotsModal open={freeSlotsModalOpen} onClose={closeFreeSlotsModal} />
       <DeleteEventsModal

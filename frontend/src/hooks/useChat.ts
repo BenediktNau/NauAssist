@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearSession, getHistory } from "@/api/client";
 import { sendMessage } from "@/api/chatStream";
 import type { ClearMarkerDto, MessageDto, SlotInfo } from "@/api/types";
+import { useInvalidateCalendar } from "@/hooks/queries";
 
 export interface MessageBubble {
   kind: "message";
@@ -55,8 +56,6 @@ export interface ChatState {
   freeSlotsModalOpen: boolean;
   deleteEventsModalOpen: boolean;
   moveEventsModalOpen: boolean;
-  /** Bei jedem erfolgreichen Calendar-Mutation hochgezählt; Konsumenten triggern damit Reloads. */
-  calendarReloadKey: number;
 }
 
 const TEMP_ID_OFFSET = -1; // temporäre IDs sind negativ, dann gibt es keine Kollision mit DB-IDs
@@ -138,7 +137,6 @@ export function useChat(): ChatState & {
   const [freeSlotsModalOpen, setFreeSlotsModalOpen] = useState(false);
   const [deleteEventsModalOpen, setDeleteEventsModalOpen] = useState(false);
   const [moveEventsModalOpen, setMoveEventsModalOpen] = useState(false);
-  const [calendarReloadKey, setCalendarReloadKey] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -346,7 +344,7 @@ export function useChat(): ChatState & {
   const closeFreeSlotsModal = useCallback(() => setFreeSlotsModalOpen(false), []);
   const closeDeleteEventsModal = useCallback(() => setDeleteEventsModalOpen(false), []);
   const closeMoveEventsModal = useCallback(() => setMoveEventsModalOpen(false), []);
-  const bumpCalendarReload = useCallback(() => setCalendarReloadKey((k) => k + 1), []);
+  const bumpCalendarReload = useInvalidateCalendar();
 
   return {
     bubbles,
@@ -367,7 +365,6 @@ export function useChat(): ChatState & {
     closeDeleteEventsModal,
     moveEventsModalOpen,
     closeMoveEventsModal,
-    calendarReloadKey,
     bumpCalendarReload,
   };
 }
