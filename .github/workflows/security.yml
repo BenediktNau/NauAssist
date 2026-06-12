@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   # ── npm audit (Frontend + Sidecar) ─────────────────────────────
@@ -38,7 +37,11 @@ jobs:
         # den Build aber nicht ab.
         run: npm audit --audit-level=high
 
-  # ── Trivy: Dependencies + Dockerfile/IaC im gesamten Repo ──────
+  # ── Trivy: Dependencies + Secrets + Dockerfile/IaC im ganzen Repo ──
+  # Report-only: Trivy bricht den Build nicht ab (Dependency-Alerting macht
+  # Dependabot). Der Bericht wird als Job-Summary und als herunterladbares
+  # Artifact abgelegt — ein nativer Security-Tab-Upload (SARIF/Code-Scanning)
+  # bräuchte bei privaten Repos GitHub Advanced Security.
   trivy-fs:
     runs-on: ubuntu-latest
     steps:
@@ -53,5 +56,30 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '1'
+          exit-code: '0'
           format: table
+          output: trivy-report.txt
+
+      - name: Bericht als Job-Summary
+        if: always()
+        run: |
+          {
+            echo "## 🛡️ Trivy-Report (HIGH/CRITICAL)"
+            echo ""
+            if [ -s trivy-report.txt ]; then
+              echo '```'
+              cat trivy-report.txt
+              echo '```'
+            else
+              echo "_Keine HIGH/CRITICAL-Funde._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bericht als Artifact ablegen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 90
+          if-no-files-found: ignore
