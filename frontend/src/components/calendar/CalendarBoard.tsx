@@ -21,12 +21,13 @@ import { WhatsNext } from "./WhatsNext";
 import { NotConnected } from "./NotConnected";
 import { EventPopover, type PopoverState } from "./EventPopover";
 import { parseEvents } from "./utils";
+import { NotConnectedError } from "@/api/calendar";
+import { PageLoader } from "@/components/nau/PageLoader";
 import {
-  getCalendarRange,
-  NotConnectedError,
-  type CalendarEvent,
-} from "@/api/calendar";
-import { getCalendarSettings, type CalendarSettings } from "@/api/calendar-settings";
+  useCalendarRangeQuery,
+  useCalendarSettingsQuery,
+  useTodayEventsQuery,
+} from "@/hooks/queries";
 import type { AppPage } from "@/App";
 import type { ActiveProposals } from "@/hooks/useChat";
 import type { SlotInfo } from "@/api/types";
@@ -41,8 +42,6 @@ interface CalendarBoardProps {
   proposals?: ActiveProposals | null;
   /** Klick auf einen Vorschlags-Ghost akzeptiert den Slot. */
   onPickProposal?: (slot: SlotInfo) => void;
-  /** Bei Änderung wird der Event-Fetch erneut ausgelöst (z.B. nach Mutation). */
-  reloadKey?: number;
 }
 
 const HOVER_HIDE_DELAY_MS = 180;
@@ -52,15 +51,9 @@ export function CalendarBoard({
   onNavigate,
   proposals,
   onPickProposal,
-  reloadKey,
 }: CalendarBoardProps) {
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
-  const [settings, setSettings] = useState<CalendarSettings | null>(null);
-  const [rawEvents, setRawEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notConnected, setNotConnected] = useState(false);
 
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const hideTimer = useRef<number | null>(null);
@@ -102,36 +95,25 @@ export function CalendarBoard({
 
   const range = useMemo(() => computeRange(view, anchor), [view, anchor]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getCalendarSettings()
-      .then((s) => { if (!cancelled) setSettings(s); })
-      .catch((e) => { if (!cancelled) setError(String((e as Error).message ?? e)); });
-    return () => { cancelled = true; };
-  }, []);
+  const settingsQuery = useCalendarSettingsQuery();
+  const settings = settingsQuery.data ?? null;
+  const connected = settings?.isConnected === true;
 
-  useEffect(() => {
-    if (settings === null) return;
-    if (!settings.isConnected) {
-      setNotConnected(true);
-      setRawEvents([]);
-      setLoading(false);
-      return;
-    }
-    setNotConnected(false);
-    setLoading(true);
-    setError(null);
-    let cancelled = false;
-    getCalendarRange(range.from, range.to)
-      .then((events) => { if (!cancelled) setRawEvents(events); })
-      .catch((e) => {
-        if (cancelled) return;
-        if (e instanceof NotConnectedError) setNotConnected(true);
-        else setError(String((e as Error).message ?? e));
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [settings, range.from, range.to, reloadKey]);
+  const eventsQuery = useCalendarRangeQuery(range.from, range.to, connected);
+  const todayQuery = useTodayEventsQuery();
+
+  const rawEvents = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const notConnected =
+    (settings !== null && !settings.isConnected) ||
+    eventsQuery.error instanceof NotConnectedError;
+  const initialPending =
+    settingsQuery.isPending ||
+    (connected && (eventsQuery.isPending || todayQuery.isPending));
+  const errorMessage = settingsQuery.error
+    ? settingsQuery.error.message
+    : eventsQuery.error && !(eventsQuery.error instanceof NotConnectedError)
+      ? eventsQuery.error.message
+      : null;
 
   const events = useMemo(() => parseEvents(rawEvents), [rawEvents]);
   const titleLabel = useMemo(() => formatTitle(view, anchor), [view, anchor]);
@@ -177,6 +159,17 @@ export function CalendarBoard({
 
   const compact = variant === "compact";
 
+  if (initialPending) {
+    if (compact) {
+      return (
+        <div className="rounded-[4px] border border-nau-line bg-nau-bg-alt p-10 text-center font-mono text-[11px] tracking-mono text-nau-fg-dim">
+          // LADE KALENDER …
+        </div>
+      );
+    }
+    return <PageLoader label="LADE KALENDER" />;
+  }
+
   if (notConnected) {
     return (
       <NotConnected
@@ -210,13 +203,9 @@ export function CalendarBoard({
     </div>
   );
 
-  const grid = error ? (
+  const grid = errorMessage ? (
     <div className="border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
-      // {error}
-    </div>
-  ) : loading && rawEvents.length === 0 ? (
-    <div className="rounded-[4px] border border-nau-line bg-nau-bg-alt p-10 text-center font-mono text-[11px] tracking-mono text-nau-fg-dim">
-      // LADE EVENTS …
+      // {errorMessage}
     </div>
   ) : view === "week" ? (
     <WeekView
@@ -252,7 +241,6 @@ export function CalendarBoard({
     <WhatsNext
       onHoverEvent={handleHoverEvent}
       onClickEvent={handleClickEvent}
-      reloadKey={rawEvents.length}
     />
   );
 

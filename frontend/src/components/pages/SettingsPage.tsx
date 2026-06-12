@@ -11,6 +11,9 @@ import {
   MessageCircle,
   LogOut,
 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys, useCalendarSettingsQuery } from "@/hooks/queries";
+import { PageLoader } from "@/components/nau/PageLoader";
 import type { AppPage } from "@/App";
 import {
   getLlmSettings,
@@ -34,7 +37,7 @@ import { ImapSection } from "@/components/settings/ImapSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
 import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
-import { getCapabilities, type Capabilities } from "@/api/capabilities";
+import { getCapabilities } from "@/api/capabilities";
 import { useAuth } from "@/lib/authContext";
 
 interface SettingsPageProps {
@@ -270,14 +273,7 @@ function ModelCombobox({
   );
 }
 
-type SectionKey =
-  | "llm"
-  | "calendar"
-  | "persona"
-  | "push"
-  | "imap"
-  | "whatsapp"
-  | "konto";
+type SectionKey = "llm" | "calendar" | "persona" | "push" | "imap" | "whatsapp" | "konto";
 
 interface NavMeta {
   label: string;
@@ -322,32 +318,59 @@ function SettingsLoading() {
 }
 
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
-  const [llm, setLlm] = useState<LlmSettings | null>(null);
-  const [ollama, setOllama] = useState<OllamaSettings | null>(null);
-  const [calendar, setCalendar] = useState<CalendarSettings | null>(null);
-  const [caps, setCaps] = useState<Capabilities | null>(null);
-  const [topError, setTopError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const llmQuery = useQuery({ queryKey: queryKeys.llmSettings, queryFn: getLlmSettings });
+  const ollamaQuery = useQuery({
+    queryKey: queryKeys.ollamaSettings,
+    queryFn: getOllamaSettings,
+  });
+  const calendarQuery = useCalendarSettingsQuery();
+  const capsQuery = useQuery({
+    queryKey: queryKeys.capabilities,
+    queryFn: getCapabilities,
+  });
   const auth = useAuth();
 
   // null = (nur Mobile) Kategorie-Liste sichtbar. Gesetzt = Detail.
   // Auf Desktop wird immer ein Detail gezeigt (`current` fällt auf "llm" zurück).
   const [active, setActive] = useState<SectionKey | null>(null);
 
-  useEffect(() => {
-    Promise.all([getLlmSettings(), getOllamaSettings(), getCalendarSettings()])
-      .then(([l, o, c]) => {
-        setLlm(l);
-        setOllama(o);
-        setCalendar(c);
-      })
-      .catch((e) => setTopError(String(e.message ?? e)));
-  }, []);
+  // Lokale Kopien gewinnen nach Saves; Query-Daten füllen initial.
+  // Die Setter spiegeln Saves in den Cache, damit andere Seiten
+  // (z. B. CalendarBoard via calendar-settings) frische Werte sehen.
+  const [llmLocal, setLlmLocal] = useState<LlmSettings | null>(null);
+  const [ollamaLocal, setOllamaLocal] = useState<OllamaSettings | null>(null);
+  const [calendarLocal, setCalendarLocal] = useState<CalendarSettings | null>(null);
 
-  useEffect(() => {
-    getCapabilities()
-      .then(setCaps)
-      .catch(() => setCaps({ whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }));
-  }, []);
+  const llm = llmLocal ?? llmQuery.data ?? null;
+  const ollama = ollamaLocal ?? ollamaQuery.data ?? null;
+  const calendar = calendarLocal ?? calendarQuery.data ?? null;
+
+  const setLlm = (l: LlmSettings) => {
+    setLlmLocal(l);
+    queryClient.setQueryData(queryKeys.llmSettings, l);
+  };
+  const setOllama = (o: OllamaSettings) => {
+    setOllamaLocal(o);
+    queryClient.setQueryData(queryKeys.ollamaSettings, o);
+  };
+  const setCalendar = (c: CalendarSettings) => {
+    setCalendarLocal(c);
+    queryClient.setQueryData(queryKeys.calendarSettings, c);
+  };
+
+  // Capabilities-Fehler → konservative Defaults (wie bisheriger catch-Fallback).
+  const caps =
+    capsQuery.data ??
+    (capsQuery.isError
+      ? { whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }
+      : null);
+
+  const topError =
+    llmQuery.error?.message ?? ollamaQuery.error?.message ?? calendarQuery.error?.message ?? null;
+
+  const initialPending =
+    llmQuery.isPending || ollamaQuery.isPending || calendarQuery.isPending || capsQuery.isPending;
 
   const groups = useMemo(() => buildGroups(caps, auth.enabled), [caps, auth.enabled]);
   const current: SectionKey = active ?? "llm";
@@ -427,85 +450,93 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         </nav>
       </aside>
 
-      {/* ── Mobile: Kategorie-Liste (nur wenn keine Sektion aktiv) ─ */}
-      {active === null && (
-        <div className="flex min-h-screen flex-col lg:hidden">
-          <div className="flex items-center gap-3 border-b border-nau-line px-4 py-4">
-            <button
-              type="button"
-              onClick={() => onNavigate("chat")}
-              aria-label="Zurück zum Chat"
-              className="inline-flex h-10 w-10 items-center justify-center text-nau-fg-dim transition-colors hover:text-nau-accent"
-            >
-              <ArrowLeft size={20} strokeWidth={1.5} />
-            </button>
-            <span className="font-mono text-[11px] tracking-mono-xwide text-nau-fg-dim">
-              // EINSTELLUNGEN
-            </span>
-          </div>
-          <div className="flex-1 px-4 py-5">
-            {groups.map((g) => (
-              <div key={g.id} className="mb-6">
-                <div className="px-1 pb-2 font-mono text-[9.5px] tracking-mono-xwide text-nau-fg-dim">
-                  {g.label}
-                </div>
-                <div className="border border-nau-line">
-                  {g.keys.map((k, i) => {
-                    const m = NAV_META[k];
-                    return (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => setActive(k)}
-                        className={
-                          "flex w-full items-center gap-4 bg-nau-bg-alt px-4 py-4 text-left " +
-                          (i > 0 ? "border-t border-nau-line" : "")
-                        }
-                      >
-                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-nau-line text-nau-accent">
-                          <m.Icon size={18} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-sans text-[15px] font-medium text-nau-fg">
-                            {m.label}
-                          </span>
-                          <span className="mt-0.5 block font-mono text-[10px] tracking-mono text-nau-fg-dim">
-                            {m.hint}
-                          </span>
-                        </span>
-                        <ChevronRight size={18} className="shrink-0 text-nau-fg-dim" />
-                      </button>
-                    );
-                  })}
-                </div>
+      {initialPending ? (
+        <main className="flex min-h-screen flex-col">
+          <PageLoader label="LADE EINSTELLUNGEN" />
+        </main>
+      ) : (
+        <>
+          {/* ── Mobile: Kategorie-Liste (nur wenn keine Sektion aktiv) ─ */}
+          {active === null && (
+            <div className="flex min-h-screen flex-col lg:hidden">
+              <div className="flex items-center gap-3 border-b border-nau-line px-4 py-4">
+                <button
+                  type="button"
+                  onClick={() => onNavigate("chat")}
+                  aria-label="Zurück zum Chat"
+                  className="inline-flex h-10 w-10 items-center justify-center text-nau-fg-dim transition-colors hover:text-nau-accent"
+                >
+                  <ArrowLeft size={20} strokeWidth={1.5} />
+                </button>
+                <span className="font-mono text-[11px] tracking-mono-xwide text-nau-fg-dim">
+                  // EINSTELLUNGEN
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Detail: Desktop immer, Mobile nur bei aktiver Sektion ── */}
-      <main className={(active === null ? "hidden lg:block" : "block") + " min-h-screen"}>
-        {/* Mobile-Zurück-Leiste */}
-        <div className="flex items-center border-b border-nau-line px-2 py-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setActive(null)}
-            className="inline-flex items-center gap-1.5 bg-transparent px-2 py-2 font-mono text-[11px] tracking-mono text-nau-accent"
-          >
-            <ArrowLeft size={18} strokeWidth={1.7} /> EINSTELLUNGEN
-          </button>
-        </div>
-
-        <div className="mx-auto max-w-[820px] px-4 pb-16 pt-6 lg:px-14 lg:pb-20 lg:pt-10">
-          {topError && (
-            <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
-              // SETTINGS NICHT LADBAR — {topError}
+              <div className="flex-1 px-4 py-5">
+                {groups.map((g) => (
+                  <div key={g.id} className="mb-6">
+                    <div className="px-1 pb-2 font-mono text-[9.5px] tracking-mono-xwide text-nau-fg-dim">
+                      {g.label}
+                    </div>
+                    <div className="border border-nau-line">
+                      {g.keys.map((k, i) => {
+                        const m = NAV_META[k];
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => setActive(k)}
+                            className={
+                              "flex w-full items-center gap-4 bg-nau-bg-alt px-4 py-4 text-left " +
+                              (i > 0 ? "border-t border-nau-line" : "")
+                            }
+                          >
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-nau-line text-nau-accent">
+                              <m.Icon size={18} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-sans text-[15px] font-medium text-nau-fg">
+                                {m.label}
+                              </span>
+                              <span className="mt-0.5 block font-mono text-[10px] tracking-mono text-nau-fg-dim">
+                                {m.hint}
+                              </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-nau-fg-dim" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-          {sectionContent(current)}
-        </div>
-      </main>
+
+          {/* ── Detail: Desktop immer, Mobile nur bei aktiver Sektion ── */}
+          <main className={(active === null ? "hidden lg:block" : "block") + " min-h-screen"}>
+            {/* Mobile-Zurück-Leiste */}
+            <div className="flex items-center border-b border-nau-line px-2 py-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setActive(null)}
+                className="inline-flex items-center gap-1.5 bg-transparent px-2 py-2 font-mono text-[11px] tracking-mono text-nau-accent"
+              >
+                <ArrowLeft size={18} strokeWidth={1.7} /> EINSTELLUNGEN
+              </button>
+            </div>
+
+            <div className="mx-auto max-w-[820px] px-4 pb-16 pt-6 lg:px-14 lg:pb-20 lg:pt-10">
+              {topError && (
+                <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
+                  // SETTINGS NICHT LADBAR — {topError}
+                </div>
+              )}
+              {sectionContent(current)}
+            </div>
+          </main>
+        </>
+      )}
     </div>
   );
 }

@@ -100,6 +100,10 @@ export default {
           "0%, 55%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        "page-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -108,6 +112,7 @@ export default {
         "nau-blink": "nau-blink 0.8s steps(1) infinite",
         "nau-mech-open": "nau-mech-open 320ms cubic-bezier(0.85, 0, 0.15, 1) both",
         "nau-mech-fade": "nau-mech-fade 320ms linear both",
+        "page-in": "page-in 180ms ease-out",
       },
     },
   },

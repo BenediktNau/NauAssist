@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queries";
+import { PageLoader } from "@/components/nau/PageLoader";
 import { Header } from "@/components/nau/Header";
 import { MobileTabBar } from "@/components/nau/MobileTabBar";
 import type { AppPage } from "@/App";
@@ -33,12 +36,21 @@ export function RecommendationsPage({
   focusSuggestionId,
   onFocusHandled,
 }: RecommendationsPageProps) {
-  const [items, setItems] = useState<SuggestionDto[]>([]);
   const [filter, setFilter] = useState<SuggestionStatus | "all">("pending");
-  const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollMessage, setPollMessage] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  const suggestionsQuery = useQuery({
+    queryKey: queryKeys.suggestions(filter),
+    queryFn: () => listSuggestions(filter === "all" ? undefined : filter),
+    placeholderData: keepPreviousData,
+  });
+  const items = useMemo(() => suggestionsQuery.data ?? [], [suggestionsQuery.data]);
+  const reloadSuggestions = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.suggestionsPrefix });
+
   // Wenn ein Deep-Link-Ziel auch in "responded"/"dismissed" liegt, müssen wir den
   // Status-Filter ggf. lockern, damit der Eintrag in der Liste ist.
   useEffect(() => {
@@ -47,23 +59,6 @@ export function RecommendationsPage({
       if (!inList && items.length > 0) setFilter("all");
     }
   }, [focusSuggestionId, items, filter]);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listSuggestions(filter === "all" ? undefined : filter);
-      setItems(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const onPollNow = async () => {
     setPolling(true);
@@ -76,7 +71,7 @@ export function RecommendationsPage({
           ? "Tick übersprungen — vorheriger Lauf noch aktiv."
           : `Tick ok · ${r.signalCount} Signale · ${r.expiredCount} expired · ${r.errorCount} Fehler`,
       );
-      await reload();
+      await reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -85,13 +80,16 @@ export function RecommendationsPage({
   };
 
   const replaceItem = (updated: SuggestionDto) =>
-    setItems((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    queryClient.setQueryData<SuggestionDto[]>(queryKeys.suggestions(filter), (prev) =>
+      prev?.map((s) => (s.id === updated.id ? updated : s)),
+    );
 
   const onPick = async (id: number, slotIndex: number) => {
     setError(null);
     try {
       const updated = await pickSuggestionSlot(id, slotIndex);
       replaceItem(updated);
+      void reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -101,7 +99,7 @@ export function RecommendationsPage({
     setError(null);
     try {
       await dismissSuggestion(id);
-      await reload();
+      await reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -122,95 +120,103 @@ export function RecommendationsPage({
     try {
       const updated = await sendSuggestion(id, text);
       replaceItem(updated);
+      void reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
+  const displayError =
+    error ?? (suggestionsQuery.error ? suggestionsQuery.error.message : null);
+
   return (
     <div className="flex min-h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <Header onOpenSettings={() => onNavigate("settings")} />
       <div className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 lg:px-8 lg:py-10">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
-              // AUTONOMER AGENT
-            </span>
-            <h1 className="m-0 mt-1 font-sans text-3xl font-normal leading-tight text-nau-fg lg:text-4xl">
-              Empfehlungen
-            </h1>
-            <p className="m-0 mt-2 max-w-xl font-sans text-sm leading-relaxed text-nau-fg-dim">
-              Hier erscheinen Termin-Vorschläge, die der Agent aus deinen freigegebenen
-              Quellen abgeleitet hat. Phase 1 zeigt noch nichts an — Backend-Foundation
-              steht, Quellen folgen.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onPollNow}
-            disabled={polling}
-            className="border border-nau-line px-4 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-50"
-          >
-            {polling ? "PRÜFE …" : "JETZT PRÜFEN"}
-          </button>
-        </div>
-
-        <nav role="tablist" aria-label="Status-Filter" className="mb-5 flex gap-1">
-          {STATUS_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={filter === t.key}
-              onClick={() => setFilter(t.key)}
-              className={
-                "min-h-10 cursor-pointer border-b-2 bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide transition-colors " +
-                (filter === t.key
-                  ? "border-nau-accent text-nau-accent"
-                  : "border-transparent text-nau-fg-dim hover:text-nau-fg")
-              }
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-
-        {pollMessage && (
-          <div className="mb-4 border border-nau-line bg-white/[0.02] px-4 py-3 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
-            {pollMessage}
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 border border-nau-danger bg-white/[0.02] px-4 py-3 font-mono text-sm text-nau-danger">
-            [ ! ] {error}
-          </div>
-        )}
-
-        {loading && items.length === 0 ? (
-          <EmptyState text="Lade …" />
-        ) : items.length === 0 ? (
-          <EmptyState
-            text={
-              filter === "pending"
-                ? "Keine offenen Empfehlungen. Der Agent prüft alle 20 min."
-                : "Nichts gefunden."
-            }
-          />
+        {suggestionsQuery.isPending ? (
+          <PageLoader label="LADE EMPFEHLUNGEN" />
         ) : (
-          <ul className="flex flex-col gap-3">
-            {items.map((s) => (
-              <SuggestionCard
-                key={s.id}
-                suggestion={s}
-                onPick={onPick}
-                onDismiss={onDismiss}
-                onSaveDraft={onSaveDraft}
-                onSend={onSend}
-                focused={focusSuggestionId === s.id}
-                onFocusHandled={onFocusHandled}
+          <>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <span className="font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
+                  // AUTONOMER AGENT
+                </span>
+                <h1 className="m-0 mt-1 font-sans text-3xl font-normal leading-tight text-nau-fg lg:text-4xl">
+                  Empfehlungen
+                </h1>
+                <p className="m-0 mt-2 max-w-xl font-sans text-sm leading-relaxed text-nau-fg-dim">
+                  Hier erscheinen Termin-Vorschläge, die der Agent aus deinen freigegebenen
+                  Quellen abgeleitet hat. Phase 1 zeigt noch nichts an — Backend-Foundation
+                  steht, Quellen folgen.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onPollNow}
+                disabled={polling}
+                className="border border-nau-line px-4 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-50"
+              >
+                {polling ? "PRÜFE …" : "JETZT PRÜFEN"}
+              </button>
+            </div>
+
+            <nav role="tablist" aria-label="Status-Filter" className="mb-5 flex gap-1">
+              {STATUS_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === t.key}
+                  onClick={() => setFilter(t.key)}
+                  className={
+                    "min-h-10 cursor-pointer border-b-2 bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide transition-colors " +
+                    (filter === t.key
+                      ? "border-nau-accent text-nau-accent"
+                      : "border-transparent text-nau-fg-dim hover:text-nau-fg")
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+
+            {pollMessage && (
+              <div className="mb-4 border border-nau-line bg-white/[0.02] px-4 py-3 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
+                {pollMessage}
+              </div>
+            )}
+            {displayError && (
+              <div className="mb-4 border border-nau-danger bg-white/[0.02] px-4 py-3 font-mono text-sm text-nau-danger">
+                [ ! ] {displayError}
+              </div>
+            )}
+
+            {items.length === 0 ? (
+              <EmptyState
+                text={
+                  filter === "pending"
+                    ? "Keine offenen Empfehlungen. Der Agent prüft alle 20 min."
+                    : "Nichts gefunden."
+                }
               />
-            ))}
-          </ul>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {items.map((s) => (
+                  <SuggestionCard
+                    key={s.id}
+                    suggestion={s}
+                    onPick={onPick}
+                    onDismiss={onDismiss}
+                    onSaveDraft={onSaveDraft}
+                    onSend={onSend}
+                    focused={focusSuggestionId === s.id}
+                    onFocusHandled={onFocusHandled}
+                  />
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 
