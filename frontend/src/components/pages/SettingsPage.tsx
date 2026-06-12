@@ -1,6 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ComponentType, ReactNode } from "react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Cpu,
+  CalendarDays,
+  User,
+  Bell,
+  Mail,
+  MessageCircle,
+  LogOut,
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys, useCalendarSettingsQuery } from "@/hooks/queries";
 import { PageLoader } from "@/components/nau/PageLoader";
@@ -263,6 +273,50 @@ function ModelCombobox({
   );
 }
 
+type SectionKey = "llm" | "calendar" | "persona" | "push" | "imap" | "whatsapp" | "konto";
+
+interface NavMeta {
+  label: string;
+  hint: string;
+  Icon: ComponentType<{ size?: number; strokeWidth?: number }>;
+}
+
+const NAV_META: Record<SectionKey, NavMeta> = {
+  llm: { label: "Sprachmodell", hint: "Modell · Prompt · Ollama", Icon: Cpu },
+  calendar: { label: "Kalender", hint: "Google · Arbeitszeiten", Icon: CalendarDays },
+  persona: { label: "Persona", hint: "Was Nau über dich weiß", Icon: User },
+  push: { label: "Push", hint: "Benachrichtigungen", Icon: Bell },
+  imap: { label: "E-Mail", hint: "IMAP / SMTP Postfächer", Icon: Mail },
+  whatsapp: { label: "WhatsApp", hint: "Agent-Nummer", Icon: MessageCircle },
+  konto: { label: "Konto", hint: "Anmeldung · Abmelden", Icon: LogOut },
+};
+
+interface NavGroup {
+  id: string;
+  label: string;
+  keys: SectionKey[];
+}
+
+function buildGroups(caps: Capabilities | null, authEnabled: boolean): NavGroup[] {
+  const channels: SectionKey[] = ["push", "imap"];
+  if (caps?.whatsApp) channels.push("whatsapp");
+
+  const groups: NavGroup[] = [
+    { id: "agent", label: "AGENT", keys: ["llm", "calendar", "persona"] },
+    { id: "channels", label: "KANÄLE", keys: channels },
+  ];
+  if (authEnabled) groups.push({ id: "account", label: "KONTO", keys: ["konto"] });
+  return groups;
+}
+
+function SettingsLoading() {
+  return (
+    <div className="border border-nau-line bg-nau-bg-alt p-10 text-center font-mono text-[11px] tracking-mono text-nau-fg-dim">
+      // LADE …
+    </div>
+  );
+}
+
 export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const queryClient = useQueryClient();
   const llmQuery = useQuery({ queryKey: queryKeys.llmSettings, queryFn: getLlmSettings });
@@ -275,6 +329,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     queryKey: queryKeys.capabilities,
     queryFn: getCapabilities,
   });
+  const auth = useAuth();
+
+  // null = (nur Mobile) Kategorie-Liste sichtbar. Gesetzt = Detail.
+  // Auf Desktop wird immer ein Detail gezeigt (`current` fällt auf "llm" zurück).
+  const [active, setActive] = useState<SectionKey | null>(null);
 
   // Lokale Kopien gewinnen nach Saves; Query-Daten füllen initial.
   // Die Setter spiegeln Saves in den Cache, damit andere Seiten
@@ -308,47 +367,49 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
       : null);
 
   const topError =
-    llmQuery.error?.message ??
-    ollamaQuery.error?.message ??
-    calendarQuery.error?.message ??
-    null;
+    llmQuery.error?.message ?? ollamaQuery.error?.message ?? calendarQuery.error?.message ?? null;
 
   const initialPending =
-    llmQuery.isPending ||
-    ollamaQuery.isPending ||
-    calendarQuery.isPending ||
-    capsQuery.isPending;
+    llmQuery.isPending || ollamaQuery.isPending || calendarQuery.isPending || capsQuery.isPending;
 
-  const navItems = [
-    { n: "01", label: "Sprachmodell", anchor: "section-llm" },
-    { n: "02", label: "Kalender", anchor: "section-calendar" },
-    { n: "03", label: "Persona", anchor: "section-persona" },
-    { n: "04", label: "Push", anchor: "section-push" },
-    { n: "05", label: "E-Mail", anchor: "section-imap" },
-    ...(caps?.whatsApp ? [{ n: "06", label: "WhatsApp", anchor: "section-whatsapp" }] : []),
-  ];
+  const groups = useMemo(() => buildGroups(caps, auth.enabled), [caps, auth.enabled]);
+  const current: SectionKey = active ?? "llm";
+
+  const sectionContent = (key: SectionKey): ReactNode => {
+    switch (key) {
+      case "llm":
+        return llm && ollama ? (
+          <LlmSection llm={llm} setLlm={setLlm} ollama={ollama} setOllama={setOllama} />
+        ) : (
+          <SettingsLoading />
+        );
+      case "calendar":
+        return calendar ? (
+          <CalendarSection calendar={calendar} setCalendar={setCalendar} />
+        ) : (
+          <SettingsLoading />
+        );
+      case "persona":
+        return <PersonaSection anchor="section-persona" />;
+      case "push":
+        return <PushSection anchor="section-push" />;
+      case "imap":
+        return <ImapSection anchor="section-imap" />;
+      case "whatsapp":
+        return <WhatsAppSection anchor="section-whatsapp" />;
+      case "konto":
+        return <AccountFooter />;
+    }
+  };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-nau-bg text-nau-fg lg:grid-cols-[260px_1fr]">
-      <div className="flex items-center gap-3 border-b border-nau-line px-4 py-4 lg:hidden">
+    <div className="min-h-screen bg-nau-bg text-nau-fg lg:grid lg:grid-cols-[260px_1fr]">
+      {/* ── Desktop-Sidebar (gruppiert) ─────────────────────────── */}
+      <aside className="sticky top-0 hidden h-screen flex-col gap-6 overflow-y-auto border-r border-nau-line px-5 py-7 lg:flex">
         <button
           type="button"
           onClick={() => onNavigate("chat")}
-          aria-label="Zurück zum Chat"
-          className="inline-flex h-10 w-10 items-center justify-center text-nau-fg-dim transition-colors hover:text-nau-accent"
-        >
-          <ArrowLeft size={20} strokeWidth={1.5} />
-        </button>
-        <span className="font-mono text-[11px] tracking-mono-xwide text-nau-fg-dim">
-          // EINSTELLUNGEN
-        </span>
-      </div>
-
-      <aside className="relative hidden border-r border-nau-line px-6 py-7 lg:block">
-        <button
-          type="button"
-          onClick={() => onNavigate("chat")}
-          className="mb-10 flex cursor-pointer items-center gap-3 bg-transparent"
+          className="flex cursor-pointer items-center gap-3 bg-transparent"
           aria-label="Zurück zum Chat"
         >
           <span className="inline-flex h-7 w-7 items-center justify-center bg-nau-accent font-mono text-[13px] font-bold text-nau-bg">
@@ -357,67 +418,125 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           <span className="font-sans text-[15px] font-semibold text-nau-fg">NauAssist</span>
         </button>
 
-        <div className="mb-4 font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim">
-          // EINSTELLUNGEN
-        </div>
-
-        <nav className="flex flex-col gap-0.5">
-          {navItems.map((it) => (
-            <a
-              key={it.n}
-              href={`#${it.anchor}`}
-              className="flex cursor-pointer items-center gap-3 px-3 py-2.5 no-underline"
-            >
-              <span className="font-mono text-[11px] font-bold tracking-mono text-nau-fg-dim">
-                {it.n}
-              </span>
-              <span className="font-sans text-sm text-nau-fg-dim">{it.label}</span>
-            </a>
+        <nav className="flex flex-col gap-5">
+          {groups.map((g) => (
+            <div key={g.id} className="flex flex-col gap-0.5">
+              <div className="px-2 pb-1.5 font-mono text-[9.5px] tracking-mono-xwide text-nau-fg-dim">
+                {g.label}
+              </div>
+              {g.keys.map((k) => {
+                const m = NAV_META[k];
+                const on = current === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setActive(k)}
+                    aria-current={on ? "page" : undefined}
+                    className={
+                      "flex cursor-pointer items-center gap-3 border-l-2 px-3 py-2.5 text-left transition-colors " +
+                      (on
+                        ? "border-nau-accent bg-nau-accent/10 text-nau-fg"
+                        : "border-transparent bg-transparent text-nau-fg-dim hover:text-nau-fg")
+                    }
+                  >
+                    <m.Icon size={18} strokeWidth={on ? 1.9 : 1.6} />
+                    <span className="whitespace-nowrap font-sans text-sm">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
       </aside>
 
-      <main className="flex max-w-[980px] flex-col px-4 pb-12 pt-6 lg:px-16 lg:pb-20 lg:pt-10">
-        {initialPending ? (
+      {initialPending ? (
+        <main className="flex min-h-screen flex-col">
           <PageLoader label="LADE EINSTELLUNGEN" />
-        ) : (
-          <>
-            <div className="mb-9">
-              <div className="mb-3 hidden font-mono text-[10px] tracking-mono-xwide text-nau-fg-dim lg:block">
-                — EINSTELLUNGEN —
+        </main>
+      ) : (
+        <>
+          {/* ── Mobile: Kategorie-Liste (nur wenn keine Sektion aktiv) ─ */}
+          {active === null && (
+            <div className="flex min-h-screen flex-col lg:hidden">
+              <div className="flex items-center gap-3 border-b border-nau-line px-4 py-4">
+                <button
+                  type="button"
+                  onClick={() => onNavigate("chat")}
+                  aria-label="Zurück zum Chat"
+                  className="inline-flex h-10 w-10 items-center justify-center text-nau-fg-dim transition-colors hover:text-nau-accent"
+                >
+                  <ArrowLeft size={20} strokeWidth={1.5} />
+                </button>
+                <span className="font-mono text-[11px] tracking-mono-xwide text-nau-fg-dim">
+                  // EINSTELLUNGEN
+                </span>
               </div>
-              <h1 className="m-0 font-sans text-3xl font-normal leading-[1.05] tracking-tight text-nau-fg lg:text-4xl">
-                Provider &amp; Kalender.
-              </h1>
+              <div className="flex-1 px-4 py-5">
+                {groups.map((g) => (
+                  <div key={g.id} className="mb-6">
+                    <div className="px-1 pb-2 font-mono text-[9.5px] tracking-mono-xwide text-nau-fg-dim">
+                      {g.label}
+                    </div>
+                    <div className="border border-nau-line">
+                      {g.keys.map((k, i) => {
+                        const m = NAV_META[k];
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => setActive(k)}
+                            className={
+                              "flex w-full items-center gap-4 bg-nau-bg-alt px-4 py-4 text-left " +
+                              (i > 0 ? "border-t border-nau-line" : "")
+                            }
+                          >
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-nau-line text-nau-accent">
+                              <m.Icon size={18} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-sans text-[15px] font-medium text-nau-fg">
+                                {m.label}
+                              </span>
+                              <span className="mt-0.5 block font-mono text-[10px] tracking-mono text-nau-fg-dim">
+                                {m.hint}
+                              </span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-nau-fg-dim" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Detail: Desktop immer, Mobile nur bei aktiver Sektion ── */}
+          <main className={(active === null ? "hidden lg:block" : "block") + " min-h-screen"}>
+            {/* Mobile-Zurück-Leiste */}
+            <div className="flex items-center border-b border-nau-line px-2 py-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setActive(null)}
+                className="inline-flex items-center gap-1.5 bg-transparent px-2 py-2 font-mono text-[11px] tracking-mono text-nau-accent"
+              >
+                <ArrowLeft size={18} strokeWidth={1.7} /> EINSTELLUNGEN
+              </button>
             </div>
 
-            {topError && (
-              <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
-                // SETTINGS NICHT LADBAR — {topError}
-              </div>
-            )}
-
-            {llm && ollama && (
-              <LlmSection llm={llm} setLlm={setLlm} ollama={ollama} setOllama={setOllama} />
-            )}
-            {calendar && <CalendarSection calendar={calendar} setCalendar={setCalendar} />}
-
-            <PersonaSection anchor="section-persona" />
-
-            <PushSection anchor="section-push" />
-
-            <ImapSection anchor="section-imap" />
-
-            {caps?.whatsApp && <WhatsAppSection anchor="section-whatsapp" />}
-
-            <AccountFooter />
-
-            <div className="mt-14 hidden items-center justify-end border-t border-nau-line pt-6 lg:flex">
-              <SecondaryButton onClick={() => onNavigate("chat")}>ZURÜCK ZUM CHAT</SecondaryButton>
+            <div className="mx-auto max-w-[820px] px-4 pb-16 pt-6 lg:px-14 lg:pb-20 lg:pt-10">
+              {topError && (
+                <div className="mb-6 border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
+                  // SETTINGS NICHT LADBAR — {topError}
+                </div>
+              )}
+              {sectionContent(current)}
             </div>
-          </>
-        )}
-      </main>
+          </main>
+        </>
+      )}
     </div>
   );
 }
@@ -428,7 +547,7 @@ function AccountFooter() {
   if (!auth.enabled) return null;
 
   return (
-    <div className="mt-14 flex items-center justify-between border-t border-nau-line pt-6">
+    <div className="flex flex-col items-start gap-4">
       <span className="font-mono text-[11px] tracking-mono text-nau-fg-dim">
         // ANGEMELDET ALS {(auth.username ?? auth.email ?? "?").toUpperCase()}
       </span>
@@ -789,7 +908,7 @@ function CalendarSection({
   };
 
   return (
-    <div id="section-calendar" className="mt-14">
+    <div id="section-calendar">
       <SectionHead
         n={2}
         label="KALENDER"

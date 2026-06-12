@@ -1,0 +1,85 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  schedule:
+    # Jeden Montag 06:00 UTC — wöchentlicher Scan auch ohne neue Commits
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── npm audit (Frontend + Sidecar) ─────────────────────────────
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [frontend, sidecar]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm audit (${{ matrix.project }})
+        working-directory: ${{ matrix.project }}
+        # Schlägt erst ab "high" fehl; Warnungen darunter werden geloggt, brechen
+        # den Build aber nicht ab.
+        run: npm audit --audit-level=high
+
+  # ── Trivy: Dependencies + Secrets + Dockerfile/IaC im ganzen Repo ──
+  # Report-only: Trivy bricht den Build nicht ab (Dependency-Alerting macht
+  # Dependabot). Der Bericht wird als Job-Summary und als herunterladbares
+  # Artifact abgelegt — ein nativer Security-Tab-Upload (SARIF/Code-Scanning)
+  # bräuchte bei privaten Repos GitHub Advanced Security.
+  trivy-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+          format: table
+          output: trivy-report.txt
+
+      - name: Bericht als Job-Summary
+        if: always()
+        run: |
+          {
+            echo "## 🛡️ Trivy-Report (HIGH/CRITICAL)"
+            echo ""
+            if [ -s trivy-report.txt ]; then
+              echo '```'
+              cat trivy-report.txt
+              echo '```'
+            else
+              echo "_Keine HIGH/CRITICAL-Funde._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bericht als Artifact ablegen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 90
+          if-no-files-found: ignore
