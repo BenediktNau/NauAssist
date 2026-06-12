@@ -1,27 +1,22 @@
 import { Settings } from "lucide-react";
 
-type HeaderTab = "chat" | "calendar" | "recommendations";
-
 interface HeaderProps {
   onOpenSettings?: () => void;
   /** Right-side meta text. Defaults to the chat status line. */
   meta?: string;
   /** When true, hides the small subtitle under the brand. */
   compact?: boolean;
-  /** Active tab on mobile — when set together with `onSelectTab`, the mobile tab bar is rendered. */
-  currentTab?: HeaderTab;
-  onSelectTab?: (tab: HeaderTab) => void;
 }
 
+// HINWEIS: Die früheren Mobile-Top-Tabs (CHAT / KALENDER / EMPFEHLUNGEN) wurden
+// entfernt — die Navigation läuft auf Mobile jetzt über <MobileTabBar /> (unten).
+// Dadurch sind `currentTab` / `onSelectTab` hier nicht mehr nötig. Der Header ist
+// auf Mobile schlank: nur Brand + Settings-Icon. LIVE/Meta bleiben Desktop-only.
 export function Header({
   onOpenSettings,
   meta = "3 KALENDER · 24 EVENTS",
   compact = false,
-  currentTab,
-  onSelectTab,
 }: HeaderProps) {
-  const showTabs = currentTab !== undefined && onSelectTab !== undefined;
-
   return (
     <div className="flex items-center justify-between border-b border-nau-line px-4 py-3 lg:px-12 lg:py-5">
       <div className="flex items-center gap-3 lg:gap-4">
@@ -37,30 +32,6 @@ export function Header({
           )}
         </div>
       </div>
-
-      {showTabs && (
-        <nav
-          role="tablist"
-          aria-label="Hauptnavigation"
-          className="flex items-stretch gap-1 lg:hidden"
-        >
-          <TabButton
-            label="CHAT"
-            active={currentTab === "chat"}
-            onClick={() => onSelectTab("chat")}
-          />
-          <TabButton
-            label="KALENDER"
-            active={currentTab === "calendar"}
-            onClick={() => onSelectTab("calendar")}
-          />
-          <TabButton
-            label="EMPFEHLUNGEN"
-            active={currentTab === "recommendations"}
-            onClick={() => onSelectTab("recommendations")}
-          />
-        </nav>
-      )}
 
       <div className="flex items-center gap-4 lg:gap-6">
         <span className="hidden font-mono text-[11px] tracking-mono text-nau-fg-dim lg:inline">
@@ -85,32 +56,5 @@ export function Header({
         )}
       </div>
     </div>
-  );
-}
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={
-        "min-h-11 cursor-pointer border-b-2 bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide transition-colors " +
-        (active
-          ? "border-nau-accent text-nau-accent"
-          : "border-transparent text-nau-fg-dim hover:text-nau-fg")
-      }
-    >
-      {label}
-    </button>
   );
 }
