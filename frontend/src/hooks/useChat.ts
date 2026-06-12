@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clearSession, getHistory } from "@/api/client";
 import { sendMessage } from "@/api/chatStream";
 import type { ClearMarkerDto, MessageDto, SlotInfo } from "@/api/types";
-import { useInvalidateCalendar } from "@/hooks/queries";
+import { queryKeys, useInvalidateCalendar } from "@/hooks/queries";
 
 export interface MessageBubble {
   kind: "message";
@@ -49,6 +50,7 @@ export interface ChatState {
   toolStatus: ToolStatus | null;
   error: string | null;
   sending: boolean;
+  historyPending: boolean;
   activeProposals: ActiveProposals | null;
   rulesModalOpen: boolean;
   newEventModalOpen: boolean;
@@ -140,23 +142,32 @@ export function useChat(): ChatState & {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  const reloadHistory = useCallback(async () => {
-    const dto = await getHistory();
-    setBubbles(mapHistory(dto.messages, dto.markers));
-  }, []);
+  const queryClient = useQueryClient();
+  const invalidateCalendar = useInvalidateCalendar();
+  const historyQuery = useQuery({
+    queryKey: queryKeys.chatHistory,
+    queryFn: getHistory,
+  });
 
-  // Initial-History laden
+  // Bubbles aus dem Cache übernehmen — aber nie während eines laufenden
+  // Streams (sonst würde die live wachsende Antwort überschrieben).
+  // dataUpdatedAt-Guard: nach Stream-Ende nicht mit altem Cache-Stand
+  // zurückspringen, sondern erst beim nächsten frischen Fetch syncen.
+  const lastSyncedAtRef = useRef(0);
   useEffect(() => {
-    let cancelled = false;
-    getHistory()
-      .then((dto) => {
-        if (!cancelled) setBubbles(mapHistory(dto.messages, dto.markers));
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "History-Load fehlgeschlagen");
-      });
+    if (sending) return;
+    if (!historyQuery.data) return;
+    if (historyQuery.dataUpdatedAt === lastSyncedAtRef.current) return;
+    lastSyncedAtRef.current = historyQuery.dataUpdatedAt;
+    setBubbles(mapHistory(historyQuery.data.messages, historyQuery.data.markers));
+  }, [sending, historyQuery.data, historyQuery.dataUpdatedAt]);
+
+  const reloadHistory = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.chatHistory });
+  }, [queryClient]);
+
+  useEffect(() => {
     return () => {
-      cancelled = true;
       abortRef.current?.abort();
     };
   }, []);
@@ -321,9 +332,11 @@ export function useChat(): ChatState & {
           setSending(false);
           setToolStatus(null);
           abortRef.current = null;
+          invalidateCalendar();
+          void queryClient.invalidateQueries({ queryKey: queryKeys.chatHistory });
         });
     },
-    [sending, reloadHistory],
+    [sending, reloadHistory, invalidateCalendar, queryClient],
   );
 
   const activeProposals = useMemo<ActiveProposals | null>(() => {
@@ -344,13 +357,14 @@ export function useChat(): ChatState & {
   const closeFreeSlotsModal = useCallback(() => setFreeSlotsModalOpen(false), []);
   const closeDeleteEventsModal = useCallback(() => setDeleteEventsModalOpen(false), []);
   const closeMoveEventsModal = useCallback(() => setMoveEventsModalOpen(false), []);
-  const bumpCalendarReload = useInvalidateCalendar();
+  const bumpCalendarReload = invalidateCalendar;
 
   return {
     bubbles,
     toolStatus,
-    error,
+    error: error ?? (historyQuery.error ? (historyQuery.error as Error).message : null),
     sending,
+    historyPending: historyQuery.isPending,
     send,
     activeProposals,
     rulesModalOpen,

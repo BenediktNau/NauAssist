@@ -15,6 +15,7 @@ import { RulesModal } from "./RulesModal";
 import { WeekViewModal } from "./WeekViewModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
 import { MobileTabBar } from "./nau/MobileTabBar";
+import { PageLoader } from "./nau/PageLoader";
 import type { AppPage } from "@/App";
 
 const TOOL_STATUS_LABEL: Record<string, string> = {
@@ -37,6 +38,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     toolStatus,
     error,
     sending,
+    historyPending,
     send,
     activeProposals,
     rulesModalOpen,
@@ -63,6 +65,18 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const onPickSlot = (slot: SlotInfo) => {
     send(`Ich nehme den Slot ${formatSlot(slot)}.`);
   };
+
+  if (historyPending) {
+    return (
+      <div className="flex h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <Header onOpenSettings={() => onNavigate("settings")} />
+        <main className="flex min-h-0 flex-1 flex-col">
+          <PageLoader />
+        </main>
+        <MobileTabBar current="chat" onSelect={onNavigate} />
+      </div>
+    );
+  }
 
   const lastBubble = bubbles[bubbles.length - 1];
   const nauIsWriting =
