@@ -89,6 +89,7 @@ export function RecommendationsPage({
     try {
       const updated = await pickSuggestionSlot(id, slotIndex);
       replaceItem(updated);
+      void reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -119,6 +120,7 @@ export function RecommendationsPage({
     try {
       const updated = await sendSuggestion(id, text);
       replaceItem(updated);
+      void reloadSuggestions();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
