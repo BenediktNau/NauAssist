@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -18,6 +18,7 @@ import {
   type ParsedEvent,
   type TimedEvent,
 } from "./utils";
+import { eventColor } from "./eventColors";
 import type { PopoverState } from "./EventPopover";
 import type { SlotInfo } from "@/api/types";
 
@@ -40,7 +41,7 @@ interface WeekViewProps {
 }
 
 const DEFAULT_ROW_HEIGHT = 44;
-const HOUR_LABEL_WIDTH = 48;
+const HOUR_LABEL_WIDTH = 40;
 const ALL_DAY_LANE_HEIGHT = 22;
 const ALL_DAY_PAD = 6;
 
@@ -114,6 +115,9 @@ export function WeekView({
   const gridHeight = hours.length * rowHeight;
   const minuteToY = (m: number) => ((m - range.startHour * 60) / minutesInGrid) * gridHeight;
 
+  const todayInWeek = days.some((d) => isToday(d));
+  const nowY = useNowY(todayInWeek, minuteToY, range);
+
   return (
     <div className="rounded-[4px] border border-nau-line bg-nau-bg-alt">
       <div
@@ -126,13 +130,24 @@ export function WeekView({
           return (
             <div
               key={d.toISOString()}
-              className="border-l border-nau-line px-2 py-2 text-left font-mono text-[10px] tracking-mono"
-              style={{ color: today ? "#facc15" : "#888885" }}
+              className="flex flex-col items-center gap-0.5 border-l border-nau-line py-1.5"
             >
-              <div>{format(d, "EEE", { locale: de }).toUpperCase()}</div>
-              <div style={{ color: today ? "#facc15" : "#f5f5f4" }}>
-                {format(d, "d.M.")}
-              </div>
+              <span
+                className="font-mono text-[9px] tracking-mono"
+                style={{ color: today ? "#facc15" : "#888885" }}
+              >
+                {format(d, "EEEEEE", { locale: de }).toUpperCase()}
+              </span>
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[12px] tabular-nums"
+                style={{
+                  background: today ? "#facc15" : "transparent",
+                  color: today ? "#0a0a0a" : "#f5f5f4",
+                  fontWeight: today ? 600 : 400,
+                }}
+              >
+                {format(d, "d")}
+              </span>
             </div>
           );
         })}
@@ -189,12 +204,12 @@ export function WeekView({
                   pinned: true,
                 })
               }
-              className="mx-0.5 cursor-pointer truncate border-none border-l-[2px] px-1.5 py-0 text-left font-mono text-[10px] leading-[20px] text-nau-fg"
+              className="mx-0.5 cursor-pointer truncate rounded-[3px] border-none px-1.5 py-0 text-left font-sans text-[10px] leading-[20px]"
               style={{
                 gridColumn: `${it.colStart} / ${it.colEnd}`,
                 gridRow: it.lane + 1,
-                background: "rgba(96,165,250,0.10)",
-                borderLeftColor: "#60a5fa",
+                background: eventColor(it.event).bg,
+                color: eventColor(it.event).fg,
               }}
               title={it.event.isSeriesInstance ? `${it.event.title} (Serie)` : it.event.title}
             >
@@ -241,6 +256,16 @@ export function WeekView({
               onPickProposal={onPickProposal}
             />
           ))}
+
+          {nowY !== null && (
+            <div
+              className="pointer-events-none absolute z-20"
+              style={{ top: nowY, left: HOUR_LABEL_WIDTH, right: 0 }}
+            >
+              <div className="absolute -left-1 -top-[3px] h-[7px] w-[7px] rounded-full bg-nau-accent" />
+              <div className="h-px w-full bg-nau-accent/80" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -276,14 +301,18 @@ function DayColumn({
     () => (proposals ?? []).filter((p) => isSameDay(p.startDate, day)),
     [proposals, day],
   );
+  const today = isToday(day);
 
   return (
-    <div className="relative border-l border-nau-line">
+    <div
+      className="relative border-l border-nau-line"
+      style={{ background: today ? "rgba(250,204,21,0.04)" : "transparent" }}
+    >
       {hours.map((_h, i) => (
         <div
           key={i}
-          className="border-b border-dashed"
-          style={{ height: rowHeight, borderColor: "rgba(255,255,255,0.04)" }}
+          className="border-b"
+          style={{ height: rowHeight, borderColor: "rgba(255,255,255,0.06)" }}
         />
       ))}
 
@@ -293,6 +322,7 @@ function DayColumn({
           18,
           minuteToY(p.topMinutes + p.durationMinutes) - top - 2,
         );
+        const c = eventColor(p.event);
         return (
           <button
             key={p.event.id}
@@ -312,31 +342,33 @@ function DayColumn({
                 pinned: true,
               })
             }
-            className="absolute cursor-pointer overflow-hidden border-none p-0 text-left font-mono text-[9px] text-nau-fg"
+            className="absolute cursor-pointer overflow-hidden rounded-[4px] border-none text-left"
             style={{
               top,
-              left: `calc(${p.left * 100}% + 3px)`,
-              width: `calc(${p.width * 100}% - 6px)`,
+              left: `calc(${p.left * 100}% + 2px)`,
+              width: `calc(${p.width * 100}% - 4px)`,
               height,
-              background: "rgba(255,255,255,0.05)",
-              borderLeft: `2px solid ${p.hasConflict ? "#f472b6" : "#f5f5f4"}`,
-              outline: p.hasConflict ? "1px solid rgba(244,114,182,0.6)" : "none",
-              padding: "3px 5px",
+              background: c.bg,
+              color: c.fg,
+              outline: p.hasConflict ? "1.5px solid #f472b6" : "none",
+              padding: "2px 4px",
             }}
             title={p.event.isSeriesInstance ? `${p.event.title} (Serie)` : p.event.title}
           >
-            <div className="truncate">
+            <div className="font-sans text-[10px] font-medium leading-tight line-clamp-2">
               {p.event.isSeriesInstance && (
-                <span className="mr-1 text-nau-fg-dim" aria-label="Serie">↻</span>
+                <span className="mr-0.5 opacity-70" aria-label="Serie">↻</span>
               )}
               {p.event.title}
             </div>
-            <div className="truncate text-[8px] text-nau-fg-dim">
-              {formatTime(p.event.startDate)}–{formatTime(p.event.endDate)}
-            </div>
+            {height > 30 && (
+              <div className="mt-0.5 font-mono text-[8px] opacity-75">
+                {formatTime(p.event.startDate)}
+              </div>
+            )}
             {p.hasConflict && (
               <div
-                className="absolute right-1 top-0.5 font-mono text-[8px] tracking-mono"
+                className="absolute right-0.5 top-0.5 font-mono text-[8px] tracking-mono"
                 style={{ color: "#f472b6" }}
               >
                 ⚠
@@ -384,6 +416,24 @@ function DayColumn({
       })}
     </div>
   );
+}
+
+/** Y-Position der Jetzt-Linie — nur wenn heute in der Woche und im Sichtbereich liegt. */
+function useNowY(
+  active: boolean,
+  minuteToY: (m: number) => number,
+  range: { startHour: number; endHour: number },
+): number | null {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (!active) return null;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes < range.startHour * 60 || minutes > range.endHour * 60) return null;
+  return minuteToY(minutes);
 }
 
 interface AllDayPositioned {

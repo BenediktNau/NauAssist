@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  addDays,
   addMonths,
   addWeeks,
   addYears,
@@ -16,12 +17,15 @@ import { de } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MonthView } from "./MonthView";
 import { WeekView, type ParsedProposal } from "./WeekView";
+import { DayView } from "./DayView";
+import { DayStrip } from "./DayStrip";
 import { YearView } from "./YearView";
 import { WhatsNext } from "./WhatsNext";
 import { NotConnected } from "./NotConnected";
 import { EventPopover, type PopoverState } from "./EventPopover";
 import { parseEvents } from "./utils";
 import { NotConnectedError } from "@/api/calendar";
+import { useIsMobile, isMobileViewport } from "@/hooks/useIsMobile";
 import { PageLoader } from "@/components/nau/PageLoader";
 import {
   useCalendarRangeQuery,
@@ -33,7 +37,7 @@ import type { ActiveProposals } from "@/hooks/useChat";
 import type { SlotInfo } from "@/api/types";
 
 export type CalendarBoardVariant = "full" | "compact";
-type ViewMode = "week" | "month" | "year";
+type ViewMode = "day" | "week" | "month" | "year";
 
 interface CalendarBoardProps {
   variant: CalendarBoardVariant;
@@ -52,7 +56,11 @@ export function CalendarBoard({
   proposals,
   onPickProposal,
 }: CalendarBoardProps) {
-  const [view, setView] = useState<ViewMode>("week");
+  const isMobile = useIsMobile();
+  // Auf dem Handy ist die Tagesansicht die Voreinstellung (volle Breite, lesbar).
+  const [view, setView] = useState<ViewMode>(() =>
+    isMobileViewport() ? "day" : "week",
+  );
   const [anchor, setAnchor] = useState<Date>(() => new Date());
 
   const [popover, setPopover] = useState<PopoverState | null>(null);
@@ -146,11 +154,13 @@ export function CalendarBoard({
     lastProposalsIdRef.current = id;
     if (parsedProposals.length === 0) return;
     setAnchor(parsedProposals[0].startDate);
-    setView("week");
+    // Auf dem Handy in die Tagesansicht des Vorschlags springen, sonst Woche.
+    setView(isMobileViewport() ? "day" : "week");
   }, [proposals?.messageId, parsedProposals]);
 
   const navigate = (delta: number) => {
     setAnchor((d) => {
+      if (view === "day") return addDays(d, delta);
       if (view === "week") return addWeeks(d, delta);
       if (view === "month") return addMonths(d, delta);
       return addYears(d, delta);
@@ -193,7 +203,7 @@ export function CalendarBoard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <ViewSwitcher value={view} onChange={setView} compact={compact} />
+        <ViewSwitcher value={view} onChange={setView} compact={compact || isMobile} />
         <Nav
           onPrev={() => navigate(-1)}
           onToday={() => setAnchor(new Date())}
@@ -206,6 +216,26 @@ export function CalendarBoard({
   const grid = errorMessage ? (
     <div className="border border-nau-danger bg-white/[0.015] px-4 py-3 font-mono text-[11px] tracking-mono text-nau-danger">
       // {errorMessage}
+    </div>
+  ) : view === "day" ? (
+    <div className="flex flex-col gap-2">
+      <DayStrip
+        weekStart={startOfWeek(anchor, { weekStartsOn: 1 })}
+        selected={anchor}
+        events={events}
+        onSelect={setAnchor}
+      />
+      <DayView
+        day={anchor}
+        events={events}
+        workingHoursStart={settings?.workingHoursStart ?? "09:00"}
+        workingHoursEnd={settings?.workingHoursEnd ?? "18:00"}
+        rowHeight={compact ? 44 : 56}
+        onHoverEvent={handleHoverEvent}
+        onClickEvent={handleClickEvent}
+        proposals={parsedProposals}
+        onPickProposal={onPickProposal}
+      />
     </div>
   ) : view === "week" ? (
     <WeekView
@@ -284,11 +314,13 @@ interface ViewSwitcherProps {
 function ViewSwitcher({ value, onChange, compact }: ViewSwitcherProps) {
   const opts: { v: ViewMode; label: string }[] = compact
     ? [
+        { v: "day", label: "T" },
         { v: "week", label: "W" },
         { v: "month", label: "M" },
         { v: "year", label: "J" },
       ]
     : [
+        { v: "day", label: "TAG" },
         { v: "week", label: "WOCHE" },
         { v: "month", label: "MONAT" },
         { v: "year", label: "JAHR" },
@@ -341,7 +373,9 @@ function Nav({
 interface Range { from: Date; to: Date }
 
 function computeRange(view: ViewMode, anchor: Date): Range {
-  if (view === "week") {
+  // Tagesansicht lädt die ganze Woche, damit die Wochenleiste Marker zeigen
+  // und der Tageswechsel ohne Nachladen funktioniert.
+  if (view === "day" || view === "week") {
     return {
       from: startOfWeek(anchor, { weekStartsOn: 1 }),
       to: endOfWeek(anchor, { weekStartsOn: 1 }),
@@ -357,6 +391,9 @@ function computeRange(view: ViewMode, anchor: Date): Range {
 }
 
 function formatTitle(view: ViewMode, anchor: Date): string {
+  if (view === "day") {
+    return format(anchor, "EEEE, d. MMMM", { locale: de }).toUpperCase();
+  }
   if (view === "week") {
     const ws = startOfWeek(anchor, { weekStartsOn: 1 });
     return `KW ${format(ws, "I", { locale: de })} · ${format(ws, "yyyy")}`;
@@ -366,6 +403,9 @@ function formatTitle(view: ViewMode, anchor: Date): string {
 }
 
 function formatSubtitle(view: ViewMode, range: Range): string {
+  if (view === "day") {
+    return `KW ${format(range.from, "I", { locale: de })} · ${format(range.from, "yyyy")}`;
+  }
   if (view === "week") {
     return `${format(range.from, "d. MMM", { locale: de })} – ${format(range.to, "d. MMM", { locale: de })}`;
   }
