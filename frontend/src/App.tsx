@@ -3,6 +3,7 @@ import { ChatView } from "@/components/ChatView";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { CalendarPage } from "@/components/pages/CalendarPage";
 import { RecommendationsPage } from "@/components/pages/RecommendationsPage";
+import { Layout } from "@/components/nau/Layout";
 
 export type AppPage = "chat" | "calendar" | "recommendations" | "settings";
 
@@ -85,29 +86,37 @@ export default function App() {
     setPage(next);
   }, []);
 
-  return (
-    <div
-      key={page}
-      className={
-        "h-full " +
-        (dir === "l"
-          ? "motion-safe:animate-page-switch-left"
-          : "motion-safe:animate-page-switch-right")
-      }
-    >
-      {page === "settings" ? (
+  const animClass =
+    dir === "l"
+      ? "motion-safe:animate-page-switch-left"
+      : "motion-safe:animate-page-switch-right";
+
+  // Einstellungen sind eine eigenständige Vollbildseite (eigene Sidebar/Zurück)
+  // — ohne die geteilte Kopf-/Fußleiste.
+  if (page === "settings") {
+    return (
+      <div key="settings" className={"h-full " + animClass}>
         <SettingsPage onNavigate={navigate} />
-      ) : page === "calendar" ? (
-        <CalendarPage onNavigate={navigate} />
-      ) : page === "recommendations" ? (
-        <RecommendationsPage
-          onNavigate={navigate}
-          focusSuggestionId={focusSuggestionId}
-          onFocusHandled={() => setFocusSuggestionId(null)}
-        />
-      ) : (
-        <ChatView onNavigate={navigate} />
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  // Tab-Seiten teilen sich die persistente Layout-Hülle (Header + MobileTabBar).
+  // Nur der innere, per `key` neu gemountete Content animiert beim Wechsel.
+  return (
+    <Layout current={page} onNavigate={navigate}>
+      <div key={page} className={"h-full min-h-0 " + animClass}>
+        {page === "calendar" ? (
+          <CalendarPage onNavigate={navigate} />
+        ) : page === "recommendations" ? (
+          <RecommendationsPage
+            focusSuggestionId={focusSuggestionId}
+            onFocusHandled={() => setFocusSuggestionId(null)}
+          />
+        ) : (
+          <ChatView onNavigate={navigate} />
+        )}
+      </div>
+    </Layout>
   );
 }

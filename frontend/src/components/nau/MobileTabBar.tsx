@@ -55,13 +55,13 @@ export function MobileTabBar({ current, onSelect }: MobileTabBarProps) {
       {/* Gleitender Hintergrund-Schimmer hinter dem aktiven Tab */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 top-0 left-0 bg-nau-accent/[0.07] transition-transform duration-300 ease-out"
+        className="pointer-events-none absolute bottom-0 top-0 left-0 bg-nau-accent/[0.07] transition-transform duration-[420ms] ease-out"
         style={slideStyle}
       />
       {/* Gleitende Indikatorlinie oben — überlagert die obere Trennlinie */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -top-px left-0 h-[2px] bg-nau-accent transition-transform duration-300 ease-out"
+        className="pointer-events-none absolute -top-px left-0 h-[2px] bg-nau-accent transition-transform duration-[420ms] ease-out"
         style={slideStyle}
       />
       {TABS.map(({ key, label, aria, Icon }) => {
@@ -75,7 +75,7 @@ export function MobileTabBar({ current, onSelect }: MobileTabBarProps) {
             aria-label={aria}
             onClick={() => onSelect(key)}
             className={
-              "relative z-10 flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1 bg-transparent pb-1.5 pt-2 font-mono text-[9px] tracking-mono-wide transition-colors duration-300 " +
+              "relative z-10 flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1 bg-transparent pb-1.5 pt-2 font-mono text-[9px] tracking-mono-wide transition-colors duration-[420ms] " +
               (active ? "text-nau-accent" : "text-nau-fg-dim hover:text-nau-fg")
             }
           >

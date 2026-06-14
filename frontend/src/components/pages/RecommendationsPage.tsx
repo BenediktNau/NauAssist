@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queries";
 import { PageLoader } from "@/components/nau/PageLoader";
-import { Header } from "@/components/nau/Header";
-import { MobileTabBar } from "@/components/nau/MobileTabBar";
-import type { AppPage } from "@/App";
 import {
   dismissSuggestion,
   listSuggestions,
@@ -17,7 +14,6 @@ import {
 } from "@/api/suggestions";
 
 interface RecommendationsPageProps {
-  onNavigate: (page: AppPage) => void;
   /** Wenn gesetzt, scrollt die Seite nach Laden zu dieser Suggestion-ID (Deep-Link). */
   focusSuggestionId?: number | null;
   /** Wird gerufen, sobald gescrollt wurde — Parent kann den Focus zurücksetzen. */
@@ -32,7 +28,6 @@ const STATUS_TABS: { key: SuggestionStatus | "all"; label: string }[] = [
 ];
 
 export function RecommendationsPage({
-  onNavigate,
   focusSuggestionId,
   onFocusHandled,
 }: RecommendationsPageProps) {
@@ -130,9 +125,9 @@ export function RecommendationsPage({
     error ?? (suggestionsQuery.error ? suggestionsQuery.error.message : null);
 
   return (
-    <div className="flex min-h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-      <Header onOpenSettings={() => onNavigate("settings")} />
-      <div className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 lg:px-8 lg:py-10">
+    // Header + MobileTabBar liefert die Layout-Hülle; hier nur der scrollbare Inhalt.
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1100px] px-4 py-6 lg:px-8 lg:py-10">
         {suggestionsQuery.isPending ? (
           <PageLoader label="LADE EMPFEHLUNGEN" />
         ) : (
@@ -219,8 +214,6 @@ export function RecommendationsPage({
           </>
         )}
       </div>
-
-      <MobileTabBar current="recommendations" onSelect={onNavigate} />
     </div>
   );
 }

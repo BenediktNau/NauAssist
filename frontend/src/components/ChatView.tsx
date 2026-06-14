@@ -5,7 +5,6 @@ import { ChatBubble } from "./ChatBubble";
 import { ClearDivider } from "./ClearDivider";
 import { MessageInput } from "./MessageInput";
 import { formatSlot } from "./SlotCard";
-import { Header } from "./nau/Header";
 import { CalendarBoard } from "./calendar/CalendarBoard";
 import { DeleteEventsModal } from "./DeleteEventsModal";
 import { FreeSlotsModal } from "./FreeSlotsModal";
@@ -14,7 +13,6 @@ import { NewEventModal } from "./NewEventModal";
 import { RulesModal } from "./RulesModal";
 import { WeekViewModal } from "./WeekViewModal";
 import { ThinkingTerminal } from "./nau/ThinkingTerminal";
-import { MobileTabBar } from "./nau/MobileTabBar";
 import { PageLoader } from "./nau/PageLoader";
 import type { AppPage } from "@/App";
 
@@ -68,13 +66,9 @@ export function ChatView({ onNavigate }: ChatViewProps) {
 
   if (historyPending) {
     return (
-      <div className="flex h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <Header onOpenSettings={() => onNavigate("settings")} />
-        <main className="flex min-h-0 flex-1 flex-col">
-          <PageLoader />
-        </main>
-        <MobileTabBar current="chat" onSelect={onNavigate} />
-      </div>
+      <main className="flex h-full min-h-0 flex-col">
+        <PageLoader />
+      </main>
     );
   }
 
@@ -93,10 +87,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
       : null;
 
   return (
-    <div className="flex h-screen flex-col bg-nau-bg text-nau-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-      <Header onOpenSettings={() => onNavigate("settings")} />
-
-      <main className="min-h-0 flex-1 px-0 py-0 lg:px-10 lg:py-8">
+    <>
+      <main className="h-full min-h-0 px-0 py-0 lg:px-10 lg:py-8">
         <div className="mx-auto flex h-full w-full max-w-[1480px] gap-6">
           {/* ── Chat card ───────────────────────────────────── */}
           <section className="flex min-w-0 flex-1 flex-col bg-nau-bg-alt lg:rounded-[4px] lg:border lg:border-nau-line">
@@ -164,9 +156,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
         onClose={closeMoveEventsModal}
         onMutated={bumpCalendarReload}
       />
-
-      <MobileTabBar current="chat" onSelect={onNavigate} />
-    </div>
+    </>
   );
 }
 
