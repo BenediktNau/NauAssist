@@ -15,7 +15,10 @@ interface MeDto {
 
 function redirectToLogin(loginUrl: string): void {
   const returnUrl = window.location.pathname + window.location.search;
-  window.location.assign(`${loginUrl}?returnUrl=${encodeURIComponent(returnUrl)}`);
+  // `replace` statt `assign`: der Login ist eine Vollbild-Weiterleitung, kein Ziel,
+  // zu dem man zurückblättern möchte. So bleibt die aktuelle Seite nicht als
+  // toter History-Eintrag (u. a. /signin-oidc) hinter der App liegen.
+  window.location.replace(`${loginUrl}?returnUrl=${encodeURIComponent(returnUrl)}`);
 }
 
 /**
