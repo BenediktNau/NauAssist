@@ -100,9 +100,13 @@ export default {
           "0%, 55%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
-        "page-in": {
-          from: { opacity: "0", transform: "translateY(8px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+        "page-switch-right": {
+          from: { opacity: "0", transform: "translateX(14px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "page-switch-left": {
+          from: { opacity: "0", transform: "translateX(-14px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
         },
       },
       animation: {
@@ -112,7 +116,8 @@ export default {
         "nau-blink": "nau-blink 0.8s steps(1) infinite",
         "nau-mech-open": "nau-mech-open 320ms cubic-bezier(0.85, 0, 0.15, 1) both",
         "nau-mech-fade": "nau-mech-fade 320ms linear both",
-        "page-in": "page-in 180ms ease-out",
+        "page-switch-right": "page-switch-right 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "page-switch-left": "page-switch-left 260ms cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },
