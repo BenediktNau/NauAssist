@@ -10,6 +10,15 @@ export type AppPage = "chat" | "calendar" | "recommendations" | "settings";
 // hierhin zurück; erst von Chat aus verlässt man die App (bzw. schließt die PWA).
 const HOME_PAGE: AppPage = "chat";
 
+// Reihenfolge bestimmt die Richtung der Wechsel-Animation (Inhalt gleitet zur
+// Seite, in die auch der gelbe Navbar-Indikator wandert).
+const PAGE_ORDER: Record<AppPage, number> = {
+  chat: 0,
+  calendar: 1,
+  recommendations: 2,
+  settings: 3,
+};
+
 interface NavState {
   nauPage?: AppPage;
 }
@@ -36,6 +45,11 @@ export default function App() {
   // State-Updater entscheiden kann, ob ein neuer History-Eintrag nötig ist.
   const pageRef = useRef<AppPage>(page);
 
+  // Richtung des letzten Wechsels (rechts/links). Wird zusammen mit `page` im
+  // selben Event gesetzt — beide Updates landen gebatcht im selben Render, sodass
+  // die neue Seite gleich die passende Wechsel-Animation trägt.
+  const [dir, setDir] = useState<"l" | "r">("r");
+
   // Einmalig: URL säubern, Basis-History-Eintrag (aktuelle Seite) verankern und
   // Browser-Zurück/Vor an die In-App-Navigation koppeln.
   useEffect(() => {
@@ -51,6 +65,7 @@ export default function App() {
 
     const onPopState = (event: PopStateEvent) => {
       const next = (event.state as NavState | null)?.nauPage ?? HOME_PAGE;
+      setDir(PAGE_ORDER[next] >= PAGE_ORDER[pageRef.current] ? "r" : "l");
       pageRef.current = next;
       setPage(next);
     };
@@ -60,6 +75,7 @@ export default function App() {
 
   const navigate = useCallback((next: AppPage) => {
     if (pageRef.current === next) return;
+    setDir(PAGE_ORDER[next] >= PAGE_ORDER[pageRef.current] ? "r" : "l");
     pageRef.current = next;
     // Neuer History-Eintrag bei gleichbleibender URL ("/") — nur der State trägt
     // die Seite. Browser-Zurück löst dann `popstate` aus und blättert zur
@@ -70,7 +86,15 @@ export default function App() {
   }, []);
 
   return (
-    <div key={page} className="h-full motion-safe:animate-page-in">
+    <div
+      key={page}
+      className={
+        "h-full " +
+        (dir === "l"
+          ? "motion-safe:animate-page-switch-left"
+          : "motion-safe:animate-page-switch-right")
+      }
+    >
       {page === "settings" ? (
         <SettingsPage onNavigate={navigate} />
       ) : page === "calendar" ? (
