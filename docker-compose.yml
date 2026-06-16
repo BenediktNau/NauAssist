@@ -25,7 +25,7 @@ services:
 
   # Startet NUR mit aktivem Compose-Profil "whatsapp" (siehe .env / COMPOSE_PROFILES).
   nauassist-wa:
-    build: ./sidecar
+    build: ./src/sidecar
     image: ghcr.io/benediktnau/nauassist-wa:latest
     profiles: ["whatsapp"]
     volumes:
