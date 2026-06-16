@@ -7,9 +7,9 @@ WORKDIR /build
 # damit Optional-Dep-Auflösung (z. B. @rolldown/binding-wasm32-wasi → @emnapi/*)
 # konsistent ist und `npm ci` nicht "Missing from lock file" wirft.
 RUN npm install -g npm@11
-COPY frontend/package.json frontend/package-lock.json ./
+COPY src/frontend/package.json src/frontend/package-lock.json ./
 RUN npm ci
-COPY frontend/ ./
+COPY src/frontend/ ./
 RUN npm run build
 
 # ── Backend Build + Tests ──────────────────────────────────────
@@ -20,7 +20,8 @@ COPY src/Backend/Backend.csproj             src/Backend/
 COPY src/Backend.Tests/Backend.Tests.csproj src/Backend.Tests/
 RUN dotnet restore src/Backend.Tests/Backend.Tests.csproj
 
-COPY src/ src/
+COPY src/Backend/        src/Backend/
+COPY src/Backend.Tests/  src/Backend.Tests/
 RUN dotnet test src/Backend.Tests/Backend.Tests.csproj \
       --configuration Release --no-restore --nologo
 RUN dotnet publish src/Backend/Backend.csproj \

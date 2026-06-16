@@ -32,7 +32,7 @@ jobs:
           node-version: 22
 
       - name: npm audit (${{ matrix.project }})
-        working-directory: ${{ matrix.project }}
+        working-directory: src/${{ matrix.project }}
         # Schlägt erst ab "high" fehl; Warnungen darunter werden geloggt, brechen
         # den Build aber nicht ab.
         run: npm audit --audit-level=high
