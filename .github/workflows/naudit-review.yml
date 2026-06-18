@@ -1,0 +1,50 @@
+name: naudit-review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+# Mehrere schnelle Pushes auf denselben PR: laufenden Review abbrechen,
+# nur der neueste Stand zählt — spart redundante (teure) LLM-Läufe.
+concurrency:
+  group: naudit-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      # Synchroner Naudit-Review als Merge-Gate. Naudit liest das PR-Diff selbst
+      # (über sein konfiguriertes GitHub-Token) und kommentiert am PR; hier zählt
+      # nur das strukturierte Verdict.
+      - name: Naudit code review
+        env:
+          NAUDIT_URL: ${{ secrets.NAUDIT_URL }}
+          NAUDIT_TOKEN: ${{ secrets.NAUDIT_TOKEN }}
+          # Untrusted Input (v. a. der Titel) bewusst über env statt direkter
+          # ${{ }}-Interpolation -> kein Shell-Injection, JSON via jq sauber escaped.
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg projectId "$REPO" \
+            --argjson mergeRequestIid "$PR_NUMBER" \
+            --arg title "$PR_TITLE" \
+            '{projectId: $projectId, mergeRequestIid: $mergeRequestIid, title: $title}')
+
+          VERDICT=$(curl -sf -X POST "$NAUDIT_URL/review" \
+            -H "X-Naudit-Token: $NAUDIT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" | jq -r '.verdict')
+
+          echo "Naudit verdict: $VERDICT"
+
+          # Fail-closed: Job wird rot bei "request_changes" und (via curl -f) bei
+          # Auth-/LLM-/Netz-Fehlern. Ein roter Check blockt höchstens den Merge
+          # (wenn als required gesetzt) — er schließt den PR nie.
+          [ "$VERDICT" = "approve" ]
