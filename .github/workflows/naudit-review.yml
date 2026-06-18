@@ -37,14 +37,29 @@ jobs:
             --arg title "$PR_TITLE" \
             '{projectId: $projectId, mergeRequestIid: $mergeRequestIid, title: $title}')
 
-          VERDICT=$(curl -sf -X POST "$NAUDIT_URL/review" \
+          # Status und Body getrennt erfassen, damit Fehler im Log sichtbar sind
+          # (statt eines kryptischen jq-Parsefehlers auf einer Nicht-JSON-Antwort).
+          # || true verhindert, dass set -e bei Verbindungsfehlern (HTTP 000) abbricht,
+          # bevor wir den Status auswerten können.
+          HTTP_CODE=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "$NAUDIT_URL/review" \
             -H "X-Naudit-Token: $NAUDIT_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" | jq -r '.verdict')
+            -d "$PAYLOAD") || true
 
+          echo "HTTP $HTTP_CODE — Antwort:"
+          cat response.json 2>/dev/null || true
+          echo
+
+          # Fail-closed: alles außer 200 ist ein Fehler — 401 (Token), 5xx (Naudit/LLM),
+          # 000 (URL nicht erreichbar) oder 200+Nicht-JSON (URL zeigt nicht auf Naudit).
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Kein gültiges 200 von Naudit (HTTP $HTTP_CODE). Prüfe NAUDIT_URL (öffentliche Basis-URL, ohne /review) und NAUDIT_TOKEN."
+            exit 1
+          fi
+
+          VERDICT=$(jq -r '.verdict // empty' response.json)
           echo "Naudit verdict: $VERDICT"
 
-          # Fail-closed: Job wird rot bei "request_changes" und (via curl -f) bei
-          # Auth-/LLM-/Netz-Fehlern. Ein roter Check blockt höchstens den Merge
-          # (wenn als required gesetzt) — er schließt den PR nie.
+          # request_changes (oder unerwartete Antwort) -> Job rot, PR bleibt offen.
           [ "$VERDICT" = "approve" ]
