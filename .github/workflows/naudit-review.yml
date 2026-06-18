@@ -41,7 +41,7 @@ jobs:
           # (statt eines kryptischen jq-Parsefehlers auf einer Nicht-JSON-Antwort).
           # || true verhindert, dass set -e bei Verbindungsfehlern (HTTP 000) abbricht,
           # bevor wir den Status auswerten können.
-          HTTP_CODE=$(curl -sS -o response.json -w '%{http_code}' \
+          HTTP_CODE=$(curl -sS -D headers.txt -o response.json -w '%{http_code}' \
             -X POST "$NAUDIT_URL/review" \
             -H "X-Naudit-Token: $NAUDIT_TOKEN" \
             -H "Content-Type: application/json" \
@@ -52,9 +52,12 @@ jobs:
           echo
 
           # Fail-closed: alles außer 200 ist ein Fehler — 401 (Token), 5xx (Naudit/LLM),
-          # 000 (URL nicht erreichbar) oder 200+Nicht-JSON (URL zeigt nicht auf Naudit).
+          # 000 (URL nicht erreichbar), 3xx (Redirect: http statt https / Trailing-Slash)
+          # oder 200+Nicht-JSON (URL zeigt nicht auf Naudit).
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Kein gültiges 200 von Naudit (HTTP $HTTP_CODE). Prüfe NAUDIT_URL (öffentliche Basis-URL, ohne /review) und NAUDIT_TOKEN."
+            # Bei Redirects das Ziel zeigen — verrät http->https oder Trailing-Slash.
+            grep -i '^location:' headers.txt || true
+            echo "::error::Kein gültiges 200 von Naudit (HTTP $HTTP_CODE). NAUDIT_URL muss die öffentliche https-Basis-URL sein (ohne /review); NAUDIT_TOKEN = Naudit:GitHub:WebhookSecret."
             exit 1
           fi
 
