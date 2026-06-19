@@ -175,6 +175,27 @@ public static class SourceAccountsEndpoints
             }
         });
 
+        // Telefonnummer → kanonische JID (+ LID) für die manuelle Chat-Auswahl.
+        group.MapPost("/whatsapp/session/{sessionId}/resolve", async (
+            string sessionId,
+            ResolveChatPayload? body,
+            IWhatsAppSidecarClient client,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body?.Phone))
+            {
+                return Results.BadRequest(new { error = "phone_required" });
+            }
+            try
+            {
+                return Results.Ok(await client.ResolveChatAsync(sessionId, body.Phone, ct));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = "sidecar_unreachable", detail = ex.Message });
+            }
+        });
+
         // Chats für einen bereits gespeicherten Account neu laden.
         group.MapGet("/{id:long}/whatsapp/chats", async (
             long id,
@@ -302,6 +323,7 @@ public static class SourceAccountsEndpoints
 
     private sealed record ListImapFoldersPayload(Dictionary<string, object> Credentials);
     private sealed record StartWhatsAppPayload(string? SessionId);
+    private sealed record ResolveChatPayload(string? Phone);
 
     private sealed record SourceAccountDto(
         long Id,

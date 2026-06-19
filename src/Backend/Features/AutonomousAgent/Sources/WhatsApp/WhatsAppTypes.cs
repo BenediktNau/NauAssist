@@ -23,3 +23,6 @@ public sealed record WhatsAppMessage(
 
 /// <summary>Seite + neuer Cursor aus <c>GET /sessions/:id/messages</c>.</summary>
 public sealed record WhatsAppMessagePage(IReadOnlyList<WhatsAppMessage> Messages, long Cursor);
+
+/// <summary>Ergebnis einer onWhatsApp-Auflösung: kanonische JID + optionale LID-Form.</summary>
+public sealed record WhatsAppResolveResult(string ChatId, string? Lid, bool Exists);

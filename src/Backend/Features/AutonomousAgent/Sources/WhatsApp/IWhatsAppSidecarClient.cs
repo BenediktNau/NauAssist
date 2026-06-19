@@ -11,5 +11,6 @@ public interface IWhatsAppSidecarClient
     Task<IReadOnlyList<WhatsAppChat>> ListChatsAsync(string sessionId, CancellationToken ct);
     Task<WhatsAppMessagePage> GetMessagesAsync(string sessionId, long since, int limit, CancellationToken ct);
     Task SendAsync(string sessionId, string chatId, string text, CancellationToken ct);
+    Task<WhatsAppResolveResult> ResolveChatAsync(string sessionId, string phone, CancellationToken ct);
     Task DeleteSessionAsync(string sessionId, CancellationToken ct);
 }

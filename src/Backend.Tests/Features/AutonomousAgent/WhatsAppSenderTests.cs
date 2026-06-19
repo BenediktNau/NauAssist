@@ -50,6 +50,8 @@ public sealed class WhatsAppSenderTests
             Task.FromResult<IReadOnlyList<WhatsAppChat>>(Array.Empty<WhatsAppChat>());
         public Task<WhatsAppMessagePage> GetMessagesAsync(string sessionId, long since, int limit, CancellationToken ct) =>
             Task.FromResult(new WhatsAppMessagePage(Array.Empty<WhatsAppMessage>(), since));
+        public Task<WhatsAppResolveResult> ResolveChatAsync(string sessionId, string phone, CancellationToken ct) =>
+            Task.FromResult(new WhatsAppResolveResult($"{phone}@s.whatsapp.net", null, true));
         public Task DeleteSessionAsync(string sessionId, CancellationToken ct) => Task.CompletedTask;
     }
 }
