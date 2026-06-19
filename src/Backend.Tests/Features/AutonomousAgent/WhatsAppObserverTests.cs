@@ -136,6 +136,27 @@ public sealed class WhatsAppObserverTests
         signals[0].Text.Should().EndWith("…");
     }
 
+    [Fact]
+    public async Task Poll_NormalisesJid_MatchesDespiteDeviceSuffix()
+    {
+        using var db = new TempSqliteDb();
+        var fake = new FakeSidecar
+        {
+            Page = new WhatsAppMessagePage(new[]
+            {
+                Msg(2, "4915112345678:7@s.whatsapp.net", "Hast du Freitag Zeit?"),
+            }, Cursor: 2),
+        };
+        var (observer, accounts, cursors) = Build(db, fake);
+        var account = await AddAccountAsync(accounts, "4915112345678@s.whatsapp.net");
+        await cursors.SetAsync(SourceKey, account.Id, "1", Now, CancellationToken.None);
+
+        var signals = await observer.PollAsync(CancellationToken.None);
+
+        signals.Should().HaveCount(1);
+        signals[0].SourceRef.Should().Be("4915112345678:7@s.whatsapp.net"); // Rohwert bleibt im Signal
+    }
+
     private sealed class FakeSidecar : IWhatsAppSidecarClient
     {
         public WhatsAppMessagePage Page { get; set; } = new(Array.Empty<WhatsAppMessage>(), 0);
