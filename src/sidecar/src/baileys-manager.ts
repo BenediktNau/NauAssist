@@ -223,6 +223,27 @@ export class BaileysManager {
     return true;
   }
 
+  /** Validiert eine Telefonnummer per onWhatsApp und liefert kanonische JID + LID. */
+  async resolveChat(
+    id: string,
+    phone: string,
+  ): Promise<{ chatId: string; lid: string | null; exists: boolean } | null> {
+    const s = this.sessions.get(id);
+    if (!s?.sock || s.state !== "connected") return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return { chatId: "", lid: null, exists: false };
+
+    const res = await s.sock.onWhatsApp(digits);
+    const hit = res?.[0];
+    if (!hit?.exists) return { chatId: "", lid: null, exists: false };
+
+    const chatId = hit.jid;
+    const lid = typeof hit.lid === "string" ? hit.lid : null;
+    // Sofort in der Auswahlliste sichtbar machen (Name = Nummer als Fallback).
+    if (!s.chats.has(chatId)) s.chats.set(chatId, digits);
+    return { chatId, lid, exists: true };
+  }
+
   async deleteSession(id: string): Promise<boolean> {
     const s = this.sessions.get(id);
     if (s?.sock) {
