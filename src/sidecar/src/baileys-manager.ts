@@ -77,6 +77,9 @@ export class BaileysManager {
       session = { id, state: "disconnected", chats: new Map(), starting: false };
       this.sessions.set(id, session);
     }
+    for (const c of this.buffer.listChats(id)) {
+      if (!session.chats.has(c.chatId)) session.chats.set(c.chatId, c.name);
+    }
     if (session.starting) return;
     session.starting = true;
 
@@ -142,7 +145,11 @@ export class BaileysManager {
       const s = this.sessions.get(id);
       if (!s) return;
       for (const c of chats) {
-        if (c.id) s.chats.set(c.id, c.name ?? c.id);
+        if (c.id) {
+          const name = c.name ?? c.id;
+          s.chats.set(c.id, name);
+          this.buffer.upsertChat(id, c.id, name);
+        }
       }
     };
     sock.ev.on("chats.upsert", rememberChats as never);
@@ -152,7 +159,11 @@ export class BaileysManager {
       const s = this.sessions.get(id);
       if (!s) return;
       for (const c of contacts) {
-        if (c.id) s.chats.set(c.id, c.name ?? c.notify ?? c.id);
+        if (c.id) {
+          const name = c.name ?? c.notify ?? c.id;
+          s.chats.set(c.id, name);
+          this.buffer.upsertChat(id, c.id, name);
+        }
       }
     }) as never);
 
@@ -169,6 +180,7 @@ export class BaileysManager {
         // pushName direkter 1:1-Chats als Anzeigename merken.
         if (m.pushName && chatId.endsWith("@s.whatsapp.net")) {
           s.chats.set(chatId, m.pushName);
+          this.buffer.upsertChat(id, chatId, m.pushName);
         }
 
         this.buffer.insert({
@@ -199,7 +211,9 @@ export class BaileysManager {
     try {
       const groups = await s.sock.groupFetchAllParticipating();
       for (const [jid, meta] of Object.entries(groups)) {
-        s.chats.set(jid, meta.subject || jid);
+        const name = meta.subject || jid;
+        s.chats.set(jid, name);
+        this.buffer.upsertChat(id, jid, name);
       }
       this.logger.info({ id, count: Object.keys(groups).length }, "groups refreshed");
     } catch (e) {
@@ -240,7 +254,10 @@ export class BaileysManager {
     const chatId = hit.jid;
     const lid = typeof hit.lid === "string" ? hit.lid : null;
     // Sofort in der Auswahlliste sichtbar machen (Name = Nummer als Fallback).
-    if (!s.chats.has(chatId)) s.chats.set(chatId, digits);
+    if (!s.chats.has(chatId)) {
+      s.chats.set(chatId, digits);
+      this.buffer.upsertChat(id, chatId, digits);
+    }
     return { chatId, lid, exists: true };
   }
 

@@ -70,6 +70,12 @@ export class MessageBuffer {
         from_me     INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS idx_messages_session_seq ON messages(session_id, seq);
+      CREATE TABLE IF NOT EXISTS chats (
+        session_id  TEXT NOT NULL,
+        chat_id     TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        PRIMARY KEY (session_id, chat_id)
+      );
     `);
     this.maxRows = opts?.maxRows ?? 5000;
     this.retentionMs = (opts?.retentionDays ?? 14) * 24 * 60 * 60 * 1000;
@@ -124,6 +130,22 @@ export class MessageBuffer {
       .prepare(`SELECT MAX(seq) AS m FROM messages WHERE session_id = ?`)
       .get(sessionId) as { m: number | null } | undefined;
     return row?.m ?? 0;
+  }
+
+  upsertChat(sessionId: string, chatId: string, name: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO chats (session_id, chat_id, name) VALUES (?, ?, ?)
+         ON CONFLICT(session_id, chat_id) DO UPDATE SET name = excluded.name`,
+      )
+      .run(sessionId, chatId, name);
+  }
+
+  listChats(sessionId: string): Array<{ chatId: string; name: string }> {
+    const rows = this.db
+      .prepare(`SELECT chat_id AS chatId, name FROM chats WHERE session_id = ?`)
+      .all(sessionId) as Array<{ chatId: string; name: string }>;
+    return rows;
   }
 
   private trim(): void {
