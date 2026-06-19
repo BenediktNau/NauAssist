@@ -117,6 +117,7 @@ export class BaileysManager {
         s.qr = undefined;
         s.phone = sock.user?.id;
         this.logger.info({ id, phone: s.phone }, "session connected");
+        void this.refreshGroups(id);
       } else if (connection === "close") {
         const code = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)
           ?.output?.statusCode;
@@ -191,9 +192,25 @@ export class BaileysManager {
     return { state: s.state, qr: s.qr, phone: s.phone };
   }
 
-  listChats(id: string): Array<{ chatId: string; name: string }> | null {
+  /** Lädt alle teilnehmenden Gruppen aktiv (ohne auf Live-Events zu warten). */
+  private async refreshGroups(id: string): Promise<void> {
+    const s = this.sessions.get(id);
+    if (!s?.sock || s.state !== "connected") return;
+    try {
+      const groups = await s.sock.groupFetchAllParticipating();
+      for (const [jid, meta] of Object.entries(groups)) {
+        s.chats.set(jid, meta.subject || jid);
+      }
+      this.logger.info({ id, count: Object.keys(groups).length }, "groups refreshed");
+    } catch (e) {
+      this.logger.warn({ id, err: e }, "group refresh failed");
+    }
+  }
+
+  async listChats(id: string): Promise<Array<{ chatId: string; name: string }> | null> {
     const s = this.sessions.get(id);
     if (!s) return null;
+    await this.refreshGroups(id);
     return [...s.chats.entries()]
       .filter(([chatId]) => chatId !== "status@broadcast")
       .map(([chatId, name]) => ({ chatId, name }));
