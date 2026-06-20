@@ -256,7 +256,10 @@ export class BaileysManager {
     // internen LIDMappingStore. Von dort holen (kann null sein, solange noch unbekannt).
     const lid = await s.sock.signalRepository.lidMapping
       .getLIDForPN(chatId)
-      .catch(() => null);
+      .catch((e) => {
+        this.logger.warn({ id, chatId, err: e }, "LID lookup failed");
+        return null;
+      });
     // Sofort in der Auswahlliste sichtbar machen (Name = Nummer als Fallback).
     if (!s.chats.has(chatId)) {
       s.chats.set(chatId, digits);
