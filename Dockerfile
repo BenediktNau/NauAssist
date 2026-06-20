@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Frontend Build ─────────────────────────────────────────────
-FROM node:22-alpine AS frontend-builder
+FROM node:26-alpine AS frontend-builder
 WORKDIR /build
 # Base-Image bringt npm 10.x mit; lokal wird mit npm 11 entwickelt — angleichen,
 # damit Optional-Dep-Auflösung (z. B. @rolldown/binding-wasm32-wasi → @emnapi/*)
