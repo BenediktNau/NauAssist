@@ -32,7 +32,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -60,7 +60,7 @@ jobs:
       # ── WhatsApp-Sidecar (separates Image; opt-in beim Deploy via Compose-Profil) ──
       - name: Extract sidecar metadata
         id: meta-wa
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}-wa
           tags: |
