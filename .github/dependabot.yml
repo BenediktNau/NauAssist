@@ -1,0 +1,70 @@
+# Dependabot-Updates für alle Ökosysteme des Repos.
+# Takt: wöchentlich montags (wie der Security-Scan). Minor/Patch je Ökosystem
+# in einer Sammel-PR gruppiert, Major-Updates einzeln (bewusste Reviews).
+version: 2
+updates:
+  # ── .NET / NuGet (Backend + Tests) ─────────────────────────────
+  - package-ecosystem: nuget
+    directories:
+      - /src/Backend
+      - /src/Backend.Tests
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: Dependencies
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  # ── npm (Frontend + WhatsApp-Sidecar) ──────────────────────────
+  - package-ecosystem: npm
+    directories:
+      - /src/frontend
+      - /src/sidecar
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: Dependencies
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # ── Docker (Root-Image + Sidecar-Image) ────────────────────────
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /src/sidecar
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: Dependencies
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+
+  # ── GitHub Actions (Workflows in .github/workflows) ────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: Dependencies
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

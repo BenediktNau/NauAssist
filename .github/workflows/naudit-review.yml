@@ -1,0 +1,68 @@
+name: naudit-review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+# Mehrere schnelle Pushes auf denselben PR: laufenden Review abbrechen,
+# nur der neueste Stand zählt — spart redundante (teure) LLM-Läufe.
+concurrency:
+  group: naudit-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      # Synchroner Naudit-Review als Merge-Gate. Naudit liest das PR-Diff selbst
+      # (über sein konfiguriertes GitHub-Token) und kommentiert am PR; hier zählt
+      # nur das strukturierte Verdict.
+      - name: Naudit code review
+        env:
+          NAUDIT_URL: ${{ secrets.NAUDIT_URL }}
+          NAUDIT_TOKEN: ${{ secrets.NAUDIT_TOKEN }}
+          # Untrusted Input (v. a. der Titel) bewusst über env statt direkter
+          # ${{ }}-Interpolation -> kein Shell-Injection, JSON via jq sauber escaped.
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg projectId "$REPO" \
+            --argjson mergeRequestIid "$PR_NUMBER" \
+            --arg title "$PR_TITLE" \
+            '{projectId: $projectId, mergeRequestIid: $mergeRequestIid, title: $title}')
+
+          # Status und Body getrennt erfassen, damit Fehler im Log sichtbar sind
+          # (statt eines kryptischen jq-Parsefehlers auf einer Nicht-JSON-Antwort).
+          # || true verhindert, dass set -e bei Verbindungsfehlern (HTTP 000) abbricht,
+          # bevor wir den Status auswerten können.
+          HTTP_CODE=$(curl -sS -D headers.txt -o response.json -w '%{http_code}' \
+            -X POST "$NAUDIT_URL/review" \
+            -H "X-Naudit-Token: $NAUDIT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD") || true
+
+          echo "HTTP $HTTP_CODE — Antwort:"
+          cat response.json 2>/dev/null || true
+          echo
+
+          # Fail-closed: alles außer 200 ist ein Fehler — 401 (Token), 5xx (Naudit/LLM),
+          # 000 (URL nicht erreichbar), 3xx (Redirect: http statt https / Trailing-Slash)
+          # oder 200+Nicht-JSON (URL zeigt nicht auf Naudit).
+          if [ "$HTTP_CODE" != "200" ]; then
+            # Bei Redirects das Ziel zeigen — verrät http->https oder Trailing-Slash.
+            grep -i '^location:' headers.txt || true
+            echo "::error::Kein gültiges 200 von Naudit (HTTP $HTTP_CODE). NAUDIT_URL muss die öffentliche https-Basis-URL sein (ohne /review); NAUDIT_TOKEN = Naudit:GitHub:WebhookSecret."
+            exit 1
+          fi
+
+          VERDICT=$(jq -r '.verdict // empty' response.json)
+          echo "Naudit verdict: $VERDICT"
+
+          # request_changes (oder unerwartete Antwort) -> Job rot, PR bleibt offen.
+          [ "$VERDICT" = "approve" ]
