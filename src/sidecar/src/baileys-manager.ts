@@ -252,7 +252,11 @@ export class BaileysManager {
     if (!hit?.exists) return { chatId: "", lid: null, exists: false };
 
     const chatId = hit.jid;
-    const lid = typeof hit.lid === "string" ? hit.lid : null;
+    // Baileys 7.0: onWhatsApp liefert kein `lid` mehr — die LID↔PN-Zuordnung lebt im
+    // internen LIDMappingStore. Von dort holen (kann null sein, solange noch unbekannt).
+    const lid = await s.sock.signalRepository.lidMapping
+      .getLIDForPN(chatId)
+      .catch(() => null);
     // Sofort in der Auswahlliste sichtbar machen (Name = Nummer als Fallback).
     if (!s.chats.has(chatId)) {
       s.chats.set(chatId, digits);
