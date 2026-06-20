@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Build ──────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /build
 # better-sqlite3 kompiliert ein natives Modul → Build-Tools nötig.
 RUN apk add --no-cache python3 make g++
@@ -12,7 +12,7 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 # ── Runtime ────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 RUN apk add --no-cache tini \
  && addgroup -g 10001 wa \
  && adduser  -D -u 10001 -G wa wa \
