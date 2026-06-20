@@ -67,6 +67,18 @@ public sealed class WhatsAppSidecarClient : IWhatsAppSidecarClient
         res.EnsureSuccessStatusCode();
     }
 
+    public async Task<WhatsAppResolveResult> ResolveChatAsync(string sessionId, string phone, CancellationToken ct)
+    {
+        using var client = _http.CreateClient("WhatsApp");
+        using var res = await client.PostAsJsonAsync(
+            $"sessions/{Uri.EscapeDataString(sessionId)}/resolve",
+            new { phone },
+            ct);
+        res.EnsureSuccessStatusCode();
+        return (await res.Content.ReadFromJsonAsync<WhatsAppResolveResult>(JsonOpts, ct))
+               ?? new WhatsAppResolveResult("", null, false);
+    }
+
     public async Task DeleteSessionAsync(string sessionId, CancellationToken ct)
     {
         using var client = _http.CreateClient("WhatsApp");

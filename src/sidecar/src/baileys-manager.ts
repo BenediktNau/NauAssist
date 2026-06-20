@@ -77,6 +77,9 @@ export class BaileysManager {
       session = { id, state: "disconnected", chats: new Map(), starting: false };
       this.sessions.set(id, session);
     }
+    for (const c of this.buffer.listChats(id)) {
+      if (!session.chats.has(c.chatId)) session.chats.set(c.chatId, c.name);
+    }
     if (session.starting) return;
     session.starting = true;
 
@@ -117,6 +120,7 @@ export class BaileysManager {
         s.qr = undefined;
         s.phone = sock.user?.id;
         this.logger.info({ id, phone: s.phone }, "session connected");
+        void this.refreshGroups(id);
       } else if (connection === "close") {
         const code = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)
           ?.output?.statusCode;
@@ -141,7 +145,11 @@ export class BaileysManager {
       const s = this.sessions.get(id);
       if (!s) return;
       for (const c of chats) {
-        if (c.id) s.chats.set(c.id, c.name ?? c.id);
+        if (c.id) {
+          const name = c.name ?? c.id;
+          s.chats.set(c.id, name);
+          this.buffer.upsertChat(id, c.id, name);
+        }
       }
     };
     sock.ev.on("chats.upsert", rememberChats as never);
@@ -151,7 +159,11 @@ export class BaileysManager {
       const s = this.sessions.get(id);
       if (!s) return;
       for (const c of contacts) {
-        if (c.id) s.chats.set(c.id, c.name ?? c.notify ?? c.id);
+        if (c.id) {
+          const name = c.name ?? c.notify ?? c.id;
+          s.chats.set(c.id, name);
+          this.buffer.upsertChat(id, c.id, name);
+        }
       }
     }) as never);
 
@@ -168,6 +180,7 @@ export class BaileysManager {
         // pushName direkter 1:1-Chats als Anzeigename merken.
         if (m.pushName && chatId.endsWith("@s.whatsapp.net")) {
           s.chats.set(chatId, m.pushName);
+          this.buffer.upsertChat(id, chatId, m.pushName);
         }
 
         this.buffer.insert({
@@ -191,9 +204,27 @@ export class BaileysManager {
     return { state: s.state, qr: s.qr, phone: s.phone };
   }
 
-  listChats(id: string): Array<{ chatId: string; name: string }> | null {
+  /** Lädt alle teilnehmenden Gruppen aktiv (ohne auf Live-Events zu warten). */
+  private async refreshGroups(id: string): Promise<void> {
+    const s = this.sessions.get(id);
+    if (!s?.sock || s.state !== "connected") return;
+    try {
+      const groups = await s.sock.groupFetchAllParticipating();
+      for (const [jid, meta] of Object.entries(groups)) {
+        const name = meta.subject || jid;
+        s.chats.set(jid, name);
+        this.buffer.upsertChat(id, jid, name);
+      }
+      this.logger.info({ id, count: Object.keys(groups).length }, "groups refreshed");
+    } catch (e) {
+      this.logger.warn({ id, err: e }, "group refresh failed");
+    }
+  }
+
+  async listChats(id: string): Promise<Array<{ chatId: string; name: string }> | null> {
     const s = this.sessions.get(id);
     if (!s) return null;
+    await this.refreshGroups(id);
     return [...s.chats.entries()]
       .filter(([chatId]) => chatId !== "status@broadcast")
       .map(([chatId, name]) => ({ chatId, name }));
@@ -204,6 +235,30 @@ export class BaileysManager {
     if (!s?.sock || s.state !== "connected") return false;
     await s.sock.sendMessage(chatId, { text });
     return true;
+  }
+
+  /** Validiert eine Telefonnummer per onWhatsApp und liefert kanonische JID + LID. */
+  async resolveChat(
+    id: string,
+    phone: string,
+  ): Promise<{ chatId: string; lid: string | null; exists: boolean } | null> {
+    const s = this.sessions.get(id);
+    if (!s?.sock || s.state !== "connected") return null;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return { chatId: "", lid: null, exists: false };
+
+    const res = await s.sock.onWhatsApp(digits);
+    const hit = res?.[0];
+    if (!hit?.exists) return { chatId: "", lid: null, exists: false };
+
+    const chatId = hit.jid;
+    const lid = typeof hit.lid === "string" ? hit.lid : null;
+    // Sofort in der Auswahlliste sichtbar machen (Name = Nummer als Fallback).
+    if (!s.chats.has(chatId)) {
+      s.chats.set(chatId, digits);
+      this.buffer.upsertChat(id, chatId, digits);
+    }
+    return { chatId, lid, exists: true };
   }
 
   async deleteSession(id: string): Promise<boolean> {

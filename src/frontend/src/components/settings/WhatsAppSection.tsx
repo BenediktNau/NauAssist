@@ -7,10 +7,12 @@ import {
   listSourceAccounts,
   listWhatsAppChats,
   listWhatsAppChatsForAccount,
+  resolveWhatsAppChat,
   startWhatsAppSession,
   updateSourceAccount,
   type SourceAccountDto,
   type WhatsAppChatDto,
+  type WhatsAppResolveDto,
 } from "@/api/source-accounts";
 
 interface WhatsAppSectionProps {
@@ -118,6 +120,8 @@ function WaAccountCard({ account, onChanged }: WaAccountCardProps) {
   const [savingAllowlist, setSavingAllowlist] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => setDraftAllowlist(account.allowlist), [account.allowlist]);
 
@@ -137,6 +141,33 @@ function WaAccountCard({ account, onChanged }: WaAccountCardProps) {
     setDraftAllowlist((prev) =>
       prev.includes(chatId) ? prev.filter((c) => c !== chatId) : [...prev, chatId],
     );
+
+  const addByPhone = async () => {
+    const sessionId = account.credentials.sessionId;
+    if (!sessionId || !phoneInput.trim()) return;
+    setResolving(true);
+    setError(null);
+    try {
+      const r: WhatsAppResolveDto = await resolveWhatsAppChat(sessionId, phoneInput.trim());
+      if (!r.exists) { setError("Nummer hat kein WhatsApp."); return; }
+      setChats((prev) => {
+        const next = prev ? [...prev] : [];
+        if (!next.some((c) => c.chatId === r.chatId)) {
+          next.push({ chatId: r.chatId, name: phoneInput.trim() });
+        }
+        return next;
+      });
+      setDraftAllowlist((prev) => {
+        const add = [r.chatId, r.lid].filter((x): x is string => !!x && !prev.includes(x));
+        return add.length ? [...prev, ...add] : prev;
+      });
+      setPhoneInput("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResolving(false);
+    }
+  };
 
   const saveAllowlist = async () => {
     setSavingAllowlist(true);
@@ -198,7 +229,7 @@ function WaAccountCard({ account, onChanged }: WaAccountCardProps) {
       </div>
 
       <div className="mt-2 font-mono text-[11px] tracking-mono text-nau-fg-dim">
-        // {account.allowlist.length} Chat(s) freigegeben
+        // {account.allowlist.filter((c) => !c.endsWith("@lid")).length} Chat(s) freigegeben
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -231,6 +262,24 @@ function WaAccountCard({ account, onChanged }: WaAccountCardProps) {
 
       {expanded && (
         <div className="mt-4 border-t border-nau-line pt-3">
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="tel"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="Nummer, z. B. 4915112345678"
+              className="min-h-10 flex-1 border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono text-nau-fg"
+            />
+            <button
+              type="button"
+              onClick={addByPhone}
+              disabled={resolving || !phoneInput.trim()}
+              className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-50"
+            >
+              {resolving ? "PRÜFE …" : "HINZUFÜGEN"}
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -304,6 +353,8 @@ function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const savedRef = useRef(false);
@@ -372,6 +423,32 @@ function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
     setAllowlist((prev) =>
       prev.includes(chatId) ? prev.filter((c) => c !== chatId) : [...prev, chatId],
     );
+
+  const addByPhone = async () => {
+    if (!sessionId || !phoneInput.trim()) return;
+    setResolving(true);
+    setError(null);
+    try {
+      const r: WhatsAppResolveDto = await resolveWhatsAppChat(sessionId, phoneInput.trim());
+      if (!r.exists) { setError("Nummer hat kein WhatsApp."); return; }
+      setChats((prev) => {
+        const next = prev ? [...prev] : [];
+        if (!next.some((c) => c.chatId === r.chatId)) {
+          next.push({ chatId: r.chatId, name: phoneInput.trim() });
+        }
+        return next;
+      });
+      setAllowlist((prev) => {
+        const add = [r.chatId, r.lid].filter((x): x is string => !!x && !prev.includes(x));
+        return add.length ? [...prev, ...add] : prev;
+      });
+      setPhoneInput("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResolving(false);
+    }
+  };
 
   const save = async () => {
     if (!sessionId) return;
@@ -445,6 +522,24 @@ function AddWhatsAppForm({ onCreated, onCancel }: AddWhatsAppFormProps) {
           <div className="border-t border-nau-line pt-3">
             <div className="mb-2 font-mono text-[11px] tracking-mono-wide text-nau-fg-dim">
               // CHATS ({chats?.length ?? 0}) — wähle, was der Agent beobachten darf
+            </div>
+            <div className="mb-3 flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="tel"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="Nummer, z. B. 4915112345678"
+                className="min-h-10 flex-1 border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono text-nau-fg"
+              />
+              <button
+                type="button"
+                onClick={addByPhone}
+                disabled={resolving || !phoneInput.trim()}
+                className="min-h-10 cursor-pointer border border-nau-line bg-transparent px-3 py-2 font-mono text-[11px] tracking-mono-wide text-nau-fg transition-colors hover:border-nau-accent hover:text-nau-accent disabled:opacity-50"
+              >
+                {resolving ? "PRÜFE …" : "HINZUFÜGEN"}
+              </button>
             </div>
             {chats && chats.length > 0 ? (
               <ul className="flex flex-col gap-1.5">

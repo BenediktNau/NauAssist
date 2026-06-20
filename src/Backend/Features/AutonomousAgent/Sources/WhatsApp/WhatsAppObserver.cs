@@ -75,11 +75,13 @@ public sealed class WhatsAppObserver : ISourceObserver
                     await _cursors.SetAsync(SourceKey, account.Id, page.Cursor.ToString(), _clock(), ct);
                 }
 
-                var allow = new HashSet<string>(account.Allowlist, StringComparer.Ordinal);
+                var allow = account.Allowlist
+                    .Select(WhatsAppJid.Normalize)
+                    .ToHashSet(StringComparer.Ordinal);
                 foreach (var m in page.Messages)
                 {
                     if (m.FromMe) continue;                  // eigene Nachrichten ignorieren (Loop-Schutz)
-                    if (!allow.Contains(m.ChatId)) continue; // nur freigegebene Chats
+                    if (!allow.Contains(WhatsAppJid.Normalize(m.ChatId))) continue; // nur freigegebene Chats (JID-normalisiert)
                     if (string.IsNullOrWhiteSpace(m.Text)) continue;
 
                     var body = m.Text.Length > _options.MaxBodyChars

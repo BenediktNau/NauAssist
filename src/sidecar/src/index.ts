@@ -44,7 +44,7 @@ app.get("/sessions/:id", async (req, reply) => {
 
 app.get("/sessions/:id/chats", async (req, reply) => {
   const { id } = req.params as { id: string };
-  const chats = manager.listChats(id);
+  const chats = await manager.listChats(id);
   if (!chats) return reply.code(404).send({ error: "not_found" });
   return chats;
 });
@@ -66,6 +66,15 @@ app.post("/sessions/:id/send", async (req, reply) => {
   const ok = await manager.sendMessage(id, body.chatId, body.text);
   if (!ok) return reply.code(409).send({ error: "session_not_connected" });
   return { ok: true };
+});
+
+app.post("/sessions/:id/resolve", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const body = (req.body ?? {}) as { phone?: string };
+  if (!body.phone) return reply.code(400).send({ error: "phone_required" });
+  const result = await manager.resolveChat(id, body.phone);
+  if (!result) return reply.code(409).send({ error: "session_not_connected" });
+  return result;
 });
 
 app.delete("/sessions/:id", async (req) => {

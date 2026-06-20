@@ -164,6 +164,31 @@ export async function listWhatsAppChatsForAccount(id: number): Promise<WhatsAppC
   return (await res.json()) as WhatsAppChatDto[];
 }
 
+export interface WhatsAppResolveDto {
+  chatId: string;
+  lid: string | null;
+  exists: boolean;
+}
+
+export async function resolveWhatsAppChat(
+  sessionId: string,
+  phone: string,
+): Promise<WhatsAppResolveDto> {
+  const res = await fetch(
+    `/api/source-accounts/whatsapp/session/${encodeURIComponent(sessionId)}/resolve`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? body.error ?? `WhatsApp-Resolve fehlgeschlagen: HTTP ${res.status}`);
+  }
+  return (await res.json()) as WhatsAppResolveDto;
+}
+
 export async function deleteWhatsAppSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/source-accounts/whatsapp/session/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
