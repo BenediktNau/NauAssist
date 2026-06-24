@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Google.Apis.Auth.OAuth2.Responses;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Tests.Helpers;

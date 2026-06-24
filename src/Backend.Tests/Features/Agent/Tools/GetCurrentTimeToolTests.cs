@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Agent.Tools;
 using NauAssist.Backend.Features.Infrastructure.Time;
 

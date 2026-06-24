@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.GetCalendarRange;
 using NauAssist.Backend.Tests.Helpers;

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Google.Apis.Calendar.v3.Data;
 using NauAssist.Backend.Features.Calendar.Google;
 

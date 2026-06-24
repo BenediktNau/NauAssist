@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.AspNetCore.Hosting;
 using NauAssist.Backend.Tests.Helpers;
 

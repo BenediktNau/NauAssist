@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Endpoints;
