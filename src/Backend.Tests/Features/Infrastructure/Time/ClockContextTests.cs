@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Infrastructure.Time;
 
 namespace NauAssist.Backend.Tests.Features.Infrastructure.Time;

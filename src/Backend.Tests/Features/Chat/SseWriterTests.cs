@@ -1,5 +1,5 @@
 using System.Text;
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Chat;
 

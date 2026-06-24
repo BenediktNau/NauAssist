@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Infrastructure.Time;

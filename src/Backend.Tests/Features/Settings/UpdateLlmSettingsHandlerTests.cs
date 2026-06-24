@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.Settings.UpdateLlmSettings;
 

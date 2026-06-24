@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.AutonomousAgent;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Auth;

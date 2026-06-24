@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using NauAssist.Backend.Tests.Helpers;

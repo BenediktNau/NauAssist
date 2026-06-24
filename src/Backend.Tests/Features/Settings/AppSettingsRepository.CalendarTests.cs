@@ -1,5 +1,5 @@
 using NauAssist.Backend.Features.Infrastructure.Auth;
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Tests.Helpers;
 

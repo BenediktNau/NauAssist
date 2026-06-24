@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Endpoints;

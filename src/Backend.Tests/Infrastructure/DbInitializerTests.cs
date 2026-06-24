@@ -1,5 +1,5 @@
 using Dapper;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NauAssist.Backend.Features.Infrastructure.Persistence;
 using NauAssist.Backend.Tests.Helpers;

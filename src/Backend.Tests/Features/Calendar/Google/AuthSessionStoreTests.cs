@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Google.Apis.Auth.OAuth2.Flows;
 using Microsoft.Extensions.Caching.Memory;
 using NauAssist.Backend.Features.Calendar.Google;

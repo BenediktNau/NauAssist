@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using NauAssist.Backend.Features.Agent;
 
 namespace NauAssist.Backend.Tests.Features.Agent;

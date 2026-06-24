@@ -1,5 +1,5 @@
 using NauAssist.Backend.Features.Infrastructure.Auth;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Llm.Ollama;
 using NauAssist.Backend.Features.Settings;
