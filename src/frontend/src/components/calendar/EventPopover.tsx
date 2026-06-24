@@ -3,6 +3,12 @@ import { createPortal } from "react-dom";
 import { addDays, differenceInCalendarDays, format } from "date-fns";
 import { de } from "date-fns/locale";
 import type { ParsedEvent } from "./utils";
+import {
+  positionPopover,
+  POPOVER_GAP,
+  POPOVER_MARGIN,
+  type PopoverPosition,
+} from "./positionPopover";
 
 export interface PopoverState {
   event: ParsedEvent;
@@ -18,39 +24,40 @@ interface EventPopoverProps {
 }
 
 const MAX_WIDTH = 320;
-const GAP = 8;
 
 export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: EventPopoverProps) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState<
-    { top: number; left: number; origin: string } | null
-  >(null);
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
+  // Viewport-Maße als State halten, damit Resize/Orientation-Change ein
+  // Reposition auslöst und das Popover nicht mit veralteten Maßen herausragt.
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+
+  useEffect(() => {
+    const onResize = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Breite nie breiter als der Viewport (schmales Handy): so passt das Popover
+  // immer mit Rand neben den Termin und kann sauber geklemmt werden.
+  const maxWidth = Math.max(0, Math.min(MAX_WIDTH, viewport.width - 2 * POPOVER_MARGIN));
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const anchor = state.anchor;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    let left = anchor.right + GAP;
-    let originX: "left" | "right" = "left";
-    if (left + rect.width > vw - 8) {
-      left = anchor.left - rect.width - GAP;
-      originX = "right";
-    }
-    if (left < 8) {
-      left = Math.max(8, anchor.left);
-      originX = "left";
-    }
-
-    let top = anchor.top;
-    if (top + rect.height > vh - 8) {
-      top = Math.max(8, vh - rect.height - 8);
-    }
-    setPosition({ top, left, origin: `top ${originX}` });
-  }, [state.anchor]);
+    setPosition(
+      positionPopover(
+        state.anchor,
+        { width: rect.width, height: rect.height },
+        viewport,
+      ),
+    );
+  }, [state.anchor, viewport]);
 
   useEffect(() => {
     if (!state.pinned) return;
@@ -81,8 +88,8 @@ export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: Eve
       className="pointer-events-auto fixed z-[80] border border-nau-line-strong bg-nau-bg p-4 shadow-[0_8px_32px_rgba(0,0,0,0.6)] animate-nau-mech-open will-change-transform"
       style={{
         top: position?.top ?? state.anchor.top,
-        left: position?.left ?? state.anchor.right + GAP,
-        maxWidth: MAX_WIDTH,
+        left: position?.left ?? state.anchor.right + POPOVER_GAP,
+        maxWidth,
         visibility: position ? "visible" : "hidden",
         transformOrigin: position?.origin ?? "top left",
       }}
