@@ -28,10 +28,23 @@ const MAX_WIDTH = 320;
 export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: EventPopoverProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
+  // Viewport-Maße als State halten, damit Resize/Orientation-Change ein
+  // Reposition auslöst und das Popover nicht mit veralteten Maßen herausragt.
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+
+  useEffect(() => {
+    const onResize = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Breite nie breiter als der Viewport (schmales Handy): so passt das Popover
   // immer mit Rand neben den Termin und kann sauber geklemmt werden.
-  const maxWidth = Math.min(MAX_WIDTH, window.innerWidth - 2 * POPOVER_MARGIN);
+  const maxWidth = Math.max(0, Math.min(MAX_WIDTH, viewport.width - 2 * POPOVER_MARGIN));
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -41,10 +54,10 @@ export function EventPopover({ state, onClose, onMouseEnter, onMouseLeave }: Eve
       positionPopover(
         state.anchor,
         { width: rect.width, height: rect.height },
-        { width: window.innerWidth, height: window.innerHeight },
+        viewport,
       ),
     );
-  }, [state.anchor]);
+  }, [state.anchor, viewport]);
 
   useEffect(() => {
     if (!state.pinned) return;
