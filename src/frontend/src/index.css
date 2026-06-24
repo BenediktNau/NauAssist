@@ -1,6 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tailwind v4 lädt das bestehende v3-Theme (nau-* Farben, tracking-mono*,
+   Animationen) weiter über die JS-Config — kein CSS-first-@theme nötig. */
+@config "../tailwind.config.js";
 
 @layer base {
   :root {
