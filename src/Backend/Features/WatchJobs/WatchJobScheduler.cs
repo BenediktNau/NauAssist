@@ -178,9 +178,13 @@ public sealed class WatchJobScheduler : BackgroundService
         }
     }
 
-    /// <summary>Hook für die Benachrichtigung beim Feuern — verdrahtet in Task 6 (WatchJobNotifier).</summary>
-    private Task OnFiredAsync(IServiceProvider scopedServices, WatchJob job, ExecutionOutcome outcome, CancellationToken ct)
-        => Task.CompletedTask;
+    /// <summary>Benachrichtigung beim Feuern: Web-Push + proaktive Chat-Nachricht über den WatchJobNotifier.</summary>
+    private async Task OnFiredAsync(IServiceProvider scopedServices, WatchJob job, ExecutionOutcome outcome, CancellationToken ct)
+    {
+        if (outcome.JudgeResult is null) return;
+        var notifier = scopedServices.GetRequiredService<WatchJobNotifier>();
+        await notifier.NotifyAsync(job, outcome.JudgeResult, ct);
+    }
 
     private static async Task AuditAsync(AuditLogRepository audit, WatchJob job, ExecutionOutcome outcome, CancellationToken ct)
     {
