@@ -232,6 +232,10 @@ if (whatsAppOptions.Enabled)
 {
     app.MapWhatsAppSourceEndpoints();
 }
+if (watchJobOptions.Enabled)
+{
+    app.MapWatchJobsEndpoints();
+}
 
 // Frontend muss vor dem Login laden — es stößt den Redirect zu Keycloak selbst an.
 app.MapFallbackToFile("index.html").AllowAnonymous();
