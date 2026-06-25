@@ -22,6 +22,9 @@ using NauAssist.Backend.Features.Infrastructure.Persistence;
 using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
 using NauAssist.Backend.Features.Settings;
+using NauAssist.Backend.Features.WatchJobs;
+using NauAssist.Backend.Features.WatchJobs.Tools;
+using NauAssist.Backend.Features.WatchJobs.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -156,6 +159,32 @@ builder.Services.AddScoped<WebPushSender>();
 builder.Services.AddScoped<VapidBootstrapper>();
 builder.Services.AddSingleton<AutonomousAgentScheduler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentScheduler>());
+
+// Watch-Jobs (opt-in). Options + Bausteine werden immer registriert (Capabilities/Endpoint-Gating,
+// einfache Tests); Scheduler und Chat-Tools nur, wenn das Feature aktiv ist.
+builder.Services.Configure<WatchJobOptions>(
+    builder.Configuration.GetSection("AutonomousAgent:WatchJobs"));
+builder.Services.Configure<WebOptions>(
+    builder.Configuration.GetSection("AutonomousAgent:WatchJobs:Web"));
+var watchJobOptions = builder.Configuration
+    .GetSection("AutonomousAgent:WatchJobs").Get<WatchJobOptions>() ?? new WatchJobOptions();
+
+builder.Services.AddHttpClient(SearxngWebSearch.HttpClientName);
+builder.Services.AddScoped<IWebSearch, SearxngWebSearch>();
+builder.Services.AddScoped<IWebFetch, HttpWebFetch>();
+builder.Services.AddScoped<WatchJobRepository>();
+builder.Services.AddScoped<WatchJudge>();
+builder.Services.AddScoped<WatchJobExecutor>();
+builder.Services.AddScoped<WatchJobNotifier>();
+
+if (watchJobOptions.Enabled)
+{
+    builder.Services.AddScoped<ITool, CreateWatchJobTool>();
+    builder.Services.AddScoped<ITool, ListWatchJobsTool>();
+    builder.Services.AddScoped<ITool, CancelWatchJobTool>();
+    builder.Services.AddSingleton<WatchJobScheduler>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<WatchJobScheduler>());
+}
 
 builder.Services.AddMediator(options =>
 {
