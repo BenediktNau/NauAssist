@@ -266,4 +266,6 @@ internal static class AuditToolNames
 {
     public const string AutonomousPoll = "autonomous_poll";
     public const string AutonomousSuggestionCreated = "autonomous_suggestion_created";
+    public const string WatchJobCheck = "watch_job_check";
+    public const string WatchJobFired = "watch_job_fired";
 }
