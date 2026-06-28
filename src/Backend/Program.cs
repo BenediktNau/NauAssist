@@ -170,6 +170,10 @@ var watchJobOptions = builder.Configuration
     .GetSection("AutonomousAgent:WatchJobs").Get<WatchJobOptions>() ?? new WatchJobOptions();
 
 builder.Services.AddHttpClient(SearxngWebSearch.HttpClientName);
+// Fetch beliebiger Ziel-URLs läuft über einen SSRF-gehärteten Client (blockt interne/
+// private Adressen, auch über Redirects). SearXNG bleibt bewusst ungeschützt = interner Dienst.
+builder.Services.AddHttpClient(HttpWebFetch.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(SsrfGuard.CreateGuardedHandler);
 builder.Services.AddScoped<IWebSearch, SearxngWebSearch>();
 builder.Services.AddScoped<IWebFetch, HttpWebFetch>();
 builder.Services.AddScoped<WatchJobRepository>();

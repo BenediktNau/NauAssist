@@ -23,5 +23,7 @@ CREATE TABLE watch_jobs (
     created_at         TEXT    NOT NULL
 );
 
-CREATE INDEX ix_watch_jobs_due  ON watch_jobs(status, next_due_at);
-CREATE INDEX ix_watch_jobs_user ON watch_jobs(user_id, status);
+-- Deckt beide Zugriffsmuster (immer user-getrennt): die Due-Poll-Abfrage des Schedulers
+-- (user_id = ? AND status = 'active' AND next_due_at <= ? ORDER BY next_due_at) sowie
+-- ListActiveByUser (user_id = ? AND status IN (...)) als Index-Präfix.
+CREATE INDEX ix_watch_jobs_due ON watch_jobs(user_id, status, next_due_at);

@@ -12,6 +12,9 @@ namespace NauAssist.Backend.Features.WatchJobs.Web;
 /// </summary>
 public sealed partial class HttpWebFetch : IWebFetch
 {
+    /// <summary>Eigener, SSRF-gehärteter Client (vgl. <see cref="SsrfGuard"/>) — getrennt vom SearXNG-Client.</summary>
+    public const string HttpClientName = "WatchJobsFetch";
+
     private readonly IHttpClientFactory _httpFactory;
     private readonly WebOptions _options;
     private readonly ILogger<HttpWebFetch> _logger;
@@ -25,6 +28,14 @@ public sealed partial class HttpWebFetch : IWebFetch
 
     public async Task<WebDocument> FetchAsync(string url, string? etag, CancellationToken ct)
     {
+        // Erste Verteidigungslinie: nur absolute http(s)-URLs. Der eigentliche IP-Block
+        // (intern/privat/Redirect-Hops) sitzt im ConnectCallback des Fetch-HttpClients.
+        if (!SsrfGuard.IsAllowedUrl(url, out _))
+        {
+            _logger.LogWarning("Fetch von {Url} abgelehnt: nur absolute http(s)-URLs erlaubt.", url);
+            return new WebDocument(url, 0, etag, "", NotModified: false);
+        }
+
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -37,7 +48,7 @@ public sealed partial class HttpWebFetch : IWebFetch
                 request.Headers.TryAddWithoutValidation("If-None-Match", etag);
             }
 
-            using var client = _httpFactory.CreateClient(SearxngWebSearch.HttpClientName);
+            using var client = _httpFactory.CreateClient(HttpClientName);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
 
             var responseEtag = response.Headers.ETag?.Tag ?? etag;

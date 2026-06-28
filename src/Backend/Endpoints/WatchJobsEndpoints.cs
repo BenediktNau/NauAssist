@@ -1,4 +1,3 @@
-using System.Text.Json;
 using NauAssist.Backend.Features.WatchJobs;
 
 namespace NauAssist.Backend.Endpoints;
@@ -32,24 +31,8 @@ public static class WatchJobsEndpoints
         j.CheckCount,
         j.LastCheckedAt,
         j.NextDueAt,
-        ExtractSummary(j.LastResultJson),
+        WatchJobResultSummary.Extract(j.LastResultJson),
         j.CreatedAt);
-
-    private static string? ExtractSummary(string? lastResultJson)
-    {
-        if (string.IsNullOrWhiteSpace(lastResultJson)) return null;
-        try
-        {
-            using var doc = JsonDocument.Parse(lastResultJson);
-            return doc.RootElement.TryGetProperty("summary", out var el) && el.ValueKind == JsonValueKind.String
-                ? el.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
 
     private sealed record WatchJobDto(
         long Id,

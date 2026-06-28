@@ -40,9 +40,22 @@ public sealed class CancelWatchJobTool : ITool
             ? modeEl.GetString()
             : "cancel";
 
-        var newStatus = string.Equals(mode, "pause", StringComparison.OrdinalIgnoreCase)
-            ? WatchJobStatus.Paused
-            : WatchJobStatus.Completed;
+        // Nur dokumentierte Modi akzeptieren — ein Tippfehler darf einen Job nicht
+        // unwiderruflich abschließen (completed fällt aus der aktiven Liste).
+        WatchJobStatus newStatus;
+        if (string.Equals(mode, "cancel", StringComparison.OrdinalIgnoreCase))
+        {
+            newStatus = WatchJobStatus.Completed;
+        }
+        else if (string.Equals(mode, "pause", StringComparison.OrdinalIgnoreCase))
+        {
+            newStatus = WatchJobStatus.Paused;
+        }
+        else
+        {
+            return JsonSerializer.SerializeToElement(
+                new { ok = false, error = $"Unbekannter mode '{mode}'. Erlaubt: cancel, pause." });
+        }
 
         var ok = await _repo.SetStatusAsync(id, newStatus, firedHash: null, ct);
         if (!ok)

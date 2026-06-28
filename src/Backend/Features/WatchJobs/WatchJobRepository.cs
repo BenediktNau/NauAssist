@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Dapper;
 using NauAssist.Backend.Features.Infrastructure.Auth;
@@ -172,13 +173,16 @@ public sealed class WatchJobRepository
         Notify: JsonSerializer.Deserialize<WatchJobNotify>(r.notify_json, JsonOpts)!,
         Budget: JsonSerializer.Deserialize<WatchJobBudget>(r.budget_json, JsonOpts)!,
         Status: WatchJobStatusExtensions.ParseWire(r.status),
-        LastCheckedAt: string.IsNullOrEmpty(r.last_checked_at) ? null : DateTimeOffset.Parse(r.last_checked_at),
-        NextDueAt: DateTimeOffset.Parse(r.next_due_at),
+        LastCheckedAt: string.IsNullOrEmpty(r.last_checked_at) ? null : ParseIso(r.last_checked_at),
+        NextDueAt: ParseIso(r.next_due_at),
         CheckCount: (int)r.check_count,
         ConsecutiveErrors: (int)r.consecutive_errors,
         LastResultJson: r.last_result_json,
         FiredHash: r.fired_hash,
-        CreatedAt: DateTimeOffset.Parse(r.created_at));
+        CreatedAt: ParseIso(r.created_at));
+
+    private static DateTimeOffset ParseIso(string value) =>
+        DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
     private sealed record WatchJobRow(
         long id,

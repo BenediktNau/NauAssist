@@ -33,26 +33,10 @@ public sealed class ListWatchJobsTool : ITool
                 title = j.Title,
                 status = j.Status.ToString().ToLowerInvariant(),
                 check_count = j.CheckCount,
-                last_summary = ExtractSummary(j.LastResultJson),
+                last_summary = WatchJobResultSummary.Extract(j.LastResultJson),
                 next_due_at = j.NextDueAt.ToString("O"),
             }),
         };
         return JsonSerializer.SerializeToElement(result);
-    }
-
-    private static string? ExtractSummary(string? lastResultJson)
-    {
-        if (string.IsNullOrWhiteSpace(lastResultJson)) return null;
-        try
-        {
-            using var doc = JsonDocument.Parse(lastResultJson);
-            return doc.RootElement.TryGetProperty("summary", out var el) && el.ValueKind == JsonValueKind.String
-                ? el.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 }

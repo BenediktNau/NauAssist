@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Agent;
 using NauAssist.Backend.Features.Infrastructure.Time;
+using NauAssist.Backend.Features.WatchJobs.Web;
 
 namespace NauAssist.Backend.Features.WatchJobs.Tools;
 
@@ -97,6 +98,14 @@ public sealed class CreateWatchJobTool : ITool
         if (searchQueries.Count == 0 && targetUrls.Count == 0)
         {
             return Error("Mindestens eine searchQuery oder targetUrl ist erforderlich.");
+        }
+
+        foreach (var targetUrl in targetUrls)
+        {
+            if (!SsrfGuard.IsAllowedUrl(targetUrl, out _))
+            {
+                return Error($"Ungültige targetUrl '{targetUrl}'. Nur absolute http:// oder https:// URLs sind erlaubt.");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(judgeQuestion) || string.IsNullOrWhiteSpace(successCriteria))

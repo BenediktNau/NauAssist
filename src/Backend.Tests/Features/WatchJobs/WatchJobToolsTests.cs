@@ -65,6 +65,42 @@ public sealed class WatchJobToolsTests
     }
 
     [Fact]
+    public async Task Create_RejectsNonHttpTargetUrl()
+    {
+        using var temp = new TempSqliteDb();
+        var repo = new WatchJobRepository(temp.AppDb, new UserContextHolder());
+        var tool = new CreateWatchJobTool(repo, Clock, Options.Create(new WatchJobOptions { MinIntervalSeconds = 30, MaxActivePerUser = 10 }));
+
+        var result = await tool.ExecuteAsync(Args("""
+            {
+              "title": "X", "goal": "Y",
+              "spec": {
+                "targetUrls": ["file:///etc/passwd"],
+                "judgeQuestion": "q", "successCriteria": "c"
+              }
+            }
+            """), CancellationToken.None);
+
+        result.GetProperty("ok").GetBoolean().Should().BeFalse();
+        (await repo.ListActiveByUserAsync(CancellationToken.None)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Cancel_RejectsUnknownMode_WithoutChangingJob()
+    {
+        using var temp = new TempSqliteDb();
+        var repo = new WatchJobRepository(temp.AppDb, new UserContextHolder());
+        var tool = new CancelWatchJobTool(repo);
+        var job = await CreateSampleAsync(repo);
+
+        var result = await tool.ExecuteAsync(Args($$"""{ "id": {{job.Id}}, "mode": "pasue" }"""), CancellationToken.None);
+
+        result.GetProperty("ok").GetBoolean().Should().BeFalse();
+        var active = await repo.ListActiveByUserAsync(CancellationToken.None);
+        active.Single().Status.Should().Be(WatchJobStatus.Active); // unverändert, nicht still completed
+    }
+
+    [Fact]
     public async Task Create_RejectsWhenMaxActivePerUserReached()
     {
         using var temp = new TempSqliteDb();
