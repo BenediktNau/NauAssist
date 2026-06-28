@@ -16,9 +16,9 @@ public sealed class CancelWatchJobTool : ITool
           "type": "object",
           "properties": {
             "id": { "type": "integer", "description": "ID des Watch-Jobs (siehe list_watch_jobs)" },
-            "mode": { "type": "string", "enum": ["cancel", "pause"], "description": "cancel = stoppen, pause = aussetzen" }
+            "mode": { "type": "string", "enum": ["cancel", "pause"], "description": "cancel = endgültig stoppen, pause = aussetzen (wieder fortsetzbar)" }
           },
-          "required": ["id"]
+          "required": ["id", "mode"]
         }
         """).RootElement;
 
@@ -38,10 +38,11 @@ public sealed class CancelWatchJobTool : ITool
 
         var mode = args.TryGetProperty("mode", out var modeEl) && modeEl.ValueKind == JsonValueKind.String
             ? modeEl.GetString()
-            : "cancel";
+            : null;
 
-        // Nur dokumentierte Modi akzeptieren — ein Tippfehler darf einen Job nicht
-        // unwiderruflich abschließen (completed fällt aus der aktiven Liste).
+        // mode ist Pflicht und muss explizit sein — kein destruktiver Default. Ein fehlendes
+        // oder vertipptes mode darf einen Job nicht unwiderruflich abschließen (completed fällt
+        // aus der aktiven Liste, nur Neuanlage möglich).
         WatchJobStatus newStatus;
         if (string.Equals(mode, "cancel", StringComparison.OrdinalIgnoreCase))
         {
@@ -54,7 +55,7 @@ public sealed class CancelWatchJobTool : ITool
         else
         {
             return JsonSerializer.SerializeToElement(
-                new { ok = false, error = $"Unbekannter mode '{mode}'. Erlaubt: cancel, pause." });
+                new { ok = false, error = $"mode ist erforderlich und muss 'cancel' oder 'pause' sein (war: '{mode}')." });
         }
 
         var ok = await _repo.SetStatusAsync(id, newStatus, firedHash: null, ct);

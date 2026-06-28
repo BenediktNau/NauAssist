@@ -146,6 +146,49 @@ public sealed class WatchJobRepository
             cancellationToken: ct));
     }
 
+    /// <summary>
+    /// Schreibt das Ergebnis eines Scheduler-Checks (Status + optional firedHash + Buchhaltung)
+    /// in <b>einer</b> Anweisung — atomar, damit ein Crash nicht halb aktualisierte Jobs hinterlässt.
+    /// </summary>
+    public async Task ApplyCheckOutcomeAsync(
+        long id,
+        WatchJobStatus status,
+        string? firedHash,
+        DateTimeOffset nextDueAt,
+        DateTimeOffset lastCheckedAt,
+        int checkCount,
+        int consecutiveErrors,
+        string? lastResultJson,
+        CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        await conn.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE watch_jobs
+            SET status = @status,
+                fired_hash = COALESCE(@firedHash, fired_hash),
+                next_due_at = @nextDueAt,
+                last_checked_at = @lastCheckedAt,
+                check_count = @checkCount,
+                consecutive_errors = @consecutiveErrors,
+                last_result_json = @lastResultJson
+            WHERE id = @id AND user_id = @userId;
+            """,
+            new
+            {
+                id,
+                userId = _user.UserId,
+                status = status.ToWire(),
+                firedHash,
+                nextDueAt = Iso(nextDueAt),
+                lastCheckedAt = Iso(lastCheckedAt),
+                checkCount,
+                consecutiveErrors,
+                lastResultJson,
+            },
+            cancellationToken: ct));
+    }
+
     public async Task<bool> SetStatusAsync(long id, WatchJobStatus status, string? firedHash, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();

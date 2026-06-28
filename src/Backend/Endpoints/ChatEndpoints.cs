@@ -8,7 +8,7 @@ namespace NauAssist.Backend.Endpoints;
 
 public static class ChatEndpoints
 {
-    private const string DefaultSessionId = "default";
+    private const string DefaultSessionId = ChatSessions.Default;
 
     public static IEndpointRouteBuilder MapChatEndpoints(this IEndpointRouteBuilder app)
     {

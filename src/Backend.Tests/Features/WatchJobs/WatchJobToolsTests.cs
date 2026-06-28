@@ -85,15 +85,20 @@ public sealed class WatchJobToolsTests
         (await repo.ListActiveByUserAsync(CancellationToken.None)).Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task Cancel_RejectsUnknownMode_WithoutChangingJob()
+    [Theory]
+    [InlineData(""" "mode": "pasue" """)]  // Tippfehler
+    [InlineData(""" "mode": "" """)]       // leer
+    [InlineData("")]                        // mode komplett weggelassen
+    public async Task Cancel_RejectsMissingOrUnknownMode_WithoutChangingJob(string modeFragment)
     {
         using var temp = new TempSqliteDb();
         var repo = new WatchJobRepository(temp.AppDb, new UserContextHolder());
         var tool = new CancelWatchJobTool(repo);
         var job = await CreateSampleAsync(repo);
 
-        var result = await tool.ExecuteAsync(Args($$"""{ "id": {{job.Id}}, "mode": "pasue" }"""), CancellationToken.None);
+        var comma = string.IsNullOrEmpty(modeFragment) ? "" : ",";
+        var result = await tool.ExecuteAsync(
+            Args($$"""{ "id": {{job.Id}}{{comma}} {{modeFragment}} }"""), CancellationToken.None);
 
         result.GetProperty("ok").GetBoolean().Should().BeFalse();
         var active = await repo.ListActiveByUserAsync(CancellationToken.None);

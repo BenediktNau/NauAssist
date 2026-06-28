@@ -141,19 +141,17 @@ public sealed class WatchJobScheduler : BackgroundService
 
             var outcome = await executor.RunOnceAsync(job, ct);
 
-            await repo.UpdateAfterCheckAsync(
+            // Status + firedHash + Buchhaltung atomar in einer Anweisung schreiben.
+            await repo.ApplyCheckOutcomeAsync(
                 job.Id,
+                outcome.Status,
+                outcome.FiredHash,
                 outcome.NextDueAt,
                 outcome.CheckedAt,
                 outcome.CheckCount,
                 outcome.ConsecutiveErrors,
                 outcome.ResultJson,
                 ct);
-
-            if (outcome.Fired || outcome.Status != WatchJobStatus.Active)
-            {
-                await repo.SetStatusAsync(job.Id, outcome.Status, outcome.FiredHash, ct);
-            }
 
             if (outcome.Fired)
             {

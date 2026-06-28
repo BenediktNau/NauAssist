@@ -12,7 +12,6 @@ namespace NauAssist.Backend.Features.WatchJobs;
 /// </summary>
 public sealed class WatchJobNotifier
 {
-    private const string ChatSessionId = "default";
     private const string WebPushChannel = "webpush";
 
     private readonly WebPushSender _push;
@@ -40,7 +39,7 @@ public sealed class WatchJobNotifier
         await _messages.AddAsync(
             new Message(
                 Id: 0,
-                SessionId: ChatSessionId,
+                SessionId: ChatSessions.Default,
                 Role: MessageRole.Assistant,
                 Content: body,
                 ProposalsJson: null,

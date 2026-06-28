@@ -134,6 +134,37 @@ public sealed class WatchJobRepositoryTests
     }
 
     [Fact]
+    public async Task ApplyCheckOutcomeAsync_WritesStatusFiredHashAndBookkeepingAtomically()
+    {
+        using var temp = new TempSqliteDb();
+        var repo = new WatchJobRepository(temp.AppDb, new UserContextHolder());
+
+        var job = await InsertSampleAsync(repo, nextDueAt: Now.AddMinutes(-1));
+
+        await repo.ApplyCheckOutcomeAsync(
+            job.Id,
+            status: WatchJobStatus.Completed,
+            firedHash: "HASH123",
+            nextDueAt: Now.AddSeconds(60),
+            lastCheckedAt: Now,
+            checkCount: 1,
+            consecutiveErrors: 0,
+            lastResultJson: """{"met":true}""",
+            CancellationToken.None);
+
+        // completed ⇒ nicht mehr aktiv/fällig; Buchhaltung dennoch geschrieben.
+        (await repo.ListActiveByUserAsync(CancellationToken.None)).Should().BeEmpty();
+        (await repo.ListDueAsync(Now, 50, CancellationToken.None)).Should().BeEmpty();
+
+        // firedHash bleibt erhalten: erneutes Setzen mit null überschreibt ihn nicht (COALESCE).
+        await repo.SetStatusAsync(job.Id, WatchJobStatus.Active, firedHash: null, CancellationToken.None);
+        var reactivated = (await repo.ListActiveByUserAsync(CancellationToken.None)).Single();
+        reactivated.FiredHash.Should().Be("HASH123");
+        reactivated.CheckCount.Should().Be(1);
+        reactivated.LastResultJson.Should().Be("""{"met":true}""");
+    }
+
+    [Fact]
     public async Task Jobs_AreIsolatedPerUser()
     {
         using var temp = new TempSqliteDb();

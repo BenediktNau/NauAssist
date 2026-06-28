@@ -29,7 +29,12 @@ internal static class SsrfGuard
     /// <summary>True, wenn die Adresse intern/privat/nicht-routbar ist und nicht angefragt werden darf.</summary>
     public static bool IsBlockedAddress(IPAddress address)
     {
-        var ip = address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
+        if (IPAddress.IsLoopback(address)) return true;
+
+        // IPv4-mapped (::ffff:w.x.y.z) UND IPv4-kompatible (::w.x.y.z, RFC 4291) IPv6-Adressen
+        // auf den IPv4-Pfad ziehen — sonst würde z.B. http://[::10.0.0.1] als routbares IPv6
+        // durchgehen, das der OS-Stack beim Connect auf eine interne IPv4 mappt.
+        var ip = NormalizeEmbeddedIPv4(address);
 
         if (IPAddress.IsLoopback(ip)) return true;
 
@@ -59,6 +64,21 @@ internal static class SsrfGuard
         }
 
         return true; // unbekannte Adressfamilie ⇒ sicherheitshalber blockieren
+    }
+
+    /// <summary>Zieht in IPv6 eingebettete IPv4-Adressen (mapped <c>::ffff:</c> und compatible <c>::</c>) auf IPv4.</summary>
+    private static IPAddress NormalizeEmbeddedIPv4(IPAddress address)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetworkV6) return address;
+        if (address.IsIPv4MappedToIPv6) return address.MapToIPv4();
+
+        var b = address.GetAddressBytes(); // 16 Bytes
+        for (var i = 0; i < 12; i++)
+        {
+            if (b[i] != 0) return address; // kein ::w.x.y.z
+        }
+
+        return new IPAddress(new[] { b[12], b[13], b[14], b[15] });
     }
 
     /// <summary>HTTP-Handler, der Verbindungen zu internen/privaten Adressen verweigert (auch bei Redirects).</summary>
