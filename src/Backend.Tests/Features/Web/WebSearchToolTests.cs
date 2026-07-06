@@ -71,6 +71,28 @@ public sealed class WebSearchToolTests
     }
 
     [Fact]
+    public async Task Search_NonStringQuery_ReturnsError()
+    {
+        var tool = new WebSearchTool(new FakeWebSearch());
+
+        var result = await tool.ExecuteAsync(Args("""{ "query": 123 }"""), CancellationToken.None);
+
+        result.GetProperty("ok").GetBoolean().Should().BeFalse();
+        result.GetProperty("error").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Search_NonIntegerMaxResults_FallsBackToDefault()
+    {
+        var search = new FakeWebSearch();
+        var tool = new WebSearchTool(search);
+
+        await tool.ExecuteAsync(Args("""{ "query": "x", "max_results": 3.7 }"""), CancellationToken.None);
+
+        search.ReceivedMaxResults.Should().Be(5);
+    }
+
+    [Fact]
     public async Task Search_EmptyHits_ReturnsHintForLlm()
     {
         var tool = new WebSearchTool(new FakeWebSearch());

@@ -38,16 +38,24 @@ public sealed class WebSearchTool : ITool
 
     public async Task<JsonElement> ExecuteAsync(JsonElement args, CancellationToken ct)
     {
-        var query = args.TryGetProperty("query", out var q) ? q.GetString() : null;
+        // Nur echte String-Query akzeptieren: bei { "query": 123 } o. Ä. würde GetString()
+        // sonst eine InvalidOperationException Richtung Agent-Loop werfen (Kontraktbruch).
+        var query = args.TryGetProperty("query", out var q) && q.ValueKind == JsonValueKind.String
+            ? q.GetString()
+            : null;
         if (string.IsNullOrWhiteSpace(query))
         {
             return JsonSerializer.SerializeToElement(new { ok = false, error = "query fehlt oder ist leer." });
         }
 
         var maxResults = DefaultResults;
-        if (args.TryGetProperty("max_results", out var max) && max.ValueKind == JsonValueKind.Number)
+        // TryGetInt32 statt GetInt32: bei { "max_results": 3.7 } beim Default bleiben,
+        // statt eine FormatException zu werfen.
+        if (args.TryGetProperty("max_results", out var max)
+            && max.ValueKind == JsonValueKind.Number
+            && max.TryGetInt32(out var n))
         {
-            maxResults = Math.Clamp(max.GetInt32(), 1, MaxResults);
+            maxResults = Math.Clamp(n, 1, MaxResults);
         }
 
         var hits = await _search.SearchAsync(query, maxResults, ct);
