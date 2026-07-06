@@ -22,6 +22,9 @@ public sealed class WatchJobExecutorTests
     private const string LowConfidenceJson =
         """{"met":true,"confidence":0.4,"evidence":[{"shop":"ShopX","price":null,"url":"u","quote":"q"}],"summary":"unsicher"}""";
 
+    private const string PartialSignalJson =
+        """{"met":false,"confidence":0.3,"evidence":[],"summary":"Suchindex zeigt Treffer, Produktseite noch ausverkauft","partialSignal":true}""";
+
     private static WatchJob SampleJob(
         bool fireOnce = true,
         string? firedHash = null,
@@ -58,6 +61,7 @@ public sealed class WatchJobExecutorTests
         {
             ConfidenceThreshold = confidenceThreshold,
             MinIntervalSeconds = 30,
+            HotIntervalSeconds = 15,
         });
         return new WatchJobExecutor(search, fetch, judge, clock, options, NullLogger<WatchJobExecutor>.Instance);
     }
@@ -106,6 +110,22 @@ public sealed class WatchJobExecutorTests
 
         outcome.Fired.Should().BeFalse();
         outcome.Status.Should().Be(WatchJobStatus.Active);
+    }
+
+    [Fact]
+    public async Task PartialSignal_SwitchesToHotInterval()
+    {
+        var llm = new FakeLlmClient();
+        llm.QueueResponse(new TextDeltaChunk(PartialSignalJson));
+        var executor = BuildExecutor(llm);
+
+        var outcome = await executor.RunOnceAsync(SampleJob(), CancellationToken.None);
+
+        outcome.Fired.Should().BeFalse();
+        outcome.Status.Should().Be(WatchJobStatus.Active);
+        // Hot-Mode: 15 s + Jitter (≤ 3 s) statt Basis-Intervall 60 s.
+        outcome.NextDueAt.Should().BeOnOrAfter(Now.AddSeconds(15));
+        outcome.NextDueAt.Should().BeOnOrBefore(Now.AddSeconds(18));
     }
 
     [Fact]

@@ -11,4 +11,5 @@ public sealed record WatchJudgeResult(
     bool Met,
     double Confidence,
     IReadOnlyList<JudgeEvidence> Evidence,
-    string Summary);
+    string Summary,
+    bool PartialSignal = false);

@@ -62,7 +62,8 @@ public sealed class WatchJudge
                 Met: GetBool(root, "met"),
                 Confidence: GetDouble(root, "confidence") ?? 0.0,
                 Evidence: ParseEvidence(root),
-                Summary: GetString(root, "summary") ?? "");
+                Summary: GetString(root, "summary") ?? "",
+                PartialSignal: GetBool(root, "partialSignal"));
         }
         catch (JsonException ex)
         {
@@ -92,6 +93,7 @@ public sealed class WatchJudge
         sb.AppendLine("  \"evidence\": [                    // Belege; leer wenn met=false");
         sb.AppendLine("    { \"shop\": string, \"price\": string|null, \"url\": string, \"quote\": string }");
         sb.AppendLine("  ],");
+        sb.AppendLine("  \"partialSignal\": boolean,        // true, wenn es unbestätigte Teil-Hinweise gibt (z.B. Suchtreffer deutet Verfügbarkeit an, die Produktseite bestätigt es nicht)");
         sb.AppendLine("  \"summary\": string               // 1-2 Sätze, was du gefunden hast (Deutsch)");
         sb.AppendLine("}");
         return sb.ToString();
