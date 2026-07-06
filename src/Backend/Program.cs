@@ -25,6 +25,7 @@ using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.WatchJobs;
 using NauAssist.Backend.Features.WatchJobs.Tools;
 using NauAssist.Backend.Features.Web;
+using NauAssist.Backend.Features.Web.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -176,6 +177,17 @@ builder.Services.AddHttpClient(HttpWebFetch.HttpClientName)
     .ConfigurePrimaryHttpMessageHandler(SsrfGuard.CreateGuardedHandler);
 builder.Services.AddScoped<IWebSearch, SearxngWebSearch>();
 builder.Services.AddScoped<IWebFetch, HttpWebFetch>();
+
+var webOptions = builder.Configuration.GetSection("Web").Get<WebOptions>() ?? new WebOptions();
+
+// Web-Chat-Tools nur anbieten, wenn eine SearXNG-Instanz konfiguriert ist — ohne
+// Such-Backend wären web_search/fetch_webpage tote Tools im Prompt.
+if (!string.IsNullOrEmpty(webOptions.SearxngBaseUrl))
+{
+    builder.Services.AddScoped<ITool, WebSearchTool>();
+    builder.Services.AddScoped<ITool, FetchWebpageTool>();
+}
+
 builder.Services.AddScoped<WatchJobRepository>();
 builder.Services.AddScoped<WatchJudge>();
 builder.Services.AddScoped<WatchJobExecutor>();
