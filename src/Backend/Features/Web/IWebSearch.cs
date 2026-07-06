@@ -6,7 +6,7 @@ public sealed record WebSearchHit(string Title, string Url, string Snippet);
 /// <summary>
 /// Pluggable Web-Suche (Default: self-hosted SearXNG). Das Backend hat sonst keinen
 /// Web-Zugriff — Ollama lokal kann nicht browsen. Implementierungen werfen nicht,
-/// sondern liefern bei Fehlern eine leere Liste (Watcher dürfen nicht am Netz scheitern).
+/// sondern liefern bei Fehlern eine leere Liste (Aufrufer (Chat-Tools, Watcher) dürfen nicht am Netz scheitern).
 /// </summary>
 public interface IWebSearch
 {

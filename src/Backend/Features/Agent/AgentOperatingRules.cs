@@ -4,7 +4,8 @@ namespace NauAssist.Backend.Features.Agent;
 /// Fixe, im Backend verdrahtete Spielregeln für den Agenten — werden bei jedem
 /// Lauf vor den User-konfigurierten <c>SystemPrompt</c> gehängt. Hier landet
 /// alles, was Tool-Verhalten betrifft (welches Tool wann, Datumsformate,
-/// Bestätigungs-Konventionen). Absätze zu optionalen Tools (Watch-Jobs, Web)
+/// Bestätigungs-Konventionen). Der konfigurierbare SystemPrompt bleibt für die
+/// Persona/Stil-Anpassung durch den User reserviert. Absätze zu optionalen Tools (Watch-Jobs, Web)
 /// erscheinen nur, wenn die Tools tatsächlich registriert sind — sonst
 /// halluziniert das LLM Calls auf nicht existente Tools.
 /// </summary>

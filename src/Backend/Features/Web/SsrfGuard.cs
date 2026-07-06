@@ -4,9 +4,9 @@ using System.Net.Sockets;
 namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
-/// SSRF-Schutz für den Fetch von user-/LLM-gelieferten URLs. Watcher fetchen Ziel-URLs
-/// serverseitig — ohne Schutz könnte ein (ggf. prompt-injizierter) Job interne Dienste
-/// (Cloud-Metadaten <c>169.254.169.254</c>, <c>localhost</c>, RFC1918) erreichen.
+/// SSRF-Schutz für den Fetch von user-/LLM-gelieferten URLs. Chat-Tools und Watcher fetchen
+/// Ziel-URLs serverseitig — ohne Schutz könnte ein (ggf. prompt-injizierter) Aufruf interne
+/// Dienste (Cloud-Metadaten <c>169.254.169.254</c>, <c>localhost</c>, RFC1918) erreichen.
 ///
 /// Der eigentliche IP-Block läuft als <see cref="SocketsHttpHandler.ConnectCallback"/>:
 /// die Auflösung+Prüfung passiert unmittelbar vor dem Connect (kein DNS-Rebinding-TOCTOU),

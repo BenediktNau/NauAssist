@@ -182,7 +182,7 @@ var webOptions = builder.Configuration.GetSection("Web").Get<WebOptions>() ?? ne
 
 // Web-Chat-Tools nur anbieten, wenn eine SearXNG-Instanz konfiguriert ist — ohne
 // Such-Backend wären web_search/fetch_webpage tote Tools im Prompt.
-if (!string.IsNullOrEmpty(webOptions.SearxngBaseUrl))
+if (!string.IsNullOrWhiteSpace(webOptions.SearxngBaseUrl))
 {
     builder.Services.AddScoped<ITool, WebSearchTool>();
     builder.Services.AddScoped<ITool, FetchWebpageTool>();

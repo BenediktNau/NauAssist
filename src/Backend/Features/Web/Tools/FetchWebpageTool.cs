@@ -51,6 +51,8 @@ public sealed class FetchWebpageTool : ITool
             });
         }
 
+        // Chat-Fetches laufen bewusst ohne ETag (kein gespeicherter Zustand wie beim Watcher) —
+        // daher tritt hier NotModified (HTTP 304) nie auf.
         var doc = await _fetch.FetchAsync(url, etag: null, ct);
         var truncated = doc.TextContent.Length > MaxTextChars;
         var text = truncated ? doc.TextContent[..MaxTextChars] : doc.TextContent;

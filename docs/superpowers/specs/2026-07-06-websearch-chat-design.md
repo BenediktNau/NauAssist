@@ -110,6 +110,13 @@ Die Tools übersetzen das in ehrliche, LLM-lesbare Resultate (`hint`, `status: 0
 statt Exceptions durch den Agent-Loop zu reichen. Ungültige Args (leere Query,
 relative URL) ⇒ beschreibendes Fehler-JSON, kein Throw.
 
+Gefetchter Webtext ist **untrusted Input** im LLM-Kontext und damit eine
+Prompt-Injection-Oberfläche: eine Seite kann versuchen, dem Agenten Anweisungen
+unterzuschieben. Für den Single-User-MVP wird das bewusst akzeptiert — destruktive
+Tools sind laut Operating-Rules bestätigungspflichtig (kein Löschen/Verschieben ohne
+Rückfrage), und die Web-Tools selbst sind read-only mit SSRF-Block. Sobald
+unbestätigte Auto-Aktionen dazukommen, ist dieses Risiko neu zu bewerten.
+
 ## Tests (TDD)
 
 - `WebSearchToolTests`: Treffer-Mapping, `max_results`-Klemmung/Default, leere

@@ -33,7 +33,7 @@ public sealed class SearxngWebSearch : IWebSearch
 
         // Deployment-Hinweis: SearXNG liefert nur dann JSON, wenn `json` in `settings.yml`
         // unter `search.formats` aktiviert ist (default oft nur html/csv/rss). Ist es das nicht,
-        // kommt eine HTML-Fehlerseite zurück → ParseResults liefert leer → Watcher prüfen still ins Leere.
+        // kommt eine HTML-Fehlerseite zurück → ParseResults liefert leer → die Suche liefert still keine Treffer.
         var url = $"{_options.SearxngBaseUrl.TrimEnd('/')}/search?q={Uri.EscapeDataString(query)}&format=json";
 
         try
