@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChatView } from "@/components/ChatView";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { CalendarPage } from "@/components/pages/CalendarPage";
 import { RecommendationsPage } from "@/components/pages/RecommendationsPage";
+import { WatchersPage } from "@/components/pages/WatchersPage";
 import { Layout } from "@/components/nau/Layout";
 import { useProactiveEvents } from "@/hooks/useProactiveEvents";
+import { queryKeys } from "@/hooks/queries";
+import { getCapabilities } from "@/api/capabilities";
 
-export type AppPage = "chat" | "calendar" | "recommendations" | "settings";
+export type AppPage = "chat" | "calendar" | "recommendations" | "watchers" | "settings";
 
 // Chat ist die Heimat-Seite: Der Zurück-Knopf führt aus jeder anderen Seite zuerst
 // hierhin zurück; erst von Chat aus verlässt man die App (bzw. schließt die PWA).
@@ -18,7 +22,8 @@ const PAGE_ORDER: Record<AppPage, number> = {
   chat: 0,
   calendar: 1,
   recommendations: 2,
-  settings: 3,
+  watchers: 3,
+  settings: 4,
 };
 
 interface NavState {
@@ -44,6 +49,9 @@ export default function App() {
   );
 
   useProactiveEvents();
+
+  const capsQuery = useQuery({ queryKey: queryKeys.capabilities, queryFn: getCapabilities });
+  const watchersEnabled = capsQuery.data?.watchJobs ?? false;
 
   // Spiegelt die aktuelle Seite synchron — damit `navigate` ohne Seiteneffekt im
   // State-Updater entscheiden kann, ob ein neuer History-Eintrag nötig ist.
@@ -107,7 +115,7 @@ export default function App() {
   // Tab-Seiten teilen sich die persistente Layout-Hülle (Header + MobileTabBar).
   // Nur der innere, per `key` neu gemountete Content animiert beim Wechsel.
   return (
-    <Layout current={page} onNavigate={navigate}>
+    <Layout current={page} onNavigate={navigate} watchersEnabled={watchersEnabled}>
       <div key={page} className={"h-full min-h-0 " + animClass}>
         {page === "calendar" ? (
           <CalendarPage onNavigate={navigate} />
@@ -116,6 +124,8 @@ export default function App() {
             focusSuggestionId={focusSuggestionId}
             onFocusHandled={() => setFocusSuggestionId(null)}
           />
+        ) : page === "watchers" ? (
+          <WatchersPage />
         ) : (
           <ChatView onNavigate={navigate} />
         )}
