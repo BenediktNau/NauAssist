@@ -4,6 +4,7 @@ using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.Chat;
 using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.WatchJobs;
+using NauAssist.Backend.Features.WatchJobs.Notify;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Features.WatchJobs;
@@ -55,6 +56,45 @@ public sealed class WatchJobNotifierTests
         (await messages.GetRecentAsync("default", 10, CancellationToken.None)).Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task NotifyAsync_FailingChannelDoesNotPreventOtherChannels()
+    {
+        using var temp = new TempSqliteDb();
+        var holder = new UserContextHolder();
+        var messages = new MessageRepository(temp.AppDb, holder);
+        var ok = new RecordingChannel("ok");
+        var boom = new ThrowingChannel("boom");
+        var notifier = new WatchJobNotifier(
+            new INotificationChannel[] { boom, ok },
+            messages, () => Now, NullLogger<WatchJobNotifier>.Instance);
+
+        var job = SampleJob(channels: new[] { "boom", "ok" });
+        await notifier.NotifyAsync(job, new WatchJudgeResult(true, 0.9, Array.Empty<JudgeEvidence>(), "Treffer"), CancellationToken.None);
+
+        ok.Sent.Should().HaveCount(1);
+        (await messages.GetRecentAsync("default", 10, CancellationToken.None)).Should().HaveCount(1);
+    }
+
+    private sealed class RecordingChannel : INotificationChannel
+    {
+        public RecordingChannel(string name) => Name = name;
+        public string Name { get; }
+        public List<WatchNotification> Sent { get; } = new();
+        public Task<bool> SendAsync(WatchNotification notification, CancellationToken ct)
+        {
+            Sent.Add(notification);
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class ThrowingChannel : INotificationChannel
+    {
+        public ThrowingChannel(string name) => Name = name;
+        public string Name { get; }
+        public Task<bool> SendAsync(WatchNotification notification, CancellationToken ct)
+            => throw new InvalidOperationException("Kanal kaputt");
+    }
+
     private static WatchJobNotifier BuildNotifier(TempSqliteDb temp, UserContextHolder holder, MessageRepository messages)
     {
         var push = new WebPushSender(
@@ -62,7 +102,9 @@ public sealed class WatchJobNotifierTests
             new FakeSettingsRepo(),
             () => Now,
             NullLogger<WebPushSender>.Instance);
-        return new WatchJobNotifier(push, messages, () => Now, NullLogger<WatchJobNotifier>.Instance);
+        return new WatchJobNotifier(
+            new INotificationChannel[] { new WebPushChannel(push) },
+            messages, () => Now, NullLogger<WatchJobNotifier>.Instance);
     }
 
     private static WatchJob SampleJob(IReadOnlyList<string> channels) => new(

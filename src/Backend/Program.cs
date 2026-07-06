@@ -23,6 +23,7 @@ using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.WatchJobs;
+using NauAssist.Backend.Features.WatchJobs.Notify;
 using NauAssist.Backend.Features.WatchJobs.Tools;
 using NauAssist.Backend.Features.WatchJobs.Web;
 
@@ -180,6 +181,7 @@ builder.Services.AddScoped<WatchJobRepository>();
 builder.Services.AddScoped<WatchJudge>();
 builder.Services.AddScoped<WatchJobExecutor>();
 builder.Services.AddScoped<WatchJobNotifier>();
+builder.Services.AddScoped<INotificationChannel, WebPushChannel>();
 
 if (watchJobOptions.Enabled)
 {

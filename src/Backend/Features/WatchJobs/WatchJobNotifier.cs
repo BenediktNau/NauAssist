@@ -1,31 +1,28 @@
 using System.Text;
-using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.WatchJobs.Notify;
 
 namespace NauAssist.Backend.Features.WatchJobs;
 
 /// <summary>
-/// Benachrichtigt beim Feuern eines Watch-Jobs: Web-Push (falls Kanal gewünscht) plus eine
-/// proaktive Assistant-Nachricht in der Chat-History (Deep-Link-Ziel des Push). Phase 1 kennt
-/// nur den Kanal <c>webpush</c>; unbekannte Kanäle (z.B. <c>pushover</c>, Phase 2) werden
-/// geloggt und ignoriert.
+/// Benachrichtigt beim Feuern eines Watch-Jobs: proaktive Assistant-Nachricht in der
+/// Chat-History (Deep-Link-Ziel der Pushes) plus alle in der Job-Spec gewünschten Kanäle.
+/// Unbekannte Kanäle werden geloggt und ignoriert; ein fehlschlagender Kanal stoppt die anderen nicht.
 /// </summary>
 public sealed class WatchJobNotifier
 {
-    private const string WebPushChannel = "webpush";
-
-    private readonly WebPushSender _push;
+    private readonly IReadOnlyList<INotificationChannel> _channels;
     private readonly MessageRepository _messages;
     private readonly Func<DateTimeOffset> _clock;
     private readonly ILogger<WatchJobNotifier> _logger;
 
     public WatchJobNotifier(
-        WebPushSender push,
+        IEnumerable<INotificationChannel> channels,
         MessageRepository messages,
         Func<DateTimeOffset> clock,
         ILogger<WatchJobNotifier> logger)
     {
-        _push = push;
+        _channels = channels.ToList();
         _messages = messages;
         _clock = clock;
         _logger = logger;
@@ -47,25 +44,30 @@ public sealed class WatchJobNotifier
                 CreatedAt: _clock()),
             ct);
 
-        foreach (var channel in job.Notify.Channels)
-        {
-            if (!string.Equals(channel, WebPushChannel, StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogInformation(
-                    "WatchJob {Id}: Kanal '{Channel}' wird in Phase 1 nicht unterstützt — übersprungen.",
-                    job.Id, channel);
-            }
-        }
+        var notification = new WatchNotification(
+            Title: job.Title,
+            Body: Truncate(result.Summary, 200),
+            Url: "/chat",
+            Tag: $"watch-{job.Id}");
 
-        if (job.Notify.Channels.Any(c => string.Equals(c, WebPushChannel, StringComparison.OrdinalIgnoreCase)))
+        foreach (var name in job.Notify.Channels)
         {
-            await _push.BroadcastAsync(
-                new PushNotificationPayload(
-                    Title: job.Title,
-                    Body: Truncate(result.Summary, 200),
-                    Url: "/chat",
-                    Tag: $"watch-{job.Id}"),
-                ct);
+            var channel = _channels.FirstOrDefault(
+                c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (channel is null)
+            {
+                _logger.LogInformation("WatchJob {Id}: unbekannter Kanal '{Channel}' — übersprungen.", job.Id, name);
+                continue;
+            }
+
+            try
+            {
+                await channel.SendAsync(notification, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "WatchJob {Id}: Kanal '{Channel}' fehlgeschlagen.", job.Id, name);
+            }
         }
     }
 
