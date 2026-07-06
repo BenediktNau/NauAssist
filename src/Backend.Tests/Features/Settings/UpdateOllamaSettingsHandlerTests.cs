@@ -128,5 +128,8 @@ public sealed class UpdateOllamaSettingsHandlerTests
         public Task<VapidSettings> GetVapidAsync(CancellationToken ct) =>
             Task.FromResult(new VapidSettings("", "", "mailto:test@example.org"));
         public Task SetVapidAsync(VapidSettings v, CancellationToken ct) => Task.CompletedTask;
+        public Task<PushoverSettings> GetPushoverAsync(CancellationToken ct) =>
+            Task.FromResult(new PushoverSettings("", ""));
+        public Task SetPushoverAsync(PushoverSettings s, CancellationToken ct) => Task.CompletedTask;
     }
 }

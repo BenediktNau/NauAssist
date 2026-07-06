@@ -28,4 +28,10 @@ public interface IAppSettingsRepository
 
     /// <summary>Speichert VAPID-Public/Private/Subject — atomar.</summary>
     Task SetVapidAsync(VapidSettings vapid, CancellationToken ct);
+
+    /// <summary>Liefert Pushover-Token/User-Key. Können leer sein, wenn noch nichts gesetzt wurde.</summary>
+    Task<PushoverSettings> GetPushoverAsync(CancellationToken ct);
+
+    /// <summary>Speichert Pushover-Token/User-Key — atomar.</summary>
+    Task SetPushoverAsync(PushoverSettings settings, CancellationToken ct);
 }

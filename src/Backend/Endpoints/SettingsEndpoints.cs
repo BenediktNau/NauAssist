@@ -218,6 +218,33 @@ public static class SettingsEndpoints
             return Results.NoContent();
         });
 
+        app.MapGet("/api/settings/pushover", async (IAppSettingsRepository repo, CancellationToken ct) =>
+        {
+            var s = await repo.GetPushoverAsync(ct);
+            // Secrets nie zurückgeben — nur, ob sie gesetzt sind.
+            return Results.Ok(new PushoverSettingsDto(
+                HasToken: !string.IsNullOrWhiteSpace(s.Token),
+                HasUserKey: !string.IsNullOrWhiteSpace(s.UserKey)));
+        });
+
+        app.MapPut("/api/settings/pushover", async (
+            UpdatePushoverPayload payload,
+            IAppSettingsRepository repo,
+            AuditLogRepository audit,
+            Func<DateTimeOffset> clock,
+            CancellationToken ct) =>
+        {
+            var next = new PushoverSettings(
+                Token: payload.Token?.Trim() ?? "",
+                UserKey: payload.UserKey?.Trim() ?? "");
+            await repo.SetPushoverAsync(next, ct);
+            await audit.AppendAsync(new AuditEntry(
+                0, null, "settings.pushover.update",
+                JsonSerializer.Serialize(new { hasToken = next.Token.Length > 0, hasUserKey = next.UserKey.Length > 0 }),
+                "{\"ok\":true}", null, clock()), ct);
+            return Results.NoContent();
+        });
+
         return app;
     }
 
@@ -262,4 +289,7 @@ public static class SettingsEndpoints
         int SearchHorizonDays,
         bool HasGoogleCredentials,
         bool IsConnected);
+
+    public sealed record UpdatePushoverPayload(string? Token, string? UserKey);
+    private sealed record PushoverSettingsDto(bool HasToken, bool HasUserKey);
 }
