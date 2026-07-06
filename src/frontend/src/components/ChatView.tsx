@@ -24,6 +24,8 @@ const TOOL_STATUS_LABEL: Record<string, string> = {
   delete_rule: "LÖSCHE REGEL",
   list_rules: "LADE REGELN",
   present_proposals: "BEREITE VORSCHLÄGE VOR",
+  web_search: "SUCHE IM WEB",
+  fetch_webpage: "LESE WEBSEITE",
 };
 
 interface ChatViewProps {
