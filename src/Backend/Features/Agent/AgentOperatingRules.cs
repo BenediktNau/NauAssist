@@ -13,7 +13,7 @@ internal static class AgentOperatingRules
 {
     public static string Compose(IEnumerable<string> toolNames)
     {
-        var tools = toolNames as ISet<string> ?? new HashSet<string>(toolNames, StringComparer.Ordinal);
+        var tools = new HashSet<string>(toolNames, StringComparer.Ordinal);
 
         var text = Header + BaseToolRules;
         if (tools.Contains("create_watch_job")) text += WatchJobRules;

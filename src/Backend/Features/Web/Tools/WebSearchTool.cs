@@ -18,6 +18,7 @@ public sealed class WebSearchTool : ITool
         "Sucht im Web nach aktuellen Informationen (News, Preise, Öffnungszeiten, Verfügbarkeiten) " +
         "und liefert Treffer mit Titel, URL und Snippet.";
 
+    // JsonDocument bewusst nicht disposed — das JsonElement hält den Parent am Leben.
     public JsonElement ParameterSchema { get; } = JsonDocument.Parse("""
         {
           "type": "object",
@@ -59,7 +60,7 @@ public sealed class WebSearchTool : ITool
         }
 
         var hits = await _search.SearchAsync(query, maxResults, ct);
-        var results = hits.Select(h => new { title = h.Title, url = h.Url, snippet = h.Snippet });
+        var results = hits.Select(h => new { title = h.Title, url = h.Url, snippet = h.Snippet }).ToList();
 
         // Die Suche wirft designbedingt nicht (leere Liste bei Fehlern) — dem LLM ehrlich
         // signalisieren, dass es „keine Treffer" von „Suche kaputt/unkonfiguriert" nicht

@@ -18,6 +18,7 @@ public sealed class FetchWebpageTool : ITool
         "Lädt eine Webseite und liefert ihren Inhalt als Text — z. B. um einen web_search-Treffer " +
         "im Detail zu lesen. Nur absolute http(s)-URLs.";
 
+    // JsonDocument bewusst nicht disposed — das JsonElement hält den Parent am Leben.
     public JsonElement ParameterSchema { get; } = JsonDocument.Parse("""
         {
           "type": "object",
@@ -55,6 +56,9 @@ public sealed class FetchWebpageTool : ITool
         // daher tritt hier NotModified (HTTP 304) nie auf.
         var doc = await _fetch.FetchAsync(url, etag: null, ct);
         var truncated = doc.TextContent.Length > MaxTextChars;
+        // Gefetchter Webtext ist untrusted Input im LLM-Kontext (Prompt-Injection-Oberfläche).
+        // Akzeptiert, solange destruktive Tools bestätigungspflichtig und die Web-Tools read-only
+        // sind — neu bewerten, falls unbestätigte Auto-Aktionen dazukommen.
         var text = truncated ? doc.TextContent[..MaxTextChars] : doc.TextContent;
 
         // Fetch wirft designbedingt nicht (leeres Dokument bei Fehlern) — leeren Text
