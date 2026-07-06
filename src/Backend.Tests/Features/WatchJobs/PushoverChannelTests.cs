@@ -28,6 +28,20 @@ public sealed class PushoverChannelTests
     }
 
     [Fact]
+    public async Task SendAsync_AbsoluteHttpsUrl_IncludesUrlFields()
+    {
+        var handler = new RecordingHandler(HttpStatusCode.OK, """{"status":1}""");
+        var channel = BuildChannel(handler, new PushoverSettings("tok", "usr"));
+
+        var ok = await channel.SendAsync(
+            new WatchNotification("T", "B", "https://example.com/x", null),
+            CancellationToken.None);
+
+        ok.Should().BeTrue();
+        handler.LastBody.Should().Contain("url=https%3A%2F%2Fexample.com%2Fx").And.Contain("url_title=");
+    }
+
+    [Fact]
     public async Task SendAsync_NotConfigured_SkipsWithoutRequest()
     {
         var handler = new RecordingHandler(HttpStatusCode.OK, """{"status":1}""");
