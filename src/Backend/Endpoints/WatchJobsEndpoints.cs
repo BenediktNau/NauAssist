@@ -3,9 +3,8 @@ using NauAssist.Backend.Features.WatchJobs;
 namespace NauAssist.Backend.Endpoints;
 
 /// <summary>
-/// Read-only-Liste der laufenden Watch-Jobs des Users — Grundlage für die spätere
-/// Watcher-UI-Section. Mutationen laufen in Phase 1 ausschließlich über die Chat-Tools
-/// (create/list/cancel_watch_job).
+/// Watch-Jobs für die Watcher-UI: Gesamtliste (alle Status) plus Statuswechsel
+/// pause/resume/cancel. Das Anlegen läuft weiterhin über das Chat-Tool create_watch_job.
 /// </summary>
 public static class WatchJobsEndpoints
 {
@@ -15,11 +14,26 @@ public static class WatchJobsEndpoints
 
         group.MapGet("/", async (WatchJobRepository repo, CancellationToken ct) =>
         {
-            var items = await repo.ListActiveByUserAsync(ct);
+            // Alle Status — die UI zeigt auch erledigte/pausierte Watcher.
+            var items = await repo.ListByUserAsync(100, ct);
             return Results.Ok(items.Select(ToDto));
         });
 
+        group.MapPost("/{id:long}/pause", (long id, WatchJobRepository repo, CancellationToken ct)
+            => SetStatusAsync(repo, id, WatchJobStatus.Paused, ct));
+        group.MapPost("/{id:long}/resume", (long id, WatchJobRepository repo, CancellationToken ct)
+            => SetStatusAsync(repo, id, WatchJobStatus.Active, ct));
+        group.MapPost("/{id:long}/cancel", (long id, WatchJobRepository repo, CancellationToken ct)
+            => SetStatusAsync(repo, id, WatchJobStatus.Completed, ct));
+
         return app;
+    }
+
+    private static async Task<IResult> SetStatusAsync(
+        WatchJobRepository repo, long id, WatchJobStatus status, CancellationToken ct)
+    {
+        var ok = await repo.SetStatusAsync(id, status, firedHash: null, ct);
+        return ok ? Results.NoContent() : Results.NotFound();
     }
 
     private static WatchJobDto ToDto(WatchJob j) => new(

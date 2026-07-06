@@ -101,6 +101,18 @@ public sealed class WatchJobRepository
         return rows.Select(MapToDomain).ToList();
     }
 
+    /// <summary>Alle Jobs des Users (alle Status), neueste zuerst — Grundlage der Watcher-UI.</summary>
+    public async Task<IReadOnlyList<WatchJob>> ListByUserAsync(int limit, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<WatchJobRow>(new CommandDefinition(
+            $"SELECT {SelectColumns} FROM watch_jobs " +
+            "WHERE user_id = @userId ORDER BY created_at DESC, id DESC LIMIT @limit;",
+            new { userId = _user.UserId, limit },
+            cancellationToken: ct));
+        return rows.Select(MapToDomain).ToList();
+    }
+
     public async Task<IReadOnlyList<WatchJob>> ListDueAsync(DateTimeOffset now, int limit, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();

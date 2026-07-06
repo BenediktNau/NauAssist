@@ -49,6 +49,40 @@ public sealed class WatchJobsEndpointsTests
         titles.Should().Contain("A-job").And.NotContain("B-job");
     }
 
+    [Fact]
+    public async Task PauseResumeCancel_ChangeStatus_AndUnknownIdReturns404()
+    {
+        using var factory = new TestAppFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("AutonomousAgent:WatchJobs:Enabled", "true");
+            builder.UseSetting("AutonomousAgent:WatchJobs:TickSeconds", "3600");
+        });
+        var client = factory.CreateClient();
+
+        WatchJob job;
+        using (var scope = factory.Services.CreateScope())
+        {
+            job = await InsertJobAsync(scope.ServiceProvider.GetRequiredService<WatchJobRepository>(), "Steuerbar");
+        }
+
+        (await client.PostAsync($"/api/watch-jobs/{job.Id}/pause", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await GetStatusAsync(client, job.Id)).Should().Be("paused");
+
+        (await client.PostAsync($"/api/watch-jobs/{job.Id}/resume", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await GetStatusAsync(client, job.Id)).Should().Be("active");
+
+        (await client.PostAsync($"/api/watch-jobs/{job.Id}/cancel", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await GetStatusAsync(client, job.Id)).Should().Be("completed");
+
+        (await client.PostAsync("/api/watch-jobs/999999/pause", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private static async Task<string?> GetStatusAsync(HttpClient client, long id)
+    {
+        var jobs = await (await client.GetAsync("/api/watch-jobs")).Content.ReadFromJsonAsync<List<JsonElement>>();
+        return jobs!.Single(j => j.GetProperty("id").GetInt64() == id).GetProperty("status").GetString();
+    }
+
     private static Task<WatchJob> InsertJobAsync(WatchJobRepository repo, string title)
         => repo.InsertAsync(
             title: title,

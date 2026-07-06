@@ -179,4 +179,39 @@ public sealed class WatchJobRepositoryTests
         (await repoB.ListDueAsync(Now, 50, CancellationToken.None)).Should().BeEmpty();
         (await repoA.ListActiveByUserAsync(CancellationToken.None)).Should().HaveCount(1);
     }
+
+    [Fact]
+    public async Task ListByUserAsync_ReturnsAllStatusesNewestFirst_ScopedToUser()
+    {
+        using var temp = new TempSqliteDb();
+        var holder = new UserContextHolder();
+        var repo = new WatchJobRepository(temp.AppDb, holder);
+
+        var a = await InsertTitledAsync(repo, "A-Job", now: DateTimeOffset.Parse("2026-07-06T10:00:00Z"));
+        await repo.SetStatusAsync(a.Id, WatchJobStatus.Completed, firedHash: null, CancellationToken.None);
+        await InsertTitledAsync(repo, "B-Job", now: DateTimeOffset.Parse("2026-07-06T11:00:00Z"));
+
+        var otherUser = new UserContextHolder();
+        otherUser.Set("user-c");
+        await InsertTitledAsync(new WatchJobRepository(temp.AppDb, otherUser), "C-Job",
+            now: DateTimeOffset.Parse("2026-07-06T12:00:00Z"));
+
+        var jobs = await repo.ListByUserAsync(100, CancellationToken.None);
+
+        jobs.Select(j => j.Title).Should().ContainInOrder("B-Job", "A-Job").And.NotContain("C-Job");
+        jobs.Should().Contain(j => j.Status == WatchJobStatus.Completed);
+    }
+
+    private static Task<WatchJob> InsertTitledAsync(WatchJobRepository repo, string title, DateTimeOffset now)
+        => repo.InsertAsync(
+            title: title,
+            goal: "Ziel",
+            kind: WatchJobKind.WebAvailability,
+            spec: new WatchJobSpec(new[] { "q" }, Array.Empty<string>(), "frage?", "kriterium"),
+            schedule: new WatchJobSchedule(60, 1800),
+            notify: new WatchJobNotify(new[] { "webpush" }, FireOnce: true),
+            budget: new WatchJobBudget(null, null),
+            nextDueAt: now.AddMinutes(5),
+            now: now,
+            CancellationToken.None);
 }
