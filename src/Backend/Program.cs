@@ -14,6 +14,7 @@ using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Events;
 using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
@@ -37,6 +38,10 @@ builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time")
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
+
+// Live-Events an die offene PWA (SSE unter /api/events) — Singleton, damit Publisher
+// (z.B. WatchJobNotifier) und Subscriber (Endpoint) dieselbe Instanz teilen.
+builder.Services.AddSingleton<ProactiveEventBroker>();
 
 // User-Kontext: scoped, beide Interfaces auf derselben Instanz. Default = Single-User;
 // gesetzt wird er von der Auth-Middleware (HTTP) bzw. vom Scheduler (Background).
@@ -236,6 +241,7 @@ app.MapSuggestionsEndpoints();
 app.MapSourceAccountsEndpoints();
 app.MapPushEndpoints();
 app.MapCapabilitiesEndpoints();
+app.MapEventsEndpoints();
 if (whatsAppOptions.Enabled)
 {
     app.MapWhatsAppSourceEndpoints();

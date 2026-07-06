@@ -1,29 +1,44 @@
 using System.Text;
+using System.Text.Json;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Events;
+using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.WatchJobs.Notify;
 
 namespace NauAssist.Backend.Features.WatchJobs;
 
 /// <summary>
 /// Benachrichtigt beim Feuern eines Watch-Jobs: proaktive Assistant-Nachricht in der
-/// Chat-History (Deep-Link-Ziel der Pushes) plus alle in der Job-Spec gewünschten Kanäle.
+/// Chat-History (Deep-Link-Ziel der Pushes), Live-Events für die offene PWA (SSE) plus
+/// alle in der Job-Spec gewünschten Kanäle.
 /// Unbekannte Kanäle werden geloggt und ignoriert; ein fehlschlagender Kanal stoppt die anderen nicht.
 /// </summary>
 public sealed class WatchJobNotifier
 {
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private readonly IReadOnlyList<INotificationChannel> _channels;
     private readonly MessageRepository _messages;
+    private readonly ProactiveEventBroker _broker;
+    private readonly IUserContext _user;
     private readonly Func<DateTimeOffset> _clock;
     private readonly ILogger<WatchJobNotifier> _logger;
 
     public WatchJobNotifier(
         IEnumerable<INotificationChannel> channels,
         MessageRepository messages,
+        ProactiveEventBroker broker,
+        IUserContext user,
         Func<DateTimeOffset> clock,
         ILogger<WatchJobNotifier> logger)
     {
         _channels = channels.ToList();
         _messages = messages;
+        _broker = broker;
+        _user = user;
         _clock = clock;
         _logger = logger;
     }
@@ -33,7 +48,7 @@ public sealed class WatchJobNotifier
         var body = BuildBody(job, result);
 
         // Proaktive Chat-Nachricht — taucht in der History auf und ist das Ziel des Push-Deep-Links.
-        await _messages.AddAsync(
+        var saved = await _messages.AddAsync(
             new Message(
                 Id: 0,
                 SessionId: ChatSessions.Default,
@@ -43,6 +58,14 @@ public sealed class WatchJobNotifier
                 Incomplete: false,
                 CreatedAt: _clock()),
             ct);
+
+        // Live an die offene PWA — vor den (potenziell langsamen) Push-Kanälen.
+        _broker.Publish(_user.UserId, new ProactiveEvent(
+            "chat_message",
+            JsonSerializer.Serialize(new { messageId = saved.Id, jobId = job.Id }, JsonOpts)));
+        _broker.Publish(_user.UserId, new ProactiveEvent(
+            "watch_job_fired",
+            JsonSerializer.Serialize(new { jobId = job.Id, title = job.Title, summary = result.Summary }, JsonOpts)));
 
         var notification = new WatchNotification(
             Title: job.Title,

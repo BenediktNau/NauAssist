@@ -2,6 +2,7 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NauAssist.Backend.Features.AutonomousAgent.Push;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Events;
 using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.WatchJobs;
 using NauAssist.Backend.Features.WatchJobs.Notify;
@@ -41,6 +42,28 @@ public sealed class WatchJobNotifierTests
     }
 
     [Fact]
+    public async Task NotifyAsync_PublishesProactiveEvents()
+    {
+        using var temp = new TempSqliteDb();
+        var holder = new UserContextHolder();
+        var messages = new MessageRepository(temp.AppDb, holder);
+        var broker = new ProactiveEventBroker();
+        using var sub = broker.Subscribe(holder.UserId);
+        var notifier = BuildNotifier(temp, holder, messages, broker);
+
+        await notifier.NotifyAsync(
+            SampleJob(channels: new[] { "webpush" }),
+            new WatchJudgeResult(true, 0.9, Array.Empty<JudgeEvidence>(), "Treffer"),
+            CancellationToken.None);
+
+        var first = await sub.Reader.ReadAsync(CancellationToken.None);
+        first.EventName.Should().Be("chat_message");
+        var second = await sub.Reader.ReadAsync(CancellationToken.None);
+        second.EventName.Should().Be("watch_job_fired");
+        second.DataJson.Should().Contain("\"jobId\":7");
+    }
+
+    [Fact]
     public async Task NotifyAsync_WithUnknownChannel_StillPersistsMessage()
     {
         using var temp = new TempSqliteDb();
@@ -66,7 +89,7 @@ public sealed class WatchJobNotifierTests
         var boom = new ThrowingChannel("boom");
         var notifier = new WatchJobNotifier(
             new INotificationChannel[] { boom, ok },
-            messages, () => Now, NullLogger<WatchJobNotifier>.Instance);
+            messages, new ProactiveEventBroker(), holder, () => Now, NullLogger<WatchJobNotifier>.Instance);
 
         var job = SampleJob(channels: new[] { "boom", "ok" });
         await notifier.NotifyAsync(job, new WatchJudgeResult(true, 0.9, Array.Empty<JudgeEvidence>(), "Treffer"), CancellationToken.None);
@@ -95,7 +118,8 @@ public sealed class WatchJobNotifierTests
             => throw new InvalidOperationException("Kanal kaputt");
     }
 
-    private static WatchJobNotifier BuildNotifier(TempSqliteDb temp, UserContextHolder holder, MessageRepository messages)
+    private static WatchJobNotifier BuildNotifier(
+        TempSqliteDb temp, UserContextHolder holder, MessageRepository messages, ProactiveEventBroker? broker = null)
     {
         var push = new WebPushSender(
             new PushSubscriptionRepository(temp.AppDb, holder),
@@ -104,7 +128,11 @@ public sealed class WatchJobNotifierTests
             NullLogger<WebPushSender>.Instance);
         return new WatchJobNotifier(
             new INotificationChannel[] { new WebPushChannel(push) },
-            messages, () => Now, NullLogger<WatchJobNotifier>.Instance);
+            messages,
+            broker ?? new ProactiveEventBroker(),
+            holder,
+            () => Now,
+            NullLogger<WatchJobNotifier>.Instance);
     }
 
     private static WatchJob SampleJob(IReadOnlyList<string> channels) => new(
