@@ -19,6 +19,7 @@ export const queryKeys = {
   ollamaSettings: ["ollama-settings"] as const,
   capabilities: ["capabilities"] as const,
   chatHistory: ["chat-history"] as const,
+  watchJobs: ["watch-jobs"] as const,
 };
 
 /**

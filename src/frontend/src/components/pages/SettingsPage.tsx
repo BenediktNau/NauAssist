@@ -363,7 +363,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
   const caps =
     capsQuery.data ??
     (capsQuery.isError
-      ? { whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" } }
+      ? { whatsApp: false, auth: { enabled: false, loginUrl: "/auth/login" }, watchJobs: false }
       : null);
 
   const topError =

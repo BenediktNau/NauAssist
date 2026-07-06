@@ -4,6 +4,7 @@ import { SettingsPage } from "@/components/pages/SettingsPage";
 import { CalendarPage } from "@/components/pages/CalendarPage";
 import { RecommendationsPage } from "@/components/pages/RecommendationsPage";
 import { Layout } from "@/components/nau/Layout";
+import { useProactiveEvents } from "@/hooks/useProactiveEvents";
 
 export type AppPage = "chat" | "calendar" | "recommendations" | "settings";
 
@@ -41,6 +42,8 @@ export default function App() {
   const [focusSuggestionId, setFocusSuggestionId] = useState<number | null>(
     () => readDeepLink().focusId,
   );
+
+  useProactiveEvents();
 
   // Spiegelt die aktuelle Seite synchron — damit `navigate` ohne Seiteneffekt im
   // State-Updater entscheiden kann, ob ein neuer History-Eintrag nötig ist.
