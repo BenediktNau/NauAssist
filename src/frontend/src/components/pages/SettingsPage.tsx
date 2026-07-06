@@ -7,6 +7,7 @@ import {
   CalendarDays,
   User,
   Bell,
+  BellRing,
   Mail,
   MessageCircle,
   LogOut,
@@ -36,6 +37,7 @@ import {
 import { ImapSection } from "@/components/settings/ImapSection";
 import { PersonaSection } from "@/components/settings/PersonaSection";
 import { PushSection } from "@/components/settings/PushSection";
+import { PushoverSection } from "@/components/settings/PushoverSection";
 import { WhatsAppSection } from "@/components/settings/WhatsAppSection";
 import { getCapabilities } from "@/api/capabilities";
 import { useAuth } from "@/lib/authContext";
@@ -273,7 +275,15 @@ function ModelCombobox({
   );
 }
 
-type SectionKey = "llm" | "calendar" | "persona" | "push" | "imap" | "whatsapp" | "konto";
+type SectionKey =
+  | "llm"
+  | "calendar"
+  | "persona"
+  | "push"
+  | "pushover"
+  | "imap"
+  | "whatsapp"
+  | "konto";
 
 interface NavMeta {
   label: string;
@@ -286,6 +296,7 @@ const NAV_META: Record<SectionKey, NavMeta> = {
   calendar: { label: "Kalender", hint: "Google · Arbeitszeiten", Icon: CalendarDays },
   persona: { label: "Persona", hint: "Was Nau über dich weiß", Icon: User },
   push: { label: "Push", hint: "Benachrichtigungen", Icon: Bell },
+  pushover: { label: "Pushover", hint: "Push aufs Handy (extern)", Icon: BellRing },
   imap: { label: "E-Mail", hint: "IMAP / SMTP Postfächer", Icon: Mail },
   whatsapp: { label: "WhatsApp", hint: "Agent-Nummer", Icon: MessageCircle },
   konto: { label: "Konto", hint: "Anmeldung · Abmelden", Icon: LogOut },
@@ -298,7 +309,7 @@ interface NavGroup {
 }
 
 function buildGroups(caps: Capabilities | null, authEnabled: boolean): NavGroup[] {
-  const channels: SectionKey[] = ["push", "imap"];
+  const channels: SectionKey[] = ["push", "pushover", "imap"];
   if (caps?.whatsApp) channels.push("whatsapp");
 
   const groups: NavGroup[] = [
@@ -393,6 +404,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
         return <PersonaSection anchor="section-persona" />;
       case "push":
         return <PushSection anchor="section-push" />;
+      case "pushover":
+        return <PushoverSection anchor="section-pushover" />;
       case "imap":
         return <ImapSection anchor="section-imap" />;
       case "whatsapp":
