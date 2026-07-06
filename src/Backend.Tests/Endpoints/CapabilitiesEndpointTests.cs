@@ -43,5 +43,25 @@ public sealed class CapabilitiesEndpointTests : IClassFixture<TestAppFactory>
         dto!.WhatsApp.Should().BeTrue();
     }
 
-    private sealed record CapsDto(bool WhatsApp);
+    [Fact]
+    public async Task Capabilities_DefaultsToWatchJobsDisabled()
+    {
+        var client = _factory.CreateClient();
+        var dto = await (await client.GetAsync("/api/capabilities")).Content.ReadFromJsonAsync<CapsDto>();
+        dto!.WatchJobs.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Capabilities_ReflectsWatchJobsFlag()
+    {
+        var factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("AutonomousAgent:WatchJobs:Enabled", "true");
+            builder.UseSetting("AutonomousAgent:WatchJobs:TickSeconds", "3600");
+        });
+        var dto = await (await factory.CreateClient().GetAsync("/api/capabilities")).Content.ReadFromJsonAsync<CapsDto>();
+        dto!.WatchJobs.Should().BeTrue();
+    }
+
+    private sealed record CapsDto(bool WhatsApp, bool WatchJobs);
 }
