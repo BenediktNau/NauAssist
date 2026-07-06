@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
 /// <see cref="IWebSearch"/> über die JSON-API einer self-hosted SearXNG-Instanz
@@ -10,7 +10,7 @@ namespace NauAssist.Backend.Features.WatchJobs.Web;
 /// </summary>
 public sealed class SearxngWebSearch : IWebSearch
 {
-    public const string HttpClientName = "WatchJobsWeb";
+    public const string HttpClientName = "WebSearch";
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly WebOptions _options;
@@ -27,7 +27,7 @@ public sealed class SearxngWebSearch : IWebSearch
     {
         if (string.IsNullOrWhiteSpace(_options.SearxngBaseUrl))
         {
-            _logger.LogWarning("WatchJob-Suche übersprungen: SearxngBaseUrl ist nicht konfiguriert.");
+            _logger.LogWarning("Web-Suche übersprungen: SearxngBaseUrl ist nicht konfiguriert.");
             return Array.Empty<WebSearchHit>();
         }
 

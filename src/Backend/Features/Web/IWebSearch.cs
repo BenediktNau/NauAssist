@@ -1,4 +1,4 @@
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>Ein Treffer einer Web-Suche.</summary>
 public sealed record WebSearchHit(string Title, string Url, string Snippet);

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Llm;
 using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.WatchJobs;
-using NauAssist.Backend.Features.WatchJobs.Web;
+using NauAssist.Backend.Features.Web;
 using NauAssist.Backend.Tests.Helpers;
 
 namespace NauAssist.Backend.Tests.Features.WatchJobs;

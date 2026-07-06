@@ -24,7 +24,7 @@ using NauAssist.Backend.Features.Rules;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.WatchJobs;
 using NauAssist.Backend.Features.WatchJobs.Tools;
-using NauAssist.Backend.Features.WatchJobs.Web;
+using NauAssist.Backend.Features.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -165,7 +165,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<AutonomousAgentSch
 builder.Services.Configure<WatchJobOptions>(
     builder.Configuration.GetSection("AutonomousAgent:WatchJobs"));
 builder.Services.Configure<WebOptions>(
-    builder.Configuration.GetSection("AutonomousAgent:WatchJobs:Web"));
+    builder.Configuration.GetSection("Web"));
 var watchJobOptions = builder.Configuration
     .GetSection("AutonomousAgent:WatchJobs").Get<WatchJobOptions>() ?? new WatchJobOptions();
 

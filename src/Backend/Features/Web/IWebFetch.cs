@@ -1,4 +1,4 @@
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
 /// Ergebnis eines HTTP-Fetch. <see cref="TextContent"/> ist bereits auf reinen Text

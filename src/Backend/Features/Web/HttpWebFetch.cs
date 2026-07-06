@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
 /// <see cref="IWebFetch"/> über <see cref="IHttpClientFactory"/>: GET mit
@@ -13,7 +13,7 @@ namespace NauAssist.Backend.Features.WatchJobs.Web;
 public sealed partial class HttpWebFetch : IWebFetch
 {
     /// <summary>Eigener, SSRF-gehärteter Client (vgl. <see cref="SsrfGuard"/>) — getrennt vom SearXNG-Client.</summary>
-    public const string HttpClientName = "WatchJobsFetch";
+    public const string HttpClientName = "WebFetch";
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly WebOptions _options;

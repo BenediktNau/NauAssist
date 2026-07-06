@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
 /// SSRF-Schutz für den Fetch von user-/LLM-gelieferten URLs. Watcher fetchen Ziel-URLs

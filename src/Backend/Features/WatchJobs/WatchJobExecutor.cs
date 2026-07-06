@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using NauAssist.Backend.Features.Infrastructure.Time;
-using NauAssist.Backend.Features.WatchJobs.Web;
+using NauAssist.Backend.Features.Web;
 
 namespace NauAssist.Backend.Features.WatchJobs;
 
