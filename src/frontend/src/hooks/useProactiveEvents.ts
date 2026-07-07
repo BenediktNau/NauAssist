@@ -27,7 +27,9 @@ export function useProactiveEvents() {
         }
       },
       onerror() {
-        // undefined zurückgeben ⇒ eingebautes Retry mit Backoff übernimmt.
+        // undefined zurückgeben ⇒ eingebautes Retry übernimmt. Kein Backoff: die Library
+        // reconnected standardmäßig in einem festen ~1s-Intervall (nur ein Server-seitiges
+        // "retry:"-Feld im Event-Stream würde das ändern).
       },
     });
 
