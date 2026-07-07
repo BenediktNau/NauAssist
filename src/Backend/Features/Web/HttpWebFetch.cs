@@ -3,17 +3,17 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
 /// <see cref="IWebFetch"/> über <see cref="IHttpClientFactory"/>: GET mit
 /// Conditional-Request (<c>If-None-Match</c>), Größen- und Timeout-Cap sowie einfacher
-/// HTML→Text-Reduktion für den Judge-Kontext. Defensiv: Fehler ⇒ leeres Dokument + Log.
+/// HTML→Text-Reduktion für den LLM-Kontext (Chat-Tools, Watcher-Judge). Defensiv: Fehler ⇒ leeres Dokument + Log.
 /// </summary>
 public sealed partial class HttpWebFetch : IWebFetch
 {
     /// <summary>Eigener, SSRF-gehärteter Client (vgl. <see cref="SsrfGuard"/>) — getrennt vom SearXNG-Client.</summary>
-    public const string HttpClientName = "WatchJobsFetch";
+    public const string HttpClientName = "WebFetch";
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly WebOptions _options;

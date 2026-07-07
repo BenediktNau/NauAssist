@@ -1,8 +1,8 @@
-namespace NauAssist.Backend.Features.WatchJobs.Web;
+namespace NauAssist.Backend.Features.Web;
 
 /// <summary>
-/// Bindet <c>AutonomousAgent:WatchJobs:Web</c>. Steuert den Web-Zugriff der Watcher:
-/// SearXNG-Endpoint sowie Fetch-Limits. Default-SearXNG ist leer ⇒ Suche liefert
+/// Bindet die top-level <c>Web</c>-Sektion. Steuert den Web-Zugriff von Chat-Tools und
+/// Watch-Jobs: SearXNG-Endpoint sowie Fetch-Limits. Default-SearXNG ist leer ⇒ Suche liefert
 /// (geloggt) leere Treffer, bis eine Instanz konfiguriert ist.
 /// </summary>
 public sealed class WebOptions
@@ -17,5 +17,5 @@ public sealed class WebOptions
     public int FetchTimeoutSeconds { get; set; } = 15;
 
     /// <summary>Identifizierbarer User-Agent (Fairness gegenüber Shops, robots-freundlich).</summary>
-    public string UserAgent { get; set; } = "NauAssist-WatchJob/1.0 (+https://github.com/BenediktNau/NauAssist)";
+    public string UserAgent { get; set; } = "NauAssist/1.0 (+https://github.com/BenediktNau/NauAssist)";
 }

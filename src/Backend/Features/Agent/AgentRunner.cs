@@ -46,7 +46,7 @@ public sealed class AgentRunner
         var snapshot = _clockContext.Build();
         var conversation = new List<LlmMessage>
         {
-            new LlmMessage("system", AgentOperatingRules.Text),
+            new LlmMessage("system", AgentOperatingRules.Compose(_tools.Keys)),
             new LlmMessage("system", BuildTimeContextBlock(snapshot)),
         };
 

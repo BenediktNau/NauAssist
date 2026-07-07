@@ -1,8 +1,8 @@
 using System.Net;
 using AwesomeAssertions;
-using NauAssist.Backend.Features.WatchJobs.Web;
+using NauAssist.Backend.Features.Web;
 
-namespace NauAssist.Backend.Tests.Features.WatchJobs;
+namespace NauAssist.Backend.Tests.Features.Web;
 
 public sealed class SsrfGuardTests
 {
