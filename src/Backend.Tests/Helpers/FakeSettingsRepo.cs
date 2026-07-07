@@ -32,4 +32,14 @@ public sealed class FakeSettingsRepo : IAppSettingsRepository
     public Task<VapidSettings> GetVapidAsync(CancellationToken ct) =>
         Task.FromResult(new VapidSettings("", "", "mailto:test@example.org"));
     public Task SetVapidAsync(VapidSettings v, CancellationToken ct) => Task.CompletedTask;
+
+    public PushoverSettings Pushover { get; set; } = new("", "");
+
+    public Task<PushoverSettings> GetPushoverAsync(CancellationToken ct) => Task.FromResult(Pushover);
+
+    public Task SetPushoverAsync(PushoverSettings settings, CancellationToken ct)
+    {
+        Pushover = settings;
+        return Task.CompletedTask;
+    }
 }

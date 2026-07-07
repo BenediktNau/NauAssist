@@ -23,4 +23,10 @@ public sealed class WatchJobOptions
 
     /// <summary>Mindest-Confidence des Judge, damit ein Treffer feuert (analog autonomer Agent: 0,6).</summary>
     public double ConfidenceThreshold { get; set; } = 0.6;
+
+    /// <summary>
+    /// Hot-Mode-Intervall: greift, wenn der Judge ein Teilsignal meldet (etwas tut sich,
+    /// ist aber unbestätigt). Darf MinIntervalSeconds bewusst unterschreiten; harte Untergrenze 10 s.
+    /// </summary>
+    public int HotIntervalSeconds { get; set; } = 15;
 }

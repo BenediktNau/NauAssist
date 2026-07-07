@@ -47,7 +47,7 @@ public sealed class CreateWatchJobTool : ITool
             "notify": {
               "type": "object",
               "properties": {
-                "channels": { "type": "array", "items": { "type": "string" }, "description": "Benachrichtigungskanäle, Phase 1: webpush" },
+                "channels": { "type": "array", "items": { "type": "string" }, "description": "Benachrichtigungskanäle: webpush, pushover" },
                 "fireOnce": { "type": "boolean", "description": "Nach dem ersten Treffer beenden (true) oder weiterbeobachten (false)" }
               }
             },

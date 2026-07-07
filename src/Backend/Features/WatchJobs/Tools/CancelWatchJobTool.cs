@@ -3,20 +3,24 @@ using NauAssist.Backend.Features.Agent;
 
 namespace NauAssist.Backend.Features.WatchJobs.Tools;
 
-/// <summary>Stoppt (cancel ⇒ completed) oder pausiert (pause ⇒ paused) einen Watch-Job des Users.</summary>
+/// <summary>
+/// Stoppt (cancel ⇒ completed), pausiert (pause ⇒ paused) oder setzt einen pausierten Watch-Job
+/// des Users fort (resume ⇒ active).
+/// </summary>
 public sealed class CancelWatchJobTool : ITool
 {
     public string Name => "cancel_watch_job";
 
     public string Description =>
-        "Stoppt oder pausiert einen laufenden Watch-Job. mode='cancel' beendet ihn, mode='pause' setzt ihn aus.";
+        "Stoppt, pausiert oder setzt einen Watch-Job fort. mode='cancel' beendet ihn, mode='pause' setzt ihn aus, " +
+        "mode='resume' setzt einen pausierten Job fort.";
 
     public JsonElement ParameterSchema { get; } = JsonDocument.Parse("""
         {
           "type": "object",
           "properties": {
             "id": { "type": "integer", "description": "ID des Watch-Jobs (siehe list_watch_jobs)" },
-            "mode": { "type": "string", "enum": ["cancel", "pause"], "description": "cancel = endgültig stoppen, pause = aussetzen (wieder fortsetzbar)" }
+            "mode": { "type": "string", "enum": ["cancel", "pause", "resume"], "description": "cancel = endgültig stoppen, pause = aussetzen (wieder fortsetzbar), resume = pausierten Job fortsetzen" }
           },
           "required": ["id", "mode"]
         }
@@ -44,24 +48,33 @@ public sealed class CancelWatchJobTool : ITool
         // oder vertipptes mode darf einen Job nicht unwiderruflich abschließen (completed fällt
         // aus der aktiven Liste, nur Neuanlage möglich).
         WatchJobStatus newStatus;
+        IReadOnlyCollection<WatchJobStatus> allowedFrom;
         if (string.Equals(mode, "cancel", StringComparison.OrdinalIgnoreCase))
         {
             newStatus = WatchJobStatus.Completed;
+            allowedFrom = new[] { WatchJobStatus.Active, WatchJobStatus.Paused };
         }
         else if (string.Equals(mode, "pause", StringComparison.OrdinalIgnoreCase))
         {
             newStatus = WatchJobStatus.Paused;
+            allowedFrom = new[] { WatchJobStatus.Active };
+        }
+        else if (string.Equals(mode, "resume", StringComparison.OrdinalIgnoreCase))
+        {
+            newStatus = WatchJobStatus.Active;
+            allowedFrom = new[] { WatchJobStatus.Paused };
         }
         else
         {
             return JsonSerializer.SerializeToElement(
-                new { ok = false, error = $"mode ist erforderlich und muss 'cancel' oder 'pause' sein (war: '{mode}')." });
+                new { ok = false, error = $"mode ist erforderlich und muss 'cancel', 'pause' oder 'resume' sein (war: '{mode}')." });
         }
 
-        var ok = await _repo.SetStatusAsync(id, newStatus, firedHash: null, ct);
+        var ok = await _repo.SetStatusAsync(id, newStatus, firedHash: null, ct, allowedFrom);
         if (!ok)
         {
-            return JsonSerializer.SerializeToElement(new { ok = false, error = $"Kein Watch-Job mit id {id} gefunden." });
+            return JsonSerializer.SerializeToElement(
+                new { ok = false, error = $"Kein Watch-Job mit id {id} im passenden Zustand gefunden." });
         }
 
         return JsonSerializer.SerializeToElement(new

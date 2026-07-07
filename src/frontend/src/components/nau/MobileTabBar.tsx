@@ -1,8 +1,8 @@
-import { MessageSquare, CalendarDays, Sparkles } from "lucide-react";
+import { MessageSquare, CalendarDays, Sparkles, Radar } from "lucide-react";
 import type { ComponentType } from "react";
 import type { AppPage } from "@/App";
 
-type TabKey = "chat" | "calendar" | "recommendations";
+type TabKey = "chat" | "calendar" | "recommendations" | "watchers";
 
 interface TabDef {
   key: TabKey;
@@ -11,17 +11,21 @@ interface TabDef {
   Icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }
 
-const TABS: TabDef[] = [
+const BASE_TABS: TabDef[] = [
   { key: "chat", label: "CHAT", aria: "Chat", Icon: MessageSquare },
   { key: "calendar", label: "KALENDER", aria: "Kalender", Icon: CalendarDays },
   { key: "recommendations", label: "EMPF.", aria: "Empfehlungen", Icon: Sparkles },
 ];
+
+const WATCHERS_TAB: TabDef = { key: "watchers", label: "WATCH", aria: "Watcher", Icon: Radar };
 
 interface MobileTabBarProps {
   /** Aktiver Tab — steuert Hervorhebung. */
   current: TabKey;
   /** Wechselt die Seite. Reicht direkt das `onNavigate`/`setPage` aus App durch. */
   onSelect: (page: AppPage) => void;
+  /** Capabilities-gated: Tab nur zeigen, wenn Watch-Jobs am Backend aktiv sind. */
+  watchersEnabled?: boolean;
 }
 
 /**
@@ -35,9 +39,10 @@ interface MobileTabBarProps {
  * (siehe INTEGRATION.md → `pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0`),
  * damit Inhalt/Eingabefeld nicht hinter der Leiste verschwindet.
  */
-export function MobileTabBar({ current, onSelect }: MobileTabBarProps) {
-  const activeIndex = TABS.findIndex((t) => t.key === current);
-  const tabWidth = 100 / TABS.length;
+export function MobileTabBar({ current, onSelect, watchersEnabled = false }: MobileTabBarProps) {
+  const tabs = watchersEnabled ? [...BASE_TABS, WATCHERS_TAB] : BASE_TABS;
+  const activeIndex = tabs.findIndex((t) => t.key === current);
+  const tabWidth = 100 / tabs.length;
   // Gleitende Akzent-Elemente: beide teilen sich denselben translateX, sodass das
   // „Gelb" als Einheit zum gewählten Tab wandert statt hart umzuspringen.
   const slideStyle = {
@@ -64,7 +69,7 @@ export function MobileTabBar({ current, onSelect }: MobileTabBarProps) {
         className="pointer-events-none absolute -top-px left-0 h-[2px] bg-nau-accent transition-transform duration-[420ms] ease-out"
         style={slideStyle}
       />
-      {TABS.map(({ key, label, aria, Icon }) => {
+      {tabs.map(({ key, label, aria, Icon }) => {
         const active = current === key;
         return (
           <button

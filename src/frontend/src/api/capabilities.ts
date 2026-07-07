@@ -6,6 +6,7 @@ export interface AuthCapabilities {
 export interface Capabilities {
   whatsApp: boolean;
   auth: AuthCapabilities;
+  watchJobs: boolean;
 }
 
 export async function getCapabilities(): Promise<Capabilities> {

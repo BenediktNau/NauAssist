@@ -14,6 +14,7 @@ using NauAssist.Backend.Features.Calendar;
 using NauAssist.Backend.Features.Calendar.CalendarContext;
 using NauAssist.Backend.Features.Calendar.Google;
 using NauAssist.Backend.Features.Chat;
+using NauAssist.Backend.Features.Events;
 using NauAssist.Backend.Features.Infrastructure.Auth;
 using NauAssist.Backend.Features.Infrastructure.Audit;
 using NauAssist.Backend.Features.Infrastructure.Llm;
@@ -23,6 +24,7 @@ using NauAssist.Backend.Features.Infrastructure.Time;
 using NauAssist.Backend.Features.Rules;
 using NauAssist.Backend.Features.Settings;
 using NauAssist.Backend.Features.WatchJobs;
+using NauAssist.Backend.Features.WatchJobs.Notify;
 using NauAssist.Backend.Features.WatchJobs.Tools;
 using NauAssist.Backend.Features.WatchJobs.Web;
 
@@ -36,6 +38,10 @@ builder.Services.Configure<TimeOptions>(builder.Configuration.GetSection("Time")
 
 builder.Services.AddSingleton<AppDb>();
 builder.Services.AddSingleton<DbInitializer>();
+
+// Live-Events an die offene PWA (SSE unter /api/events) — Singleton, damit Publisher
+// (z.B. WatchJobNotifier) und Subscriber (Endpoint) dieselbe Instanz teilen.
+builder.Services.AddSingleton<ProactiveEventBroker>();
 
 // User-Kontext: scoped, beide Interfaces auf derselben Instanz. Default = Single-User;
 // gesetzt wird er von der Auth-Middleware (HTTP) bzw. vom Scheduler (Background).
@@ -180,6 +186,9 @@ builder.Services.AddScoped<WatchJobRepository>();
 builder.Services.AddScoped<WatchJudge>();
 builder.Services.AddScoped<WatchJobExecutor>();
 builder.Services.AddScoped<WatchJobNotifier>();
+builder.Services.AddScoped<INotificationChannel, WebPushChannel>();
+builder.Services.AddHttpClient(PushoverChannel.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<INotificationChannel, PushoverChannel>();
 
 if (watchJobOptions.Enabled)
 {
@@ -232,6 +241,7 @@ app.MapSuggestionsEndpoints();
 app.MapSourceAccountsEndpoints();
 app.MapPushEndpoints();
 app.MapCapabilitiesEndpoints();
+app.MapEventsEndpoints();
 if (whatsAppOptions.Enabled)
 {
     app.MapWhatsAppSourceEndpoints();
