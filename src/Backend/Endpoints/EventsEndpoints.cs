@@ -23,12 +23,13 @@ public static class EventsEndpoints
         {
             ctx.Response.Headers.ContentType = "text/event-stream";
             ctx.Response.Headers.CacheControl = "no-cache";
-            await ctx.Response.Body.FlushAsync(ct);
 
             using var subscription = broker.Subscribe(user.UserId);
             Task<ProactiveEvent>? pending = null;
             try
             {
+                await ctx.Response.Body.FlushAsync(ct);
+
                 while (!ct.IsCancellationRequested)
                 {
                     pending ??= subscription.Reader.ReadAsync(ct).AsTask();
@@ -53,6 +54,11 @@ public static class EventsEndpoints
             catch (OperationCanceledException)
             {
                 // Client hat getrennt — normales Ende.
+            }
+            catch (IOException)
+            {
+                // Abrupter Verbindungsabbruch kann beim Schreiben als IOException auftreten,
+                // bevor der CancellationToken feuert — ebenfalls normales Ende, kein Fehler.
             }
         });
 

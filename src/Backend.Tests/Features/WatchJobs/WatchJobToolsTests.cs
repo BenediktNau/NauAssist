@@ -181,6 +181,23 @@ public sealed class WatchJobToolsTests
         active.Single().Status.Should().Be(WatchJobStatus.Active);
     }
 
+    [Fact]
+    public async Task Resume_OnCompletedJob_ReturnsError_WithoutReactivating()
+    {
+        using var temp = new TempSqliteDb();
+        var repo = new WatchJobRepository(temp.AppDb, new UserContextHolder());
+        var tool = new CancelWatchJobTool(repo);
+
+        var job = await CreateSampleAsync(repo);
+        await tool.ExecuteAsync(Args($$"""{ "id": {{job.Id}}, "mode": "cancel" }"""), CancellationToken.None);
+
+        // completed ist keine gültige Ausgangslage für resume ⇒ Fehler, kein Umgehen von MaxActivePerUser.
+        var resumeResult = await tool.ExecuteAsync(Args($$"""{ "id": {{job.Id}}, "mode": "resume" }"""), CancellationToken.None);
+        resumeResult.GetProperty("ok").GetBoolean().Should().BeFalse();
+
+        (await repo.ListActiveByUserAsync(CancellationToken.None)).Should().BeEmpty();
+    }
+
     private static Task<WatchJob> CreateSampleAsync(WatchJobRepository repo)
         => repo.InsertAsync(
             "Sample", "Ziel",

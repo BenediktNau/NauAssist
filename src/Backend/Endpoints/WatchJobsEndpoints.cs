@@ -20,19 +20,24 @@ public static class WatchJobsEndpoints
         });
 
         group.MapPost("/{id:long}/pause", (long id, WatchJobRepository repo, CancellationToken ct)
-            => SetStatusAsync(repo, id, WatchJobStatus.Paused, ct));
+            => SetStatusAsync(repo, id, WatchJobStatus.Paused, ct, new[] { WatchJobStatus.Active }));
         group.MapPost("/{id:long}/resume", (long id, WatchJobRepository repo, CancellationToken ct)
-            => SetStatusAsync(repo, id, WatchJobStatus.Active, ct));
+            => SetStatusAsync(repo, id, WatchJobStatus.Active, ct, new[] { WatchJobStatus.Paused }));
         group.MapPost("/{id:long}/cancel", (long id, WatchJobRepository repo, CancellationToken ct)
-            => SetStatusAsync(repo, id, WatchJobStatus.Completed, ct));
+            => SetStatusAsync(repo, id, WatchJobStatus.Completed, ct, new[] { WatchJobStatus.Active, WatchJobStatus.Paused }));
 
         return app;
     }
 
     private static async Task<IResult> SetStatusAsync(
-        WatchJobRepository repo, long id, WatchJobStatus status, CancellationToken ct)
+        WatchJobRepository repo,
+        long id,
+        WatchJobStatus status,
+        CancellationToken ct,
+        IReadOnlyCollection<WatchJobStatus> allowedFrom)
     {
-        var ok = await repo.SetStatusAsync(id, status, firedHash: null, ct);
+        // "Not found" deckt hier auch "falscher Ausgangszustand" ab — bewusst keine 409-Unterscheidung.
+        var ok = await repo.SetStatusAsync(id, status, firedHash: null, ct, allowedFrom);
         return ok ? Results.NoContent() : Results.NotFound();
     }
 

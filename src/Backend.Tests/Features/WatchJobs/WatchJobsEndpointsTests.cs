@@ -77,6 +77,30 @@ public sealed class WatchJobsEndpointsTests
         (await client.PostAsync("/api/watch-jobs/999999/pause", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Resume_OnCompletedJob_Returns404()
+    {
+        using var factory = new TestAppFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("AutonomousAgent:WatchJobs:Enabled", "true");
+            builder.UseSetting("AutonomousAgent:WatchJobs:TickSeconds", "3600");
+        });
+        var client = factory.CreateClient();
+
+        WatchJob job;
+        using (var scope = factory.Services.CreateScope())
+        {
+            job = await InsertJobAsync(scope.ServiceProvider.GetRequiredService<WatchJobRepository>(), "Abgeschlossen");
+        }
+
+        (await client.PostAsync($"/api/watch-jobs/{job.Id}/cancel", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await GetStatusAsync(client, job.Id)).Should().Be("completed");
+
+        // completed ist keine gültige Ausgangslage für resume ⇒ 404, kein heimliches Wiederbeleben.
+        (await client.PostAsync($"/api/watch-jobs/{job.Id}/resume", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await GetStatusAsync(client, job.Id)).Should().Be("completed");
+    }
+
     private static async Task<string?> GetStatusAsync(HttpClient client, long id)
     {
         var jobs = await (await client.GetAsync("/api/watch-jobs")).Content.ReadFromJsonAsync<List<JsonElement>>();

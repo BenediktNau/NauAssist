@@ -187,7 +187,7 @@ builder.Services.AddScoped<WatchJudge>();
 builder.Services.AddScoped<WatchJobExecutor>();
 builder.Services.AddScoped<WatchJobNotifier>();
 builder.Services.AddScoped<INotificationChannel, WebPushChannel>();
-builder.Services.AddHttpClient(PushoverChannel.HttpClientName);
+builder.Services.AddHttpClient(PushoverChannel.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddScoped<INotificationChannel, PushoverChannel>();
 
 if (watchJobOptions.Enabled)
