@@ -25,6 +25,8 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
     private const string KeyVapidPublic        = "push.vapid_public_key";
     private const string KeyVapidPrivate       = "push.vapid_private_key";
     private const string KeyVapidSubject       = "push.vapid_subject";
+    private const string KeyPushoverToken   = "push.pushover_token";
+    private const string KeyPushoverUserKey = "push.pushover_user_key";
 
     private readonly AppDb _db;
     private readonly IUserContext _user;
@@ -294,6 +296,36 @@ public sealed class AppSettingsRepository : IAppSettingsRepository
             await UpsertAsync(conn, tx, KeyVapidPublic, vapid.PublicKey, ct);
             await UpsertAsync(conn, tx, KeyVapidPrivate, vapid.PrivateKey, ct);
             await UpsertAsync(conn, tx, KeyVapidSubject, vapid.Subject, ct);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    public async Task<PushoverSettings> GetPushoverAsync(CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<(string Key, string Value)>(new CommandDefinition(
+            "SELECT key, value FROM app_settings WHERE key IN (@k1, @k2);",
+            new { k1 = KeyPushoverToken, k2 = KeyPushoverUserKey },
+            cancellationToken: ct));
+        var map = rows.ToDictionary(r => r.Key, r => r.Value);
+        return new PushoverSettings(
+            Token: map.GetValueOrDefault(KeyPushoverToken, ""),
+            UserKey: map.GetValueOrDefault(KeyPushoverUserKey, ""));
+    }
+
+    public async Task SetPushoverAsync(PushoverSettings settings, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            await UpsertAsync(conn, tx, KeyPushoverToken, settings.Token, ct);
+            await UpsertAsync(conn, tx, KeyPushoverUserKey, settings.UserKey, ct);
             tx.Commit();
         }
         catch

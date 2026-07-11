@@ -93,6 +93,21 @@ public sealed class SettingsEndpointsTests : IDisposable
         put.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task PushoverSettings_PutThenGet_ReportsConfiguredWithoutLeakingSecrets()
+    {
+        using var client = _factory.CreateClient();
+
+        using var put = await client.PutAsJsonAsync("/api/settings/pushover", new { token = "app-token", userKey = "user-key" });
+        put.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var res = await client.GetAsync("/api/settings/pushover");
+        res.EnsureSuccessStatusCode();
+        var body = await res.Content.ReadAsStringAsync();
+        body.Should().Contain("\"hasToken\":true").And.Contain("\"hasUserKey\":true");
+        body.Should().NotContain("app-token").And.NotContain("user-key");
+    }
+
     public void Dispose() => _factory.Dispose();
 
     private sealed record LlmSettingsDto(

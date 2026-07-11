@@ -101,6 +101,18 @@ public sealed class WatchJobRepository
         return rows.Select(MapToDomain).ToList();
     }
 
+    /// <summary>Alle Jobs des Users (alle Status), neueste zuerst — Grundlage der Watcher-UI.</summary>
+    public async Task<IReadOnlyList<WatchJob>> ListByUserAsync(int limit, CancellationToken ct)
+    {
+        using var conn = _db.OpenConnection();
+        var rows = await conn.QueryAsync<WatchJobRow>(new CommandDefinition(
+            $"SELECT {SelectColumns} FROM watch_jobs " +
+            "WHERE user_id = @userId ORDER BY created_at DESC, id DESC LIMIT @limit;",
+            new { userId = _user.UserId, limit },
+            cancellationToken: ct));
+        return rows.Select(MapToDomain).ToList();
+    }
+
     public async Task<IReadOnlyList<WatchJob>> ListDueAsync(DateTimeOffset now, int limit, CancellationToken ct)
     {
         using var conn = _db.OpenConnection();
@@ -189,17 +201,39 @@ public sealed class WatchJobRepository
             cancellationToken: ct));
     }
 
-    public async Task<bool> SetStatusAsync(long id, WatchJobStatus status, string? firedHash, CancellationToken ct)
+    /// <summary>
+    /// Setzt den Status eines Jobs. Optional auf gültige Ausgangszustände beschränkt
+    /// (<paramref name="allowedFrom"/>) — verhindert z.B. dass <c>resume</c> einen bereits
+    /// <c>completed</c>/<c>failed</c>/<c>expired</c> Job wiederbelebt und so den
+    /// <c>MaxActivePerUser</c>-Deckel umgeht. Ohne <paramref name="allowedFrom"/> (null)
+    /// unverändertes Verhalten — u.a. für Testaufbau, der einen Status erzwingt.
+    /// </summary>
+    public async Task<bool> SetStatusAsync(
+        long id,
+        WatchJobStatus status,
+        string? firedHash,
+        CancellationToken ct,
+        IReadOnlyCollection<WatchJobStatus>? allowedFrom = null)
     {
         using var conn = _db.OpenConnection();
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            """
+        var sql = """
             UPDATE watch_jobs
             SET status = @status,
                 fired_hash = COALESCE(@firedHash, fired_hash)
-            WHERE id = @id AND user_id = @userId;
-            """,
-            new { id, userId = _user.UserId, status = status.ToWire(), firedHash },
+            WHERE id = @id AND user_id = @userId
+            """
+            + (allowedFrom is null ? "" : " AND status IN @allowedStatuses")
+            + ";";
+        var affected = await conn.ExecuteAsync(new CommandDefinition(
+            sql,
+            new
+            {
+                id,
+                userId = _user.UserId,
+                status = status.ToWire(),
+                firedHash,
+                allowedStatuses = allowedFrom?.Select(s => s.ToWire()).ToArray(),
+            },
             cancellationToken: ct));
         return affected > 0;
     }

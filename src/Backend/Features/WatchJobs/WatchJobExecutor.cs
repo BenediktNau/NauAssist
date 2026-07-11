@@ -121,11 +121,12 @@ public sealed class WatchJobExecutor
                 JudgeResult: judgeResult);
         }
 
-        // Kein (sicherer) Treffer ⇒ weiterbeobachten mit Backoff.
+        // Kein (sicherer) Treffer ⇒ weiterbeobachten. Ein Teilsignal verdichtet die Kadenz
+        // (Hot-Mode), sonst greift das exponentielle Backoff.
         return new ExecutionOutcome(
             Fired: false,
             Status: WatchJobStatus.Active,
-            NextDueAt: NextDueAt(job, now, backoff: true),
+            NextDueAt: judgeResult.PartialSignal ? HotNextDueAt(now) : NextDueAt(job, now, backoff: true),
             CheckedAt: now,
             CheckCount: checkCount,
             ConsecutiveErrors: 0,
@@ -186,6 +187,18 @@ public sealed class WatchJobExecutor
 
         var jitter = Random.Shared.Next(0, Math.Max(1, nextInterval / 10) + 1);
         return now.AddSeconds(nextInterval + jitter);
+    }
+
+    /// <summary>
+    /// Hot-Mode: bei einem Teilsignal kurzzeitig eng pollen. Bewusst unterhalb von
+    /// MinIntervalSeconds erlaubt (harte Untergrenze 10 s), weil sich der Zustand gerade ändert;
+    /// sobald das Teilsignal wegfällt, greift wieder das normale Backoff.
+    /// </summary>
+    private DateTimeOffset HotNextDueAt(DateTimeOffset now)
+    {
+        var hot = Math.Max(10, _options.HotIntervalSeconds);
+        var jitter = Random.Shared.Next(0, Math.Max(1, hot / 5) + 1);
+        return now.AddSeconds(hot + jitter);
     }
 
     private static ExecutionOutcome Expired(WatchJob job, DateTimeOffset now, int checkCount) => new(
