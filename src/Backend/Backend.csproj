@@ -19,7 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.79" />
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-    <PackageReference Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageReference Include="Google.Apis.Calendar.v3" Version="1.75.0.4206" />
     <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
     <PackageReference Include="Mediator.SourceGenerator" Version="3.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
