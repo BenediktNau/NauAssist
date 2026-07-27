@@ -13,7 +13,7 @@
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc13",
     "better-sqlite3": "^12.11.1",
-    "fastify": "^5.8.5",
+    "fastify": "^5.10.0",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4"
   },
@@ -23,6 +23,12 @@
     "@types/qrcode": "^1.5.5",
     "tsx": "^4.22.4",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "sharp": "^0.35.3",
+    "protobufjs": "^7.6.5",
+    "find-my-way": "^9.7.0",
+    "fast-uri": "^3.1.4"
   },
   "engines": {
     "node": ">=22"
