@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import pino from "pino";
-import { BaileysManager } from "./baileys-manager";
-import { MessageBuffer } from "./buffer";
+import { BaileysManager } from "./baileys-manager.js";
+import { MessageBuffer } from "./buffer.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const DATA_DIR = process.env.DATA_DIR ?? "/data";

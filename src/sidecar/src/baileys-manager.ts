@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 import type { Logger } from "pino";
-import type { MessageBuffer } from "./buffer";
+import type { MessageBuffer } from "./buffer.js";
 
 export type SessionState = "pairing" | "connected" | "loggedOut" | "disconnected";
 
