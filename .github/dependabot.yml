@@ -36,6 +36,15 @@ updates:
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # TypeScript 7 kollidiert mit typescript-eslint: dessen Peer lautet
+      # ">=4.8.4 <6.1.0", `npm ci` bricht deshalb mit ERESOLVE ab — und weil
+      # kein PR-Check das Frontend installiert, faellt das erst beim
+      # Release-Image-Build auf (Dockerfile, `npm ci`). Wieder freigeben,
+      # sobald typescript-eslint TS 7 unterstuetzt.
+      # Momentaufnahme, keine Dauerentscheidung.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # ── Docker (Root-Image + Sidecar-Image) ────────────────────────
   - package-ecosystem: docker
