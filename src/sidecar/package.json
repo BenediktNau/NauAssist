@@ -19,7 +19,7 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.0",
     "@types/qrcode": "^1.5.5",
     "tsx": "^4.23.12",
