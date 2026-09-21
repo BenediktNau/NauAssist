@@ -14,13 +14,13 @@
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "better-sqlite3": "^13.0.3",
-    "fastify": "^5.12.3",
+    "fastify": "^5.12.5",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "@types/qrcode": "^1.5.5",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
