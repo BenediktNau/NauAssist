@@ -29,7 +29,7 @@ RUN dotnet publish src/Backend/Backend.csproj \
       --output /publish
 
 # ── Runtime ────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl tzdata \
