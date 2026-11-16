@@ -13,7 +13,7 @@ COPY src/frontend/ ./
 RUN npm run build
 
 # ── Backend Build + Tests ──────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-builder
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS backend-builder
 WORKDIR /src
 
 COPY src/Backend/Backend.csproj             src/Backend/
